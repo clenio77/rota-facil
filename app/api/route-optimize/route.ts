@@ -122,14 +122,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Tentar usar OSRM primeiro
+    // 1) Tentar usar Mapbox Optimization API com tráfego, se token disponível
+    const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+    if (mapboxToken) {
+      try {
+        const coordinates = validStops.map(s => `${s.lng},${s.lat}`).join(';');
+        const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordinates}?geometries=geojson&steps=true&overview=full&roundtrip=false&access_token=${mapboxToken}`;
+        const response = await fetch(url, { method: 'GET' });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.trips && data.trips.length > 0) {
+            const trip = data.trips[0];
+            // data.waypoints está na ordem original; cada item possui waypoint_index (ordem na rota)
+            const order = (data.waypoints || [])
+              .map((wp: any, idx: number) => ({ inputIndex: idx, order: wp.waypoint_index }))
+              .filter((x: any) => x.order !== undefined && x.order !== null)
+              .sort((a: any, b: any) => a.order - b.order)
+              .map((x: any) => x.inputIndex);
+
+            const optimizedStops = order.map((i: number, idx: number) => ({
+              ...validStops[i],
+              sequence: idx + 1,
+            }));
+
+            return NextResponse.json({
+              success: true,
+              optimizedStops,
+              distance: (trip.distance || 0) / 1000,
+              duration: (trip.duration || 0) / 60,
+              geometry: trip.geometry,
+              provider: 'mapbox',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao chamar Mapbox Optimization API:', err);
+        // segue para fallback
+      }
+    }
+
+    // 2) Fallback: Tentar usar OSRM se disponível
     const osrmResult = await callOSRM(validStops);
-    
     if (osrmResult && osrmResult.routes && osrmResult.routes.length > 0) {
-      // OSRM retornou uma rota otimizada
       const route = osrmResult.routes[0];
-      
-      // Mapear a ordem otimizada
       const optimizedStops = validStops.map((stop, index) => ({
         ...stop,
         sequence: index + 1,
@@ -138,9 +173,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         optimizedStops,
-        distance: route.distance / 1000, // Converter para km
-        duration: route.duration / 60, // Converter para minutos
+        distance: route.distance / 1000,
+        duration: route.duration / 60,
         geometry: route.geometry,
+        provider: 'osrm',
       });
     }
 

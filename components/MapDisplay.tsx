@@ -93,11 +93,14 @@ export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
         L.latLng(coord[1], coord[0])
       );
       
-      L.polyline(latlngs, {
+      const polyline = L.polyline(latlngs, {
         color: '#3B82F6',
         weight: 4,
         opacity: 0.7,
       }).addTo(map);
+      // Ajustar o mapa à geometria da rota
+      const routeBounds = polyline.getBounds();
+      map.fitBounds(routeBounds, { padding: [50, 50] });
     } else if (validStops.length > 1) {
       // Desenhar linha conectando os pontos na ordem da sequência
       const sortedStops = [...validStops].sort((a, b) => 

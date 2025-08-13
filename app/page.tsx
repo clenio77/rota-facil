@@ -73,6 +73,11 @@ export default function HomePage() {
   const [showMap, setShowMap] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Route summary state
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | undefined>(undefined);
+  const [routeDurationMin, setRouteDurationMin] = useState<number | undefined>(undefined);
+  const [routeGeometry, setRouteGeometry] = useState<{ type: string; coordinates: [number, number][] } | undefined>(undefined);
+  const [routeProvider, setRouteProvider] = useState<string | undefined>(undefined);
 
   // Voice input state
   const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
@@ -240,6 +245,10 @@ export default function HomePage() {
 
         setStops(optimizedStops);
         setShowMap(true);
+        setRouteDistanceKm(result.distance);
+        setRouteDurationMin(result.duration);
+        setRouteGeometry(result.geometry);
+        setRouteProvider((result as any).provider);
       } else {
         throw new Error(result.error || 'Erro ao otimizar rota');
       }
@@ -319,34 +328,35 @@ export default function HomePage() {
     <div className="space-y-6">
       {/* Header Section */}
       <div className="bg-white rounded-xl shadow-custom p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Minhas Paradas</h2>
-        <p className="text-gray-600 mb-4">
-          Tire fotos dos pacotes para adicionar os endereços automaticamente
-        </p>
-        
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stops.length}</div>
-            <div className="text-sm text-gray-500">Total</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
+            <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{confirmedStops.length}</div>
-            <div className="text-sm text-gray-500">Confirmadas</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">
-              {stops.filter(s => s.status === 'processing' || s.status === 'uploading').length}
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3 w-full sm:w-auto mt-3 sm:mt-0">
+            <div className="text-center bg-gray-50 rounded-lg py-2 px-3">
+              <div className="text-xl font-bold text-blue-600">{stops.length}</div>
+              <div className="text-xs text-gray-500">Total</div>
             </div>
-            <div className="text-sm text-gray-500">Processando</div>
+            <div className="text-center bg-gray-50 rounded-lg py-2 px-3">
+              <div className="text-xl font-bold text-green-600">{confirmedStops.length}</div>
+              <div className="text-xs text-gray-500">Confirmadas</div>
+            </div>
+            <div className="text-center bg-gray-50 rounded-lg py-2 px-3">
+              <div className="text-xl font-bold text-orange-600">
+                {stops.filter(s => s.status === 'processing' || s.status === 'uploading').length}
+              </div>
+              <div className="text-xs text-gray-500">Processando</div>
+            </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="btn-primary flex-1 flex items-center justify-center gap-2"
+            className="btn-primary w-full flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -358,7 +368,7 @@ export default function HomePage() {
             onMouseUp={stopListening}
             onTouchStart={startListening}
             onTouchEnd={stopListening}
-            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+            className="btn-secondary w-full flex items-center justify-center gap-2"
             aria-pressed={isListening}
             title="Segure para falar o endereço"
           >
@@ -373,7 +383,7 @@ export default function HomePage() {
             <button
               onClick={handleOptimizeRoute}
               disabled={isOptimizing}
-              className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 sm:col-span-2"
             >
               {isOptimizing ? (
                 <>
@@ -393,18 +403,28 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Map Display */}
-      {showMap && confirmedStops.length > 0 && (
-        <div className="bg-white rounded-xl shadow-custom p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Rota Otimizada</h3>
-          <div className="h-96">
-            <MapDisplay stops={confirmedStops} />
-          </div>
-        </div>
-      )}
+      {/* Content Grid: List + Map */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Stops List */}
+        <div className="space-y-4 order-2 lg:order-1">
+          {/* Route summary card (if available) visible on mobile as well */}
+          {showMap && (routeDistanceKm || routeDurationMin) && (
+            <div className="bg-white rounded-xl shadow-custom p-4 flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-500">Distância</div>
+                <div className="text-lg font-semibold">{routeDistanceKm?.toFixed(1)} km</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Duração</div>
+                <div className="text-lg font-semibold">{routeDurationMin?.toFixed(0)} min</div>
+              </div>
+              {routeProvider && (
+                <span className="badge badge-info">{routeProvider}</span>
+              )}
+            </div>
+          )}
 
-      {/* Stops List */}
-      <div className="space-y-4">
+          <div className="space-y-4">
         {stops.length === 0 ? (
           <div className="bg-white rounded-xl shadow-custom p-12 text-center">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -435,6 +455,20 @@ export default function HomePage() {
               />
             ))
         )}
+          </div>
+        </div>
+
+        {/* Map Display - sticky on large screens */}
+        <div className="order-1 lg:order-2">
+          {showMap && confirmedStops.length > 0 && (
+            <div className="bg-white rounded-xl shadow-custom p-4 lg:p-6 lg:sticky lg:top-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Rota Otimizada</h3>
+              <div className="h-96 lg:h-[600px]">
+                <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Hidden file input */}
