@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+.next/
+.env.local
+.env*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# VSCode
+.vscode/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
+
+# Misc
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Supabase
+supabase/.temp/
+
+# PWA
+public/sw.js
+public/workbox-*.js
