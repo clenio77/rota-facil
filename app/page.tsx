@@ -69,6 +69,7 @@ interface OptimizeResponse {
 }
 
 export default function HomePage() {
+  const STORAGE_KEY = 'rotafacil:stops:v1';
   const [stops, setStops] = useState<Stop[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -98,6 +99,32 @@ export default function HomePage() {
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
+
+  // Load stops from localStorage on first render
+  React.useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Stop[];
+        if (Array.isArray(parsed)) {
+          setStops(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Persist stops to localStorage on change
+  React.useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
+      }
+    } catch {
+      // ignore
+    }
+  }, [stops]);
 
   // Função para capturar imagem
   const handleImageCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
