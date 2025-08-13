@@ -36,6 +36,11 @@ RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimizaç�
 
 ## 🚀 Instalação e Configuração
 
+> 📚 **Guias Disponíveis:**
+> - 🏃 [**Guia Rápido**](docs/QUICK_START.md) - Deploy em 15 minutos!
+> - 📖 [**Guia Completo**](docs/DEPLOYMENT_GUIDE.md) - Passo a passo detalhado
+> - 🎨 [**Design Visual**](docs/DESIGN.md) - Componentes e UI/UX
+
 ### Pré-requisitos
 
 - Node.js 18+ e npm/yarn
