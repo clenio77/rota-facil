@@ -1,36 +1,209 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RotaFácil - Sistema de Otimização de Rotas de Entrega 🚚
 
-## Getting Started
+<div align="center">
+  <img src="https://img.shields.io/badge/Next.js-15.4.6-black?style=for-the-badge&logo=next.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript" />
+  <img src="https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=for-the-badge&logo=tailwind-css" />
+  <img src="https://img.shields.io/badge/PWA-Ready-5A0FC8?style=for-the-badge&logo=pwa" />
+</div>
 
-First, run the development server:
+## 📱 Sobre o Projeto
+
+RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimização de rotas de entrega através de reconhecimento automático de endereços por OCR. Tire fotos dos pacotes e o sistema extrai automaticamente os endereços e calcula a rota mais eficiente.
+
+### ✨ Funcionalidades Principais
+
+- 📸 **Captura Inteligente**: Tire fotos dos pacotes diretamente do app
+- 🔍 **OCR Automático**: Extração automática de endereços das imagens
+- 📍 **Geocodificação**: Conversão automática de endereços em coordenadas
+- 🗺️ **Visualização em Mapa**: Veja todas as paradas em um mapa interativo
+- 🚀 **Otimização de Rota**: Algoritmo inteligente que calcula a melhor sequência
+- 📱 **PWA Completo**: Funciona offline e pode ser instalado como app
+- 🎨 **Design Moderno**: Interface bonita e intuitiva
+
+## 🛠️ Stack Tecnológica
+
+| Categoria | Tecnologia | Descrição |
+|-----------|------------|-----------|
+| **Framework** | Next.js 15.4.6 | App Router, Server Components, API Routes |
+| **UI/UX** | Tailwind CSS 4.0 | Utility-first CSS framework |
+| **Linguagem** | TypeScript 5.0 | Type safety e melhor DX |
+| **OCR** | Tesseract.js | Reconhecimento de texto em imagens |
+| **Mapas** | Leaflet | Visualização interativa de mapas |
+| **Banco de Dados** | Supabase | PostgreSQL + Storage |
+| **Roteamento** | OSRM | Motor de otimização de rotas |
+| **PWA** | next-pwa | Service Worker e funcionalidades offline |
+
+## 🚀 Instalação e Configuração
+
+### Pré-requisitos
+
+- Node.js 18+ e npm/yarn
+- Conta no [Supabase](https://supabase.com)
+- (Opcional) Servidor OSRM para otimização avançada
+
+### 1. Clone o Repositório
+
+```bash
+git clone https://github.com/seu-usuario/rotafacil.git
+cd rotafacil
+```
+
+### 2. Instale as Dependências
+
+```bash
+npm install
+# ou
+yarn install
+```
+
+### 3. Configure o Supabase
+
+1. Crie um projeto no [Supabase](https://supabase.com)
+2. No painel SQL, execute:
+
+```sql
+CREATE TABLE stops (
+  id SERIAL PRIMARY KEY,
+  photo_url TEXT NOT NULL,
+  address TEXT NOT NULL,
+  latitude DECIMAL(10, 8),
+  longitude DECIMAL(11, 8),
+  extracted_text TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+3. Configure o Storage:
+   - Crie um bucket chamado `delivery-photos`
+   - Configure as políticas para permitir upload público
+
+### 4. Configure as Variáveis de Ambiente
+
+```bash
+cp .env.local.example .env.local
+```
+
+Edite `.env.local` com suas credenciais:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
+OSRM_URL=http://localhost:5000 # Opcional
+```
+
+### 5. Execute o Projeto
 
 ```bash
 npm run dev
-# or
+# ou
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📱 Como Usar
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Adicionar Paradas**
+   - Clique no botão "Adicionar Parada"
+   - Tire uma foto do pacote com o endereço visível
+   - O sistema extrairá automaticamente o endereço
 
-## Learn More
+2. **Revisar Endereços**
+   - Verifique se os endereços foram extraídos corretamente
+   - Remova ou tente novamente se necessário
 
-To learn more about Next.js, take a look at the following resources:
+3. **Otimizar Rota**
+   - Com pelo menos 2 paradas confirmadas, clique em "Otimizar Rota"
+   - Visualize a sequência otimizada no mapa
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Navegar**
+   - Siga a ordem numerada das paradas
+   - Use o mapa para orientação visual
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🏗️ Arquitetura do Projeto
 
-## Deploy on Vercel
+```
+rotafacil/
+├── app/                    # Next.js App Router
+│   ├── api/               # API Routes
+│   │   ├── ocr-process/   # Processamento OCR
+│   │   └── route-optimize/ # Otimização de rotas
+│   ├── layout.tsx         # Layout principal
+│   ├── page.tsx           # Página inicial
+│   └── globals.css        # Estilos globais
+├── components/            # Componentes React
+│   ├── StopCard.tsx      # Card de parada
+│   └── MapDisplay.tsx    # Visualização do mapa
+├── lib/                  # Utilitários e serviços
+│   ├── supabaseClient.ts # Cliente Supabase
+│   ├── ocrService.ts     # Serviço OCR
+│   └── osrmService.ts    # Serviço OSRM
+├── hooks/                # Custom React Hooks
+│   └── useGeolocation.ts # Hook de geolocalização
+└── public/              # Assets públicos
+    └── manifest.json    # PWA manifest
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔧 Configuração Avançada
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Servidor OSRM (Opcional)
+
+Para otimização avançada de rotas, configure um servidor OSRM:
+
+```bash
+# Com Docker
+docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/brazil-latest.osm.pbf
+docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/brazil-latest.osrm
+docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/brazil-latest.osrm
+docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/brazil-latest.osrm
+```
+
+### Deploy na Vercel
+
+```bash
+# Instale a CLI da Vercel
+npm i -g vercel
+
+# Deploy
+vercel
+```
+
+Configure as variáveis de ambiente no painel da Vercel.
+
+## 📊 Status de Implementação
+
+- ✅ **Sprint 1**: Interface e captura de imagem
+- ✅ **Sprint 2**: OCR e persistência de dados
+- ✅ **Sprint 3**: Otimização de rotas e mapas
+- ✅ **Sprint 4**: PWA e deploy
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Por favor:
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## 🙏 Agradecimentos
+
+- [Next.js](https://nextjs.org/) - Framework React
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Tesseract.js](https://tesseract.projectnaptha.com/) - OCR
+- [Leaflet](https://leafletjs.com/) - Mapas
+- [Supabase](https://supabase.com/) - Backend as a Service
+- [OSRM](http://project-osrm.org/) - Roteamento
+
+---
+
+<div align="center">
+  <p>Feito com ❤️ para otimizar suas entregas</p>
+  <p>⭐ Star este repositório se foi útil!</p>
+</div>
