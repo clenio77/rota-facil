@@ -6,6 +6,16 @@ interface Stop {
   lng: number;
 }
 
+interface OSRMRoute {
+  distance: number;
+  duration: number;
+  geometry: any;
+}
+
+interface OSRMResponse {
+  routes: OSRMRoute[];
+}
+
 // Função para calcular distância entre dois pontos (Haversine formula)
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Raio da Terra em km
@@ -57,7 +67,7 @@ function optimizeRouteSimple(stops: Stop[], startLat: number = -23.5505, startLn
 }
 
 // Função para chamar OSRM (quando disponível)
-async function callOSRM(stops: Stop[]): Promise<any> {
+async function callOSRM(stops: Stop[]): Promise<OSRMResponse | null> {
   const osrmUrl = process.env.OSRM_URL || 'http://router.project-osrm.org';
   
   // Criar string de coordenadas
@@ -75,7 +85,7 @@ async function callOSRM(stops: Stop[]): Promise<any> {
     );
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await response.json() as OSRMResponse;
       return data;
     }
   } catch (error) {

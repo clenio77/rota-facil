@@ -15,6 +15,19 @@ interface Stop {
   sequence?: number;
 }
 
+interface OptimizedStop extends Stop {
+  sequence: number;
+}
+
+interface OptimizeResponse {
+  success: boolean;
+  optimizedStops: OptimizedStop[];
+  distance?: number;
+  duration?: number;
+  geometry?: any;
+  error?: string;
+}
+
 export default function HomePage() {
   const [stops, setStops] = useState<Stop[]>([]);
   const [showMap, setShowMap] = useState(false);
@@ -40,7 +53,7 @@ export default function HomePage() {
     try {
       // Upload para Supabase Storage
       const fileName = `delivery-${Date.now()}-${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('delivery-photos')
         .upload(fileName, file);
 
@@ -162,12 +175,12 @@ export default function HomePage() {
         }),
       });
 
-      const result = await response.json();
+      const result: OptimizeResponse = await response.json();
 
       if (result.success) {
         // Atualizar paradas com sequência otimizada
         const optimizedStops = stops.map(stop => {
-          const optimizedData = result.optimizedStops.find((os: any) => os.id === stop.id);
+          const optimizedData = result.optimizedStops.find((os) => os.id === stop.id);
           if (optimizedData) {
             return {
               ...stop,
