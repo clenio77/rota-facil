@@ -1,0 +1,12 @@
+# Pacotes para ambiente Python do RotaFácil
+# OCR
+pytesseract
+Pillow
+# Supabase
+supabase
+# Geocodificação
+geopy
+# Outros utilitários
+requests
+# Testes
+pytest
