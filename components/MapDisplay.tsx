@@ -28,9 +28,10 @@ interface RouteGeometry {
 interface MapDisplayProps {
   stops: Stop[];
   routeGeometry?: RouteGeometry;
+  origin?: { lat: number; lng: number };
 }
 
-export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
+export default function MapDisplay({ stops, routeGeometry, origin }: MapDisplayProps) {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +62,19 @@ export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
     // Adicionar marcadores
     const bounds = L.latLngBounds([]);
     const validStops = stops.filter(s => s.lat && s.lng);
+
+    // Origem (se fornecida)
+    if (origin && typeof origin.lat === 'number' && typeof origin.lng === 'number') {
+      const originMarker = L.marker([origin.lat, origin.lng], {
+        icon: L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="background-color: #10B981; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">S</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 28],
+        })
+      }).addTo(map).bindPopup('<strong>Ponto de partida</strong>');
+      bounds.extend([origin.lat, origin.lng]);
+    }
 
     validStops.forEach((stop) => {
       if (!stop.lat || !stop.lng) return;
@@ -130,7 +144,7 @@ export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
     return () => {
       // Não destruir o mapa, apenas limpar quando o componente for desmontado
     };
-  }, [stops, routeGeometry]);
+  }, [stops, routeGeometry, origin]);
 
   return (
     <div 

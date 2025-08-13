@@ -100,7 +100,7 @@ async function callOSRM(stops: Stop[]): Promise<OSRMResponse | null> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { stops } = await request.json();
+    const { stops, origin, roundtrip } = await request.json();
 
     if (!stops || !Array.isArray(stops) || stops.length < 2) {
       return NextResponse.json(
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar coordenadas
-    const validStops = stops.filter(stop => 
+    const validStops: Stop[] = stops.filter((stop: Stop) => 
       stop.lat && stop.lng && 
       !isNaN(stop.lat) && !isNaN(stop.lng)
     );
@@ -122,12 +122,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const hasOrigin = origin && typeof origin.lat === 'number' && typeof origin.lng === 'number';
+    const originLat: number | undefined = hasOrigin ? origin.lat : undefined;
+    const originLng: number | undefined = hasOrigin ? origin.lng : undefined;
+    const isRoundtrip: boolean = Boolean(roundtrip);
+
     // 1) Tentar usar Mapbox Optimization API com tráfego, se token disponível
     const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
     if (mapboxToken) {
       try {
-        const coordinates = validStops.map(s => `${s.lng},${s.lat}`).join(';');
-        const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordinates}?geometries=geojson&steps=true&overview=full&roundtrip=false&access_token=${mapboxToken}`;
+        // Se houver origem, a primeira coordenada será fixa (source=first)
+        const coordinateList = hasOrigin
+          ? [`${originLng},${originLat}`, ...validStops.map(s => `${s.lng},${s.lat}`)]
+          : validStops.map(s => `${s.lng},${s.lat}`);
+        const coordinates = coordinateList.join(';');
+        const params = new URLSearchParams({
+          geometries: 'geojson',
+          steps: 'true',
+          overview: 'full',
+          access_token: mapboxToken,
+          roundtrip: isRoundtrip ? 'true' : 'false',
+        });
+        if (hasOrigin) params.set('source', 'first');
+        const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordinates}?${params.toString()}`;
         const response = await fetch(url, { method: 'GET' });
         if (response.ok) {
           const data: {
@@ -143,7 +160,9 @@ export async function POST(request: NextRequest) {
               .sort((a, b) => (a.order as number) - (b.order as number))
               .map((x) => x.inputIndex);
 
-            const optimizedStops = order.map((i: number, idx: number) => ({
+            // Se origem foi incluída (índice 0), remova-a da ordem e ajuste índices para mapearem os stops
+            const stopOrder = hasOrigin ? order.filter(i => i !== 0).map(i => i - 1) : order;
+            const optimizedStops = stopOrder.map((i: number, idx: number) => ({
               ...validStops[i],
               sequence: idx + 1,
             }));
@@ -164,42 +183,61 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2) Fallback: Tentar usar OSRM se disponível
-    const osrmResult = await callOSRM(validStops);
-    if (osrmResult && osrmResult.routes && osrmResult.routes.length > 0) {
-      const route = osrmResult.routes[0];
-      const optimizedStops = validStops.map((stop, index) => ({
-        ...stop,
-        sequence: index + 1,
-      }));
+    // 2) Fallback: usar algoritmo simples para ordem (com origem se houver)
+    const simpleOrder = optimizeRouteSimple(validStops, hasOrigin ? originLat : undefined, hasOrigin ? originLng : undefined);
+    const optimizedStops = simpleOrder.map((stop, index) => ({ ...stop, sequence: index + 1 }));
 
-      return NextResponse.json({
-        success: true,
-        optimizedStops,
-        distance: route.distance / 1000,
-        duration: route.duration / 60,
-        geometry: route.geometry,
-        provider: 'osrm',
-      });
+    // 3) Tentar obter geometria via OSRM para a ordem calculada
+    const osrmUrl = process.env.OSRM_URL || 'http://router.project-osrm.org';
+    const routeCoordsParts: string[] = [];
+    if (hasOrigin && originLng !== undefined && originLat !== undefined) {
+      routeCoordsParts.push(`${originLng},${originLat}`);
+    }
+    routeCoordsParts.push(...optimizedStops.map(s => `${s.lng},${s.lat}`));
+    if (hasOrigin && isRoundtrip && originLng !== undefined && originLat !== undefined) {
+      routeCoordsParts.push(`${originLng},${originLat}`);
+    }
+    try {
+      if (routeCoordsParts.length >= 2) {
+        const url = `${osrmUrl}/route/v1/driving/${routeCoordsParts.join(';')}?overview=full&geometries=geojson&steps=true`;
+        const resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+        if (resp.ok) {
+          const osrmData = await resp.json() as OSRMResponse;
+          if (osrmData.routes && osrmData.routes.length > 0) {
+            const route = osrmData.routes[0];
+            return NextResponse.json({
+              success: true,
+              optimizedStops,
+              distance: route.distance / 1000,
+              duration: route.duration / 60,
+              geometry: route.geometry,
+              provider: 'simple+osrm',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao buscar geometria no OSRM:', e);
     }
 
-    // Fallback: usar algoritmo simples
-    console.log('Usando algoritmo de otimização simples (OSRM não disponível)');
-    
-    const optimizedOrder = optimizeRouteSimple(validStops);
-    const optimizedStops = optimizedOrder.map((stop, index) => ({
-      ...stop,
-      sequence: index + 1,
-    }));
-
-    // Calcular distância total
+    // 4) Último recurso: algoritmo simples com distância haversine
+    console.log('Usando algoritmo de otimização simples (sem geometria de rota)');
+    // Calcular distância total aproximada
     let totalDistance = 0;
-    for (let i = 0; i < optimizedStops.length - 1; i++) {
+    const path: Array<{ lat: number; lng: number }> = [];
+    if (hasOrigin && originLat !== undefined && originLng !== undefined) {
+      path.push({ lat: originLat, lng: originLng });
+    }
+    path.push(...optimizedStops);
+    if (hasOrigin && isRoundtrip && originLat !== undefined && originLng !== undefined) {
+      path.push({ lat: originLat, lng: originLng });
+    }
+    for (let i = 0; i < path.length - 1; i++) {
       totalDistance += calculateDistance(
-        optimizedStops[i].lat,
-        optimizedStops[i].lng,
-        optimizedStops[i + 1].lat,
-        optimizedStops[i + 1].lng
+        path[i].lat,
+        path[i].lng,
+        path[i + 1].lat,
+        path[i + 1].lng
       );
     }
 

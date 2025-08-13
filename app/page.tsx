@@ -84,6 +84,9 @@ export default function HomePage() {
   const [isListening, setIsListening] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const recognitionRef = useRef<MinimalSpeechRecognition | null>(null);
+  const [useDeviceOrigin, setUseDeviceOrigin] = useState(false);
+  const [deviceOrigin, setDeviceOrigin] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [roundtrip, setRoundtrip] = useState(true);
 
   // Função para capturar imagem
   const handleImageCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,7 +226,9 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          stops: validStops.map(s => ({ id: s.id, lat: s.lat, lng: s.lng }))
+          stops: validStops.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })),
+          origin: useDeviceOrigin && deviceOrigin ? deviceOrigin : undefined,
+          roundtrip,
         }),
       });
 
@@ -400,6 +405,41 @@ export default function HomePage() {
               )}
             </button>
           )}
+          {/* Settings toggles */}
+          <div className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={useDeviceOrigin}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setUseDeviceOrigin(checked);
+                  if (checked && navigator?.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => setDeviceOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                      () => alert('Não foi possível obter sua localização.'),
+                      { enableHighAccuracy: true, timeout: 8000 }
+                    );
+                  }
+                }}
+              />
+              <span className="text-sm text-gray-700">Usar minha localização como ponto de partida</span>
+              {deviceOrigin && useDeviceOrigin && (
+                <span className="ml-auto text-xs text-gray-500">{deviceOrigin.lat.toFixed(4)}, {deviceOrigin.lng.toFixed(4)}</span>
+              )}
+            </label>
+
+            <label className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={roundtrip}
+                onChange={(e) => setRoundtrip(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">Retornar ao ponto de partida</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -464,7 +504,7 @@ export default function HomePage() {
             <div className="bg-white rounded-xl shadow-custom p-4 lg:p-6 lg:sticky lg:top-6">
               <h3 className="text-xl font-bold text-gray-900 mb-4">Rota Otimizada</h3>
               <div className="h-96 lg:h-[600px]">
-                <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} />
+                <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
               </div>
             </div>
           )}
