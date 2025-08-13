@@ -1,9 +1,14 @@
 'use client'
 
 import React, { useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import StopCard from '../components/StopCard';
-import MapDisplay from '../components/MapDisplay';
 import { supabase } from '../lib/supabaseClient';
+
+const MapDisplay = dynamic(() => import('../components/MapDisplay'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">Carregando mapa...</div>
+});
 
 interface Stop {
   id: number;
@@ -24,7 +29,10 @@ interface OptimizeResponse {
   optimizedStops: OptimizedStop[];
   distance?: number;
   duration?: number;
-  geometry?: any;
+  geometry?: {
+    type: string;
+    coordinates: [number, number][];
+  };
   error?: string;
 }
 

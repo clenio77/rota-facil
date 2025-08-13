@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet icon issue in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: string })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -20,9 +20,14 @@ interface Stop {
   sequence?: number;
 }
 
+interface RouteGeometry {
+  coordinates: [number, number][];
+  type: string;
+}
+
 interface MapDisplayProps {
   stops: Stop[];
-  routeGeometry?: any;
+  routeGeometry?: RouteGeometry;
 }
 
 export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
@@ -57,7 +62,7 @@ export default function MapDisplay({ stops, routeGeometry }: MapDisplayProps) {
     const bounds = L.latLngBounds([]);
     const validStops = stops.filter(s => s.lat && s.lng);
 
-    validStops.forEach((stop, index) => {
+    validStops.forEach((stop) => {
       if (!stop.lat || !stop.lng) return;
 
       const marker = L.marker([stop.lat, stop.lng])

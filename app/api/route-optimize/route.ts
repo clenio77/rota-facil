@@ -9,7 +9,10 @@ interface Stop {
 interface OSRMRoute {
   distance: number;
   duration: number;
-  geometry: any;
+  geometry: {
+    type: string;
+    coordinates: [number, number][];
+  };
 }
 
 interface OSRMResponse {
