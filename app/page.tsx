@@ -3,7 +3,39 @@
 import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import StopCard from '../components/StopCard';
-import { supabase } from '../lib/supabaseClient';
+import { getSupabase } from '../lib/supabaseClient';
+// SpeechRecognition types for browsers (ambient declarations)
+// Minimal subset to type usage without depending on lib.dom updates
+interface MinimalSpeechRecognitionEventResult {
+  transcript: string;
+}
+interface MinimalSpeechRecognitionResult {
+  0: MinimalSpeechRecognitionEventResult;
+}
+interface MinimalSpeechRecognitionEventResults {
+  0: MinimalSpeechRecognitionResult;
+}
+interface MinimalSpeechRecognitionEvent {
+  results: MinimalSpeechRecognitionEventResults;
+}
+type MinimalSpeechRecognitionHandler = (e: MinimalSpeechRecognitionEvent) => void;
+interface MinimalSpeechRecognition {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: MinimalSpeechRecognitionHandler;
+  onerror: () => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
+type MinimalSpeechRecognitionConstructor = new () => MinimalSpeechRecognition;
+declare global {
+  interface Window {
+    SpeechRecognition?: MinimalSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: MinimalSpeechRecognitionConstructor;
+  }
+}
 
 const MapDisplay = dynamic(() => import('../components/MapDisplay'), {
   ssr: false,
@@ -42,6 +74,12 @@ export default function HomePage() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Voice input state
+  const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const recognitionRef = useRef<MinimalSpeechRecognition | null>(null);
+
   // Função para capturar imagem
   const handleImageCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -61,6 +99,7 @@ export default function HomePage() {
     try {
       // Upload para Supabase Storage
       const fileName = `delivery-${Date.now()}-${file.name}`;
+      const supabase = getSupabase();
       const { error: uploadError } = await supabase.storage
         .from('delivery-photos')
         .upload(fileName, file);
@@ -214,6 +253,68 @@ export default function HomePage() {
 
   const confirmedStops = stops.filter(s => s.status === 'confirmed' || s.status === 'optimized');
 
+  // Voice capture handlers
+  const startListening = () => {
+    if (typeof window === 'undefined') return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      alert('Seu navegador não suporta reconhecimento de voz.');
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'pt-BR';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const text = e.results && e.results[0] && e.results[0][0]
+        ? e.results[0][0].transcript
+        : '';
+      setVoiceText(text);
+      setIsVoiceDialogOpen(true);
+    };
+    rec.onerror = () => setIsListening(false);
+    rec.onend = () => setIsListening(false);
+    recognitionRef.current = rec;
+    setIsListening(true);
+    rec.start();
+  };
+
+  const stopListening = () => {
+    recognitionRef.current?.stop?.();
+  };
+
+  const handleConfirmVoiceAddress = async () => {
+    const address = voiceText.trim();
+    if (!address) { alert('Digite ou dite um endereço.'); return; }
+    try {
+      // Geocodificar no servidor para evitar restrições do Nominatim no cliente
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.lat || !data.lng) {
+        alert('Não foi possível geocodificar este endereço.');
+        return;
+      }
+      const newStop: Stop = {
+        id: Date.now(),
+        photoUrl: '',
+        status: 'confirmed',
+        address: data.address || address,
+        lat: data.lat,
+        lng: data.lng,
+      };
+      setStops(prev => [...prev, newStop]);
+      setIsVoiceDialogOpen(false);
+      setVoiceText('');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao confirmar o endereço.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -251,6 +352,21 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Adicionar Parada
+          </button>
+          <button
+            onMouseDown={startListening}
+            onMouseUp={stopListening}
+            onTouchStart={startListening}
+            onTouchEnd={stopListening}
+            className="btn-secondary flex-1 flex items-center justify-center gap-2"
+            aria-pressed={isListening}
+            title="Segure para falar o endereço"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14a3 3 0 003-3V7a3 3 0 10-6 0v4a3 3 0 003 3z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0M12 18v3m-4 0h8" />
+            </svg>
+            {isListening ? 'Gravando...' : 'Falar endereço'}
           </button>
           
           {confirmedStops.length >= 2 && (
@@ -330,6 +446,36 @@ export default function HomePage() {
         onChange={handleImageCapture}
         className="hidden"
       />
+
+      {/* Voice confirmation dialog */}
+      {isVoiceDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl shadow-custom p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-3">Confirmar endereço</h3>
+            <p className="text-sm text-gray-600 mb-3">Revise o endereço reconhecido, ajuste se necessário e confirme.</p>
+            <textarea
+              className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[96px]"
+              value={voiceText}
+              onChange={(e) => setVoiceText(e.target.value)}
+              placeholder="Ex.: Rua Exemplo, 123 - Bairro, Cidade - UF"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setIsVoiceDialogOpen(false); setVoiceText(''); }}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmVoiceAddress}
+                className="btn-primary px-4 py-2"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

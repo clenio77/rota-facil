@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWorker } from 'tesseract.js';
-import { supabase } from '../../../lib/supabaseClient';
+import { getSupabase } from '../../../lib/supabaseClient';
 
 // Função para limpar e extrair endereço do texto
 function extractAddress(text: string): string {
@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       const coordinates = await geocodeAddress(address);
 
       // Salvar no banco de dados
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('stops')
         .insert({
