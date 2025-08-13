@@ -130,15 +130,18 @@ export async function POST(request: NextRequest) {
         const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving-traffic/${coordinates}?geometries=geojson&steps=true&overview=full&roundtrip=false&access_token=${mapboxToken}`;
         const response = await fetch(url, { method: 'GET' });
         if (response.ok) {
-          const data = await response.json();
+          const data: {
+            trips?: Array<{ distance?: number; duration?: number; geometry?: { type: string; coordinates: [number, number][] } }>;
+            waypoints?: Array<{ waypoint_index?: number | null }>;
+          } = await response.json();
           if (data && data.trips && data.trips.length > 0) {
             const trip = data.trips[0];
             // data.waypoints está na ordem original; cada item possui waypoint_index (ordem na rota)
             const order = (data.waypoints || [])
-              .map((wp: any, idx: number) => ({ inputIndex: idx, order: wp.waypoint_index }))
-              .filter((x: any) => x.order !== undefined && x.order !== null)
-              .sort((a: any, b: any) => a.order - b.order)
-              .map((x: any) => x.inputIndex);
+              .map((wp, idx: number) => ({ inputIndex: idx, order: wp.waypoint_index ?? undefined }))
+              .filter((x) => x.order !== undefined)
+              .sort((a, b) => (a.order as number) - (b.order as number))
+              .map((x) => x.inputIndex);
 
             const optimizedStops = order.map((i: number, idx: number) => ({
               ...validStops[i],

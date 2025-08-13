@@ -248,7 +248,7 @@ export default function HomePage() {
         setRouteDistanceKm(result.distance);
         setRouteDurationMin(result.duration);
         setRouteGeometry(result.geometry);
-        setRouteProvider((result as any).provider);
+        setRouteProvider((result as { provider?: string }).provider);
       } else {
         throw new Error(result.error || 'Erro ao otimizar rota');
       }
