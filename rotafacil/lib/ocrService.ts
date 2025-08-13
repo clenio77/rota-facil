@@ -1,4 +1,3 @@
-// Serviço de OCR usando Tesseract.js
 import Tesseract from 'tesseract.js';
 
 export async function extractTextFromImage(imageUrl: string): Promise<string> {

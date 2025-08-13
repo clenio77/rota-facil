@@ -1,3 +1,4 @@
+// Hook para obter localização do usuário
 import { useState, useEffect } from 'react';
 
 export function useGeolocation() {
