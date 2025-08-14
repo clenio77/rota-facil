@@ -89,6 +89,7 @@ export default function HomePage() {
   const [deviceOrigin, setDeviceOrigin] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [roundtrip, setRoundtrip] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
   // Sync settings modal with URL hash (#settings)
   React.useEffect(() => {
@@ -304,6 +305,9 @@ export default function HomePage() {
   };
 
   const confirmedStops = stops.filter(s => s.status === 'confirmed' || s.status === 'optimized');
+  const optimizedStops = confirmedStops
+    .filter(s => typeof s.sequence === 'number')
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
   // Voice capture handlers
   const startListening = () => {
@@ -329,6 +333,60 @@ export default function HomePage() {
     recognitionRef.current = rec;
     setIsListening(true);
     rec.start();
+  };
+
+  // Start route via Google Maps deep link
+  const handleStartRoute = () => {
+    const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+    if (route.length < 2) {
+      alert('Otimize a rota ou confirme pelo menos 2 paradas.');
+      return;
+    }
+    const useOrigin = useDeviceOrigin && deviceOrigin;
+    const originStr = useOrigin && deviceOrigin ? `${deviceOrigin.lat},${deviceOrigin.lng}` : `${route[0].lat},${route[0].lng}`;
+    const destinationStr = roundtrip && useOrigin && deviceOrigin
+      ? `${deviceOrigin.lat},${deviceOrigin.lng}`
+      : `${route[route.length - 1].lat},${route[route.length - 1].lng}`;
+
+    // Build waypoints excluding destination (and origin if using device)
+    const innerStops = (() => {
+      if (useOrigin && deviceOrigin) {
+        // when origin is device, include all stops; exclude last if roundtrip=false and destination is last stop
+        return route.slice(0, roundtrip ? route.length : route.length - 1);
+      }
+      // when origin is first stop, waypoints are middle stops
+      return route.slice(1, route.length - 1);
+    })();
+    const waypointsStr = innerStops
+      .filter(s => s.lat && s.lng)
+      .map(s => `${s.lat},${s.lng}`)
+      .join('|');
+
+    const params = new URLSearchParams({
+      api: '1',
+      origin: originStr,
+      destination: destinationStr,
+      travelmode: 'driving',
+    });
+    if (waypointsStr) params.set('waypoints', waypointsStr);
+    const url = `https://www.google.com/maps/dir/?${params.toString()}`;
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+  };
+
+  // Clear route list
+  const handleClearStops = () => {
+    if (!confirm('Deseja limpar todas as paradas?')) return;
+    setStops([]);
+    setShowMap(false);
+    setRouteDistanceKm(undefined);
+    setRouteDurationMin(undefined);
+    setRouteGeometry(undefined);
+    setRouteProvider(undefined);
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem('rotafacil:stops:v1'); } catch {}
+    }
   };
 
   const stopListening = () => {
@@ -540,7 +598,13 @@ export default function HomePage() {
         <div id="route-section" className="order-1 lg:order-2 scroll-mt-24">
           {showMap && confirmedStops.length > 0 && (
             <div className="bg-white rounded-xl shadow-custom p-4 lg:p-6 lg:sticky lg:top-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Rota Otimizada</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Rota Otimizada</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleStartRoute} className="btn-primary px-3 py-1.5">Iniciar rota</button>
+                  <button onClick={() => setIsMapFullscreen(true)} className="btn-secondary px-3 py-1.5">Tela cheia</button>
+                </div>
+              </div>
               <div className="h-96 lg:h-[600px]">
                 <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
               </div>
@@ -642,6 +706,26 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Fullscreen Map Overlay */}
+      {isMapFullscreen && (
+        <div className="fixed inset-0 z-[60] bg-black">
+          <div className="absolute inset-0">
+            <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
+          </div>
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button onClick={handleStartRoute} className="btn-primary px-3 py-1.5">Iniciar rota</button>
+            <button onClick={() => setIsMapFullscreen(false)} className="btn-secondary px-3 py-1.5">Sair da tela cheia</button>
+          </div>
+        </div>
+      )}
+
+      {/* Clear list floating action */}
+      {stops.length > 0 && (
+        <button onClick={handleClearStops} className="fixed bottom-24 right-4 z-40 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-custom">
+          Limpar lista
+        </button>
       )}
     </div>
   );
