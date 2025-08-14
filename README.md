@@ -14,12 +14,18 @@ RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimizaç�
 ### ✨ Funcionalidades Principais
 
 - 📸 **Captura Inteligente**: Tire fotos dos pacotes diretamente do app
+- 🎤 **Entrada por Voz (pt-BR)**: Dite o endereço, revise e confirme antes de enviar
 - 🔍 **OCR Automático**: Extração automática de endereços das imagens
-- 📍 **Geocodificação**: Conversão automática de endereços em coordenadas
-- 🗺️ **Visualização em Mapa**: Veja todas as paradas em um mapa interativo
-- 🚀 **Otimização de Rota**: Algoritmo inteligente que calcula a melhor sequência
+- 📍 **Geocodificação**: Conversão de endereços em coordenadas via endpoint dedicado
+- 🚦 **Trânsito em Tempo Real (opcional)**: Otimização com Mapbox (free tier suportado)
+- 🧭 **Origem do Dispositivo + Retorno**: Use sua localização como partida e opte por ida/volta
+- ▶️ **Iniciar Rota**: Abre Google Maps com origem/waypoints/destino na ordem otimizada
+- ⛶ **Mapa em Tela Cheia**: Expanda o mapa e retorne quando quiser
+- 💾 **Persistência Local**: Paradas guardadas no dispositivo (não se perdem ao recarregar)
+- 🗺️ **Visualização em Mapa**: Veja paradas e trajeto otimizado
+- 🚀 **Otimização de Rota**: Mapbox Optimization (com trânsito), fallback OSRM e algoritmo simples
 - 📱 **PWA Completo**: Funciona offline e pode ser instalado como app
-- 🎨 **Design Moderno**: Interface bonita e intuitiva
+- 🎨 **Design Responsivo**: Layout bonito e profissional, otimizado para qualquer tela
 
 ## 🛠️ Stack Tecnológica
 
@@ -92,9 +98,13 @@ cp .env.local.example .env.local
 Edite `.env.local` com suas credenciais:
 
 ```env
+# Supabase (obrigatórios)
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
-OSRM_URL=http://localhost:5000 # Opcional
+
+# Otimização de rotas (opcionais)
+MAPBOX_ACCESS_TOKEN=seu-token-mapbox # ativa trânsito em tempo real (free tier)
+OSRM_URL=http://localhost:5000       # se usar OSRM próprio
 ```
 
 ### 5. Execute o Projeto
@@ -110,9 +120,8 @@ Acesse [http://localhost:3000](http://localhost:3000)
 ## 📱 Como Usar
 
 1. **Adicionar Paradas**
-   - Clique no botão "Adicionar Parada"
-   - Tire uma foto do pacote com o endereço visível
-   - O sistema extrairá automaticamente o endereço
+   - Opção 1 (Foto): clique em "Adicionar Parada", fotografe o pacote e aguarde o OCR
+   - Opção 2 (Voz): toque e segure "Falar endereço", revise no modal e confirme
 
 2. **Revisar Endereços**
    - Verifique se os endereços foram extraídos corretamente
@@ -120,11 +129,13 @@ Acesse [http://localhost:3000](http://localhost:3000)
 
 3. **Otimizar Rota**
    - Com pelo menos 2 paradas confirmadas, clique em "Otimizar Rota"
-   - Visualize a sequência otimizada no mapa
+   - Em Ajustes, você pode habilitar "Usar minha localização" e "Retornar ao ponto"
+   - Se `MAPBOX_ACCESS_TOKEN` estiver definido, a otimização usa trânsito em tempo real
 
 4. **Navegar**
-   - Siga a ordem numerada das paradas
-   - Use o mapa para orientação visual
+   - Clique em "Iniciar rota" para abrir o Google Maps com o trajeto (origem/waypoints/destino)
+   - Use "Tela cheia" para visualizar melhor o mapa e "Sair da tela cheia" para retornar
+   - A lista de paradas persiste localmente; use "Limpar lista" para recomeçar
 
 ## 🏗️ Arquitetura do Projeto
 
@@ -132,8 +143,9 @@ Acesse [http://localhost:3000](http://localhost:3000)
 rotafacil/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API Routes
-│   │   ├── ocr-process/   # Processamento OCR
-│   │   └── route-optimize/ # Otimização de rotas
+│   │   ├── geocode/        # Geocodificação de endereços (server-side)
+│   │   ├── ocr-process/    # Processamento OCR
+│   │   └── route-optimize/ # Otimização de rotas (Mapbox/OSRM/algoritmo simples)
 │   ├── layout.tsx         # Layout principal
 │   ├── page.tsx           # Página inicial
 │   └── globals.css        # Estilos globais
@@ -141,11 +153,7 @@ rotafacil/
 │   ├── StopCard.tsx      # Card de parada
 │   └── MapDisplay.tsx    # Visualização do mapa
 ├── lib/                  # Utilitários e serviços
-│   ├── supabaseClient.ts # Cliente Supabase
-│   ├── ocrService.ts     # Serviço OCR
-│   └── osrmService.ts    # Serviço OSRM
-├── hooks/                # Custom React Hooks
-│   └── useGeolocation.ts # Hook de geolocalização
+│   └── supabaseClient.ts # Cliente Supabase (instanciado sob demanda)
 └── public/              # Assets públicos
     └── manifest.json    # PWA manifest
 ```
@@ -174,7 +182,11 @@ npm i -g vercel
 vercel
 ```
 
-Configure as variáveis de ambiente no painel da Vercel.
+Configure as variáveis de ambiente no painel da Vercel:
+
+- `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` (obrigatórios)
+- `MAPBOX_ACCESS_TOKEN` (opcional para trânsito)
+- `OSRM_URL` (opcional se usar servidor próprio)
 
 ## 📊 Status de Implementação
 
