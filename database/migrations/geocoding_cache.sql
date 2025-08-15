@@ -47,16 +47,21 @@ CREATE TRIGGER update_geocoding_cache_updated_at
 -- 5. Políticas RLS (Row Level Security)
 ALTER TABLE geocoding_cache ENABLE ROW LEVEL SECURITY;
 
+-- Remover políticas existentes se houver
+DROP POLICY IF EXISTS "Permitir leitura pública do cache" ON geocoding_cache;
+DROP POLICY IF EXISTS "Permitir inserção pública no cache" ON geocoding_cache;
+DROP POLICY IF EXISTS "Permitir atualização pública do cache" ON geocoding_cache;
+
 -- Permitir leitura pública do cache
-CREATE POLICY IF NOT EXISTS "Permitir leitura pública do cache" ON geocoding_cache
+CREATE POLICY "Permitir leitura pública do cache" ON geocoding_cache
   FOR SELECT USING (true);
 
 -- Permitir inserção pública no cache
-CREATE POLICY IF NOT EXISTS "Permitir inserção pública no cache" ON geocoding_cache
+CREATE POLICY "Permitir inserção pública no cache" ON geocoding_cache
   FOR INSERT WITH CHECK (true);
 
 -- Permitir atualização pública do cache (para incrementar hits)
-CREATE POLICY IF NOT EXISTS "Permitir atualização pública do cache" ON geocoding_cache
+CREATE POLICY "Permitir atualização pública do cache" ON geocoding_cache
   FOR UPDATE USING (true);
 
 -- 6. Função para limpeza automática de cache antigo (opcional)
