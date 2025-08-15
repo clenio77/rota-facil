@@ -63,18 +63,18 @@ export default function MapDisplay({ stops, routeGeometry, origin }: MapDisplayP
     const bounds = L.latLngBounds([]);
     const validStops = stops.filter(s => s.lat && s.lng);
 
-    // Origem (se fornecida)
-    if (origin && typeof origin.lat === 'number' && typeof origin.lng === 'number') {
-      const originMarker = L.marker([origin.lat, origin.lng], {
-        icon: L.divIcon({
-          className: 'custom-div-icon',
-          html: `<div style="background-color: #10B981; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">S</div>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 28],
-        })
-      }).addTo(map).bindPopup('<strong>Ponto de partida</strong>');
-      bounds.extend([origin.lat, origin.lng]);
-    }
+      // Origem (se fornecida)
+  if (origin && typeof origin.lat === 'number' && typeof origin.lng === 'number') {
+    L.marker([origin.lat, origin.lng], {
+      icon: L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: #10B981; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">S</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      })
+    }).addTo(map).bindPopup('<strong>Ponto de partida</strong>');
+    bounds.extend([origin.lat, origin.lng]);
+  }
 
     validStops.forEach((stop) => {
       if (!stop.lat || !stop.lng) return;

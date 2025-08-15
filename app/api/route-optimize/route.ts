@@ -69,34 +69,8 @@ function optimizeRouteSimple(stops: Stop[], startLat: number = -23.5505, startLn
   return optimized;
 }
 
-// Função para chamar OSRM (quando disponível)
-async function callOSRM(stops: Stop[]): Promise<OSRMResponse | null> {
-  const osrmUrl = process.env.OSRM_URL || 'http://router.project-osrm.org';
-  
-  // Criar string de coordenadas
-  const coordinates = stops.map(s => `${s.lng},${s.lat}`).join(';');
-  
-  try {
-    const response = await fetch(
-      `${osrmUrl}/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=true`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (response.ok) {
-      const data = await response.json() as OSRMResponse;
-      return data;
-    }
-  } catch (error) {
-    console.error('Erro ao chamar OSRM:', error);
-  }
-
-  return null;
-}
+// Função para chamar OSRM (quando disponível) - removida pois não é mais usada
+// A funcionalidade foi integrada diretamente no código principal
 
 export async function POST(request: NextRequest) {
   try {
