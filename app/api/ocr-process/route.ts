@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWorker } from 'tesseract.js';
 import { getSupabase } from '../../../lib/supabaseClient';
+import { enhanceImageForOCR } from '../../../lib/imagePreprocessing';
+// Cache está integrado na API de geocodificação via geocodeAddressWithProviders
+import { validateBrazilianAddress, correctCommonOCRErrors } from '../../../lib/brazilianAddressValidator';
 
 // Função melhorada para extrair endereço do texto OCR
 function extractAddressImproved(text: string): { address: string; confidence: number } {
@@ -386,19 +389,51 @@ export async function POST(request: NextRequest) {
 
     console.log('Iniciando processamento OCR para:', imageUrl);
 
-    // Criar worker do Tesseract com configurações otimizadas
+    // 1. Melhorar imagem para OCR (melhoria gratuita!)
+    const imageEnhancement = await enhanceImageForOCR(imageUrl);
+    console.log('Melhorias aplicadas:', imageEnhancement.improvements);
+    console.log('Confiança da imagem:', (imageEnhancement.totalConfidence * 100).toFixed(1) + '%');
+
+    // 2. Criar worker do Tesseract com configurações otimizadas
     const worker = await createWorker('por');
 
     try {
-      // Processar imagem
-      const { data: { text, confidence } } = await worker.recognize(imageUrl);
+      // 3. Processar imagem melhorada
+      const { data: { text, confidence } } = await worker.recognize(imageEnhancement.enhancedUrl);
       
       console.log('Texto extraído pelo OCR:', text);
       console.log('Confiança do OCR:', confidence);
 
-      // Extrair endereço do texto com método melhorado
-      const extractionResult = extractAddressImproved(text);
-      const address = extractionResult.address;
+      // 4. Corrigir erros comuns de OCR primeiro
+      const correctedText = correctCommonOCRErrors(text);
+      console.log('Texto corrigido:', correctedText);
+
+      // 5. Extrair endereço do texto com método melhorado
+      const extractionResult = extractAddressImproved(correctedText);
+      let address = extractionResult.address;
+
+      // 6. Validar e melhorar endereço brasileiro
+      if (address) {
+        const brazilianValidation = validateBrazilianAddress(address);
+        console.log('Validação brasileira:', brazilianValidation);
+        
+        if (brazilianValidation.confidence > extractionResult.confidence) {
+          // Se a validação brasileira é mais confiante, usar endereço corrigido
+          address = brazilianValidation.correctedAddress;
+          extractionResult.confidence = brazilianValidation.confidence;
+          console.log('Endereço melhorado:', address);
+        }
+        
+        // Se não passou na validação brasileira, tentar novamente com texto original
+        if (!brazilianValidation.isValid && extractionResult.confidence < 0.5) {
+          const fallbackExtraction = extractAddressImproved(text);
+          if (fallbackExtraction.confidence > extractionResult.confidence) {
+            address = fallbackExtraction.address;
+            extractionResult.confidence = fallbackExtraction.confidence;
+            console.log('Usando extração fallback:', address);
+          }
+        }
+      }
       
       console.log('Endereço extraído:', address);
       console.log('Confiança da extração:', extractionResult.confidence);

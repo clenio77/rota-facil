@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { searchGeocodingCache, saveToGeocodingCache } from '../../../lib/geocodingCache';
 
 // Tipo para resultado de geocodificação
 interface GeocodeResult {
@@ -202,6 +203,20 @@ async function geocodeAddressImproved(originalAddress: string): Promise<GeocodeR
 
   console.log(`Geocodificando: "${address}" (CEP: ${cep})`);
 
+  // 0. Verificar cache primeiro (melhoria gratuita!)
+  const cachedResult = await searchGeocodingCache(originalAddress);
+  if (cachedResult) {
+    console.log('Resultado encontrado no cache');
+    return {
+      lat: cachedResult.lat,
+      lng: cachedResult.lng,
+      address: cachedResult.formatted_address,
+      confidence: cachedResult.confidence,
+      provider: cachedResult.provider,
+      formatted_address: cachedResult.formatted_address
+    };
+  }
+
   // 1. Se temos CEP, tentar ViaCEP primeiro
   if (cep) {
     const viaCepResult = await geocodeWithViaCEP(cep);
@@ -249,6 +264,24 @@ async function geocodeAddressImproved(originalAddress: string): Promise<GeocodeR
   return null;
 }
 
+// Wrapper para salvar resultado no cache
+async function geocodeAndCache(originalAddress: string): Promise<GeocodeResult | null> {
+  const result = await geocodeAddressImproved(originalAddress);
+  
+  if (result && !result.provider.includes('cache')) {
+    // Salvar apenas se não veio do cache
+    await saveToGeocodingCache(originalAddress, {
+      lat: result.lat,
+      lng: result.lng,
+      address: result.formatted_address || result.address,
+      confidence: result.confidence,
+      provider: result.provider
+    });
+  }
+  
+  return result;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { address } = await request.json();
@@ -260,7 +293,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const result = await geocodeAddressImproved(address);
+    const result = await geocodeAndCache(address);
     
     if (!result) {
       return NextResponse.json({ 
