@@ -94,6 +94,20 @@ export default function HomePage() {
   const [roundtrip, setRoundtrip] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const MAX_CITY_DISTANCE_KM = 35; // raio para filtrar outras cidades
+
+  const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
   // Sync settings modal with URL hash (#settings)
   React.useEffect(() => {
@@ -175,13 +189,26 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           imageUrl: publicUrl,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        const center = deviceOrigin || deviceLocation;
+        if (center && typeof result.lat === 'number' && typeof result.lng === 'number') {
+          const dist = haversineKm(center.lat, center.lng, result.lat, result.lng);
+          if (dist > MAX_CITY_DISTANCE_KM) {
+            console.warn(`Parada rejeitada por estar fora do raio (${dist.toFixed(1)} km)`);
+            setStops(prev => prev.map(stop => 
+              stop.id === newStop.id 
+                ? { ...stop, status: 'error' }
+                : stop
+            ));
+            return;
+          }
+        }
         setStops(prev => prev.map(stop => 
           stop.id === newStop.id 
             ? { 
@@ -231,13 +258,24 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           imageUrl: stop.photoUrl,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        const center = deviceOrigin || deviceLocation;
+        if (center && typeof result.lat === 'number' && typeof result.lng === 'number') {
+          const dist = haversineKm(center.lat, center.lng, result.lat, result.lng);
+          if (dist > MAX_CITY_DISTANCE_KM) {
+            console.warn(`Parada rejeitada por estar fora do raio (${dist.toFixed(1)} km)`);
+            setStops(prev => prev.map(s => 
+              s.id === id ? { ...s, status: 'error' } : s
+            ));
+            return;
+          }
+        }
         setStops(prev => prev.map(s => 
           s.id === id 
             ? { 
@@ -315,6 +353,14 @@ export default function HomePage() {
   };
 
   const confirmedStops = stops.filter(s => s.status === 'confirmed' || s.status === 'optimized');
+  const centerLocation = deviceOrigin || deviceLocation;
+  const cityFilteredConfirmedStops = React.useMemo(() => {
+    if (!centerLocation) return confirmedStops;
+    return confirmedStops.filter(s =>
+      typeof s.lat === 'number' && typeof s.lng === 'number' &&
+      haversineKm(centerLocation.lat, centerLocation.lng, s.lat, s.lng) <= MAX_CITY_DISTANCE_KM
+    );
+  }, [confirmedStops, centerLocation]);
   const optimizedStops = confirmedStops
     .filter(s => typeof s.sequence === 'number')
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
@@ -413,13 +459,21 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           address,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
       const data = await res.json();
       if (!data.success || !data.lat || !data.lng) {
         alert('Não foi possível geocodificar este endereço.');
         return;
+      }
+      const center = deviceOrigin || deviceLocation;
+      if (center) {
+        const dist = haversineKm(center.lat, center.lng, data.lat, data.lng);
+        if (dist > MAX_CITY_DISTANCE_KM) {
+          alert('Endereço fora da sua cidade atual. Ajuste a cidade ou o endereço.');
+          return;
+        }
       }
       const newStop: Stop = {
         id: Date.now(),
@@ -646,7 +700,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="h-96 lg:h-[600px]">
-                <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
+                <MapDisplay stops={cityFilteredConfirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
               </div>
             </div>
           )}
@@ -752,7 +806,7 @@ export default function HomePage() {
       {isMapFullscreen && (
         <div className="fixed inset-0 z-[60] bg-black">
           <div className="absolute inset-0">
-            <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
+            <MapDisplay stops={cityFilteredConfirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
           </div>
           <div className="absolute top-4 right-4 flex gap-2">
             <button onClick={handleStartRoute} className="btn-primary px-3 py-1.5">Iniciar rota</button>
