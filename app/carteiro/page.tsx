@@ -199,6 +199,40 @@ export default function CarteiroPage() {
           </div>
         )}
 
+        {/* GPX Optimizer Section */}
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
+            🚀 GPX Optimizer - Nova Funcionalidade
+          </h3>
+          <div className="space-y-3">
+            <p className="text-green-700">
+              Otimize suas rotas GPX com algoritmos avançados e filtro de localização inteligente!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/gpx-optimizer"
+                className="inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <span className="mr-2">🚀</span>
+                Acessar GPX Optimizer
+              </Link>
+              <div className="text-sm text-green-600 flex items-center">
+                {deviceLocation && (
+                  <span>✅ Filtro de localização ativo para {deviceLocation.city}</span>
+                )}
+                {!deviceLocation && (
+                  <span>📍 Ative a localização para filtro automático</span>
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-green-600 space-y-1">
+              <p>• Algoritmos: Nearest Neighbor, 2-opt, Genetic Algorithm</p>
+              <p>• Filtro automático por proximidade da sua localização</p>
+              <p>• Economia de combustível e tempo calculada automaticamente</p>
+            </div>
+          </div>
+        </div>
+
         {/* Informações Adicionais */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-blue-800 mb-4">

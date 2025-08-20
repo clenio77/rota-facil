@@ -447,17 +447,36 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
             <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
-            <div className="mt-4">
-              <Link
-                href="/carteiro"
-                className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                <span className="text-xl">📮</span>
-                <span>Versão Profissional para Carteiros</span>
-                <span className="text-lg">→</span>
-              </Link>
-              <div className="mt-2 text-sm text-gray-500">
-                ✨ OCR avançado • Listas ECT • Cache inteligente
+            <div className="mt-4 space-y-3">
+              <div>
+                <Link
+                  href="/carteiro"
+                  className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  <span className="text-xl">📮</span>
+                  <span>Versão Profissional para Carteiros</span>
+                  <span className="text-lg">→</span>
+                </Link>
+                <div className="mt-2 text-sm text-gray-500">
+                  ✨ OCR avançado • Listas ECT • Cache inteligente
+                </div>
+              </div>
+
+              <div>
+                <Link
+                  href="/gpx-optimizer"
+                  className="inline-flex items-center space-x-3 bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:from-green-700 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  <span className="text-xl">🚀</span>
+                  <div className="flex flex-col items-start">
+                    <span>GPX Optimizer - Otimize suas Rotas</span>
+                    <span className="text-xs opacity-75">Com filtro de localização inteligente</span>
+                  </div>
+                  <span className="text-lg">→</span>
+                </Link>
+                <div className="mt-2 text-sm text-gray-500">
+                  🎯 Algoritmos avançados • Filtro de proximidade • Economia de combustível
+                </div>
               </div>
             </div>
           </div>
