@@ -22,7 +22,9 @@ export default function RouteResult({ routeData }: RouteResultProps) {
   };
 
   const handleCopyAddresses = () => {
-    const addresses = routeData.stops.map(stop => stop.address).join('\n');
+    const addresses = routeData.stops
+      .map(stop => stop.address || `${stop.lat}, ${stop.lng}`)
+      .join('\n');
     navigator.clipboard.writeText(addresses);
     // Aqui você poderia adicionar um toast de confirmação
   };
@@ -80,7 +82,7 @@ export default function RouteResult({ routeData }: RouteResultProps) {
                 {stop.sequence}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-gray-800">{stop.address}</p>
+                <p className="font-medium text-gray-800">{stop.address || `${stop.lat}, ${stop.lng}`}</p>
                 <p className="text-sm text-gray-500">
                   Coordenadas: {stop.lat.toFixed(6)}, {stop.lng.toFixed(6)}
                 </p>

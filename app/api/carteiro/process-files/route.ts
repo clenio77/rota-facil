@@ -150,18 +150,46 @@ export async function POST(request: NextRequest) {
 async function processGPXFile(file: File): Promise<{type: string; waypoints: Array<{lat: number; lng: number; name: string}>; totalPoints: number}> {
   try {
     const text = await file.text();
-    
-    // Extrair waypoints do GPX
-    const waypointRegex = /<wpt\s+lat="([^"]+)"\s+lon="([^"]+)">\s*<name>([^<]+)<\/name>/g;
-    const waypoints: Array<{lat: number; lng: number; name: string}> = [];
-    
-    let match;
-    while ((match = waypointRegex.exec(text)) !== null) {
-      waypoints.push({
-        lat: parseFloat(match[1]),
-        lng: parseFloat(match[2]),
-        name: match[3].trim()
-      });
+
+    const waypoints: Array<{ lat: number; lng: number; name: string }> = [];
+
+    // 1) Waypoints (<wpt ...>) com nome opcional
+    const wptRegex = /<wpt[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>([\s\S]*?)<\/wpt>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = wptRegex.exec(text)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      const inner = match[3] || '';
+      const nameMatch = inner.match(/<name>([\s\S]*?)<\/name>/i);
+      const name = nameMatch ? nameMatch[1].trim() : `Waypoint ${waypoints.length + 1}`;
+      if (!isNaN(lat) && !isNaN(lng)) {
+        waypoints.push({ lat, lng, name });
+      }
+    }
+
+    // 2) Pontos de rota (<rtept ...>)
+    const rteptRegex = /<rtept[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>([\s\S]*?)<\/rtept>/gi;
+    while ((match = rteptRegex.exec(text)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      const inner = match[3] || '';
+      const nameMatch = inner.match(/<name>([\s\S]*?)<\/name>/i);
+      const name = nameMatch ? nameMatch[1].trim() : `Rota ${waypoints.length + 1}`;
+      if (!isNaN(lat) && !isNaN(lng)) {
+        waypoints.push({ lat, lng, name });
+      }
+    }
+
+    // 3) Pontos de trilha (<trkpt ...>) — muitos GPX usam isso em vez de <wpt>
+    const trkptRegex = /<trkpt[^>]*lat=["']([^"']+)["'][^>]*lon=["']([^"']+)["'][^>]*>([\s\S]*?)<\/trkpt>/gi;
+    let trkIndex = 1;
+    while ((match = trkptRegex.exec(text)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lng = parseFloat(match[2]);
+      const name = `Trilha ${trkIndex++}`;
+      if (!isNaN(lat) && !isNaN(lng)) {
+        waypoints.push({ lat, lng, name });
+      }
     }
 
     return {
