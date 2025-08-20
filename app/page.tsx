@@ -445,6 +445,16 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
             <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
+            <div className="mt-2">
+              <a
+                href="/carteiro"
+                className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <span>📮</span>
+                <span>Versão para Carteiros</span>
+                <span>→</span>
+              </a>
+            </div>
           </div>
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 w-full sm:w-auto mt-3 sm:mt-0">
