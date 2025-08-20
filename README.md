@@ -17,6 +17,7 @@ RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimizaç�
 - 📸 **Captura Inteligente**: Tire fotos dos pacotes diretamente do app
 - 🎤 **Entrada por Voz (pt-BR)**: Dite o endereço, revise e confirme antes de enviar
 - 🔍 **OCR Automático Avançado**: Extração automática com pré-processamento de imagem
+- 🚀 **Otimização Automática de Imagens**: Redimensiona e otimiza fotos grandes para OCR mais rápido
 - 🇧🇷 **Validação Brasileira**: Reconhece 27 estados, 80+ cidades e tipos de logradouros
 - 🛠️ **Correção Automática**: Corrige erros comuns de OCR (Pua→Rua, Pv.→Av.)
 
@@ -35,9 +36,18 @@ RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimizaç�
 - 💾 **Persistência Local**: Paradas guardadas no dispositivo (não se perdem ao recarregar)
 - 🗺️ **Visualização em Mapa**: Veja paradas e trajeto otimizado
 
+#### 🚀 **GPX Optimizer - Nova Funcionalidade**
+- 📁 **Upload de GPX**: Suporte completo a waypoints, tracks e routes
+- 🎯 **Filtro de Localização**: Otimiza apenas pontos próximos à sua localização
+- 🧠 **Algoritmos Avançados**: Nearest Neighbor, 2-opt, Genetic Algorithm, Auto-select
+- 📊 **Métricas Detalhadas**: Economia de distância, tempo e combustível calculada
+- 💾 **Export Otimizado**: Download do GPX otimizado com metadados
+- 🌍 **Geolocalização Inteligente**: Filtro automático por proximidade (configurável)
+
 #### 🚀 **Performance e Experiência**
 - 📊 **Sistema de Confiança**: Veja o nível de precisão de cada geocodificação
-- ⚡ **Cache Automático**: 70-90% cache hit rate para máxima velocidade  
+- ⚡ **Cache Automático**: 70-90% cache hit rate para máxima velocidade
+- 🖼️ **Otimização de Imagens**: Redução automática de 80% no tamanho, 3-5x mais rápido no OCR
 - 📱 **PWA Completo**: Funciona offline e pode ser instalado como app
 - 🎨 **Design Responsivo**: Layout bonito e profissional, otimizado para qualquer tela
 
@@ -49,9 +59,10 @@ RotaFácil é um Progressive Web App (PWA) inovador que revoluciona a otimizaç�
 | **UI/UX** | Tailwind CSS 4.0 | Utility-first CSS framework |
 | **Linguagem** | TypeScript 5.0 | Type safety e melhor DX |
 | **OCR** | Tesseract.js | Reconhecimento de texto em imagens |
+| **Otimização de Imagens** | Canvas API + Sharp | Redimensionamento e filtros para OCR |
 | **Mapas** | Leaflet | Visualização interativa de mapas |
 | **Banco de Dados** | Supabase | PostgreSQL + Storage |
-| **Roteamento** | OSRM | Motor de otimização de rotas |
+| **Roteamento** | OSRM + Algoritmos TSP | Motor de otimização de rotas + GPX |
 | **PWA** | next-pwa | Service Worker e funcionalidades offline |
 
 ## 🚀 Instalação e Configuração
