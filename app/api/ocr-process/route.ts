@@ -296,20 +296,48 @@ async function geocodeAddressOriginal(address: string): Promise<{ lat: number; l
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl, userLocation } = await request.json();
+    const { imageUrl, imageData, userLocation } = await request.json();
 
-    if (!imageUrl) {
+    // Aceitar tanto imageUrl quanto imageData (base64)
+    let processImageUrl = imageUrl;
+
+    if (!imageUrl && !imageData) {
       return NextResponse.json(
-        { success: false, error: 'URL da imagem não fornecida' },
+        { success: false, error: 'URL da imagem ou dados da imagem não fornecidos' },
         { status: 400 }
       );
     }
 
-    console.log('Iniciando processamento OCR para:', imageUrl);
+    // REJEITAR URLs blob completamente
+    if (imageUrl && imageUrl.startsWith('blob:')) {
+      return NextResponse.json({
+        success: false,
+        error: '❌ URL blob detectada. Isso indica um problema no upload da imagem. Por favor, tire uma nova foto.',
+        details: 'URLs blob não podem ser processadas no servidor. A imagem deve ser enviada via Supabase Storage.'
+      }, { status: 400 });
+    }
 
-    // 1. Melhorar imagem para OCR (melhoria gratuita!)
-    const imageEnhancement = await enhanceImageForOCR(imageUrl);
-    console.log('Imagem processada com confiança:', (imageEnhancement.confidence * 100).toFixed(1) + '%');
+    // Se recebemos dados base64, usar diretamente
+    if (imageData && imageData.startsWith('data:image/')) {
+      processImageUrl = imageData;
+      console.log('Processando imagem a partir de dados base64');
+    } else {
+      console.log('Processando imagem a partir de URL:', imageUrl);
+    }
+
+    // 1. Pular pré-processamento se for URL blob (não funciona no servidor)
+    let imageEnhancement;
+    if (processImageUrl.startsWith('blob:')) {
+      console.log('URL blob detectada, pulando pré-processamento...');
+      imageEnhancement = {
+        enhancedImageUrl: processImageUrl,
+        confidence: 0.5
+      };
+    } else {
+      // 1. Melhorar imagem para OCR (melhoria gratuita!)
+      imageEnhancement = await enhanceImageForOCR(processImageUrl);
+      console.log('Imagem processada com confiança:', (imageEnhancement.confidence * 100).toFixed(1) + '%');
+    }
 
     // 2. Executar OCR com sistema de fallback robusto
     const ocrResult = await executeOCRWithFallback(imageEnhancement.enhancedImageUrl, 0.3);

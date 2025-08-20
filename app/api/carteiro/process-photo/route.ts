@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeOCRWithFallback } from '../../../../lib/ocrFallbackSystem';
 import { extractAddressIntelligently } from '../../../../lib/smartAddressExtractor';
+import { enhanceECTImageForOCR } from '../../../../lib/imagePreprocessing';
+import { parseECTAddresses, isECTList } from '../../../../lib/ectParser';
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,39 +49,104 @@ export async function POST(request: NextRequest) {
       type: photo.type
     });
 
-    // Converter foto para base64
+    // Converter foto para buffer
     const arrayBuffer = await photo.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    const imageUrl = `data:${photo.type};base64,${base64}`;
+    const imageBuffer = Buffer.from(arrayBuffer);
 
-    // 1. Executar OCR com sistema de fallback
-    console.log('Executando OCR...');
-    const ocrResult = await executeOCRWithFallback(imageUrl, 0.3);
+    console.log('Iniciando processamento inteligente da imagem...');
+
+    // 1. Pré-processar imagem para melhor OCR (especialmente para listas ECT)
+    let processedImageUrl: string;
+    try {
+      console.log('Aplicando pré-processamento ECT...');
+      const enhancedBuffer = await enhanceECTImageForOCR(imageBuffer);
+      const base64Enhanced = enhancedBuffer.toString('base64');
+      processedImageUrl = `data:image/png;base64,${base64Enhanced}`;
+      console.log('Pré-processamento concluído com sucesso');
+    } catch (preprocessError) {
+      console.log('Pré-processamento falhou, usando imagem original:', preprocessError);
+      const base64 = imageBuffer.toString('base64');
+      processedImageUrl = `data:${photo.type};base64,${base64}`;
+    }
+
+    // 2. Executar OCR com sistema de fallback na imagem processada
+    console.log('Executando OCR na imagem otimizada...');
+    const ocrResult = await executeOCRWithFallback(processedImageUrl, 0.2);
     
-    if (!ocrResult.text || ocrResult.confidence < 0.3) {
+    if (!ocrResult.text || ocrResult.confidence < 0.2) {
       return NextResponse.json({
         success: false,
-        error: 'Não foi possível extrair texto da imagem. Tente uma foto mais clara.',
-        ocrConfidence: ocrResult.confidence
+        error: 'Não foi possível extrair texto da imagem com nenhuma API externa. Tente uma imagem mais clara ou digite os endereços manualmente.',
+        ocrConfidence: ocrResult.confidence,
+        suggestions: [
+          'Tire a foto com boa iluminação',
+          'Mantenha a câmera estável',
+          'Certifique-se que o texto está legível',
+          'Evite reflexos e sombras'
+        ]
       });
     }
 
     console.log('OCR concluído:', {
       confidence: ocrResult.confidence,
-      textLength: ocrResult.text.length
+      textLength: ocrResult.text.length,
+      provider: ocrResult.provider
     });
 
-    // 2. Extrair endereços inteligentemente
-    console.log('Extraindo endereços...');
-    const extractionResult = await extractAddressIntelligently(ocrResult.text);
+    // 3. Detectar se é uma lista ECT e usar parser especializado
+    console.log('Verificando se é lista ECT...');
+    const isECT = isECTList(ocrResult.text);
+
+    let extractionResult;
+    if (isECT) {
+      console.log('Lista ECT detectada! Usando parser especializado...');
+      const ectAddresses = parseECTAddresses(ocrResult.text);
+
+      if (ectAddresses.length > 0) {
+        // Usar o primeiro endereço com maior confiança para geocodificação
+        const bestAddress = ectAddresses.reduce((best, current) =>
+          current.confidence > best.confidence ? current : best
+        );
+
+        extractionResult = {
+          address: bestAddress.address,
+          confidence: bestAddress.confidence,
+          method: 'ECT Parser',
+          allAddresses: ectAddresses,
+          isECTList: true
+        };
+      } else {
+        extractionResult = {
+          address: null,
+          confidence: 0,
+          method: 'ECT Parser Failed',
+          suggestions: ['Lista ECT detectada mas nenhum endereço válido encontrado']
+        };
+      }
+    } else {
+      console.log('Não é lista ECT, usando extração inteligente padrão...');
+      extractionResult = await extractAddressIntelligently(ocrResult.text);
+    }
     
-    if (!extractionResult.address || extractionResult.confidence < 0.4) {
+    // Usar limiar de confiança mais baixo para listas ECT
+    const confidenceThreshold = extractionResult.isECTList ? 0.3 : 0.4;
+
+    if (!extractionResult.address || extractionResult.confidence < confidenceThreshold) {
       return NextResponse.json({
         success: false,
-        error: 'Não foi possível identificar endereços válidos na imagem.',
+        error: extractionResult.isECTList
+          ? 'Lista ECT detectada, mas não foi possível extrair endereços válidos automaticamente. Você pode digitar os endereços manualmente.'
+          : 'Não foi possível identificar endereços válidos na imagem.',
         extractedText: ocrResult.text,
         extractionConfidence: extractionResult.confidence,
-        suggestions: extractionResult.suggestions
+        isECTList: extractionResult.isECTList,
+        allAddresses: extractionResult.allAddresses,
+        suggestions: extractionResult.suggestions || [
+          'Tire uma foto mais clara',
+          'Certifique-se que o texto está bem visível',
+          'Tente uma iluminação melhor',
+          'Digite os endereços manualmente se necessário'
+        ]
       });
     }
 

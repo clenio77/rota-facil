@@ -254,6 +254,36 @@ export class OCRFallbackSystem {
 }
 
 export async function executeOCRWithFallback(imageUrl: string, minConfidence: number = 0.3): Promise<OCRResult> {
+  // Se for URL blob, não podemos processar no servidor com Tesseract
+  if (imageUrl.startsWith('blob:')) {
+    console.log('URL blob detectada - usando apenas API externa');
+    const externalStrategy = new ExternalOCRStrategy();
+    try {
+      const result = await externalStrategy.execute(imageUrl);
+      return result || {
+        text: '',
+        confidence: 0,
+        provider: 'fallback-failed'
+      };
+    } catch (error) {
+      console.error('API externa falhou para URL blob:', error);
+      return {
+        text: '',
+        confidence: 0,
+        provider: 'fallback-failed'
+      };
+    }
+  }
+
   const system = new OCRFallbackSystem();
-  return system.executeWithFallback(imageUrl, minConfidence);
+  try {
+    return await system.executeWithFallback(imageUrl, minConfidence);
+  } catch (error) {
+    console.error('Sistema de fallback falhou:', error);
+    return {
+      text: '',
+      confidence: 0,
+      provider: 'fallback-failed'
+    };
+  }
 }

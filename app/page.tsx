@@ -149,45 +149,110 @@ export default function HomePage() {
     setStops(prev => [...prev, newStop]);
 
     try {
-      // Upload para Supabase Storage
-      const fileName = `delivery-${Date.now()}-${file.name}`;
-      const supabase = getSupabase();
-      const { error: uploadError } = await supabase.storage
-        .from('delivery-photos')
-        .upload(fileName, file);
+      // VERIFICAR SE SUPABASE ESTÁ CONFIGURADO
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      if (uploadError) throw uploadError;
+      if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('seu-projeto') || supabaseKey.includes('sua-chave')) {
+        console.log('🧪 MODO TESTE: Supabase não configurado, simulando processamento');
 
-      // Obter URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('delivery-photos')
-        .getPublicUrl(fileName);
+        // Simular delay de upload
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Atualizar status para processando
-      setStops(prev => prev.map(stop => 
-        stop.id === newStop.id 
-          ? { ...stop, photoUrl: publicUrl, status: 'processing' }
-          : stop
-      ));
+        // Atualizar status para processando
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? { ...stop, status: 'processing' }
+            : stop
+        ));
 
-      // Chamar API de OCR com contexto de localização
-      const response = await fetch('/api/ocr-process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageUrl: publicUrl,
-          userLocation: deviceOrigin || deviceLocation || undefined
-        }),
-      });
+        // Simular delay de processamento
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        // MODO REAL: Upload para Supabase Storage
+        console.log('📤 MODO REAL: Fazendo upload para Supabase');
+        const fileName = `delivery-${Date.now()}-${file.name}`;
+        const supabase = getSupabase();
+        const { error: uploadError } = await supabase.storage
+          .from('delivery-photos')
+          .upload(fileName, file);
 
-      const result = await response.json();
+        if (uploadError) throw uploadError;
+
+        // Obter URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('delivery-photos')
+          .getPublicUrl(fileName);
+
+        console.log('Upload concluído:', { fileName, publicUrl });
+
+        // Atualizar status para processando
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? { ...stop, photoUrl: publicUrl, status: 'processing' }
+            : stop
+        ));
+      }
+
+      // VERIFICAR MODO DE OPERAÇÃO
+      const isTestMode = !supabaseUrl || !supabaseKey || supabaseUrl.includes('seu-projeto') || supabaseKey.includes('sua-chave');
+
+      if (isTestMode) {
+        // MODO TESTE: Simular diferentes cenários de OCR
+        const testScenarios = [
+          {
+            name: 'Endereço de São Paulo (rejeitado)',
+            result: {
+              success: false,
+              error: '❌ TESTE: Endereço rejeitado: "Rua Augusta, 123, São Paulo, SP" não está em Uberlândia, MG. Configure o Supabase para usar OCR real.',
+              address: 'Rua Augusta, 123, São Paulo, SP',
+              extractedText: 'Rua Augusta, 123\nSão Paulo, SP',
+              confidence: 0.8,
+              lat: null,
+              lng: null
+            }
+          },
+          {
+            name: 'Endereço de Uberlândia (aceito)',
+            result: {
+              success: true,
+              address: 'Rua Coronel Antônio Alves, 1234, Uberlândia, MG',
+              extractedText: 'Rua Coronel Antônio Alves, 1234\nUberlândia, MG',
+              confidence: 0.9,
+              lat: -18.9186,
+              lng: -48.2772
+            }
+          }
+        ];
+
+        // Alternar entre cenários a cada teste
+        const scenarioIndex = stops.length % testScenarios.length;
+        const scenario = testScenarios[scenarioIndex];
+        const result = scenario.result;
+
+        console.log(`🧪 MODO TESTE: ${scenario.name}`, result);
+      } else {
+        // MODO REAL: Chamar API de OCR
+        console.log('🔍 MODO REAL: Processando OCR');
+        const response = await fetch('/api/ocr-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: publicUrl,
+            userLocation: deviceOrigin || deviceLocation || undefined
+          }),
+        });
+
+        const result = await response.json();
+        console.log('📍 Resultado OCR real:', result);
+      }
 
       if (result.success) {
-        setStops(prev => prev.map(stop => 
-          stop.id === newStop.id 
-            ? { 
-                ...stop, 
-                status: 'confirmed', 
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? {
+                ...stop,
+                status: 'confirmed',
                 address: result.address,
                 lat: result.lat,
                 lng: result.lng
@@ -198,12 +263,21 @@ export default function HomePage() {
         throw new Error(result.error || 'Erro ao processar imagem');
       }
     } catch (error) {
-      console.error('Erro:', error);
-      setStops(prev => prev.map(stop => 
-        stop.id === newStop.id 
-          ? { ...stop, status: 'error' }
-          : stop
-      ));
+      console.error('Erro no processamento:', error);
+
+      // Mostrar erro específico se for problema de URL blob
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      if (errorMessage.includes('blob')) {
+        alert('❌ Problema no upload da imagem. Por favor, tire uma nova foto.');
+        // Remover a parada com problema
+        setStops(prev => prev.filter(stop => stop.id !== newStop.id));
+      } else {
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? { ...stop, status: 'error' }
+            : stop
+        ));
+      }
     }
 
     // Limpar input
@@ -222,7 +296,14 @@ export default function HomePage() {
     const stop = stops.find(s => s.id === id);
     if (!stop) return;
 
-    setStops(prev => prev.map(s => 
+    // Verificar se a URL é blob (problema conhecido)
+    if (stop.photoUrl.startsWith('blob:')) {
+      console.error('Tentativa de reprocessar URL blob - isso não funcionará');
+      alert('Erro: Não é possível reprocessar esta imagem. Por favor, tire uma nova foto.');
+      return;
+    }
+
+    setStops(prev => prev.map(s =>
       s.id === id ? { ...s, status: 'processing' } : s
     ));
 
@@ -320,6 +401,14 @@ export default function HomePage() {
     .filter(s => typeof s.sequence === 'number')
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
+  // Verificar se está em modo de teste
+  const isTestMode = typeof window !== 'undefined' && (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('seu-projeto') ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.includes('sua-chave')
+  );
+
   // Voice capture handlers
   const startListening = () => {
     if (typeof window === 'undefined') return;
@@ -404,6 +493,60 @@ export default function HomePage() {
     recognitionRef.current?.stop?.();
   };
 
+  // MODO TESTE: Função para testar diferentes cenários
+  const handleTestScenario = (scenarioType: 'rejected' | 'accepted') => {
+    const testScenarios = {
+      rejected: {
+        name: 'Endereço de São Paulo (rejeitado)',
+        address: 'Rua Augusta, 123, São Paulo, SP',
+        success: false,
+        error: '❌ Endereço rejeitado: "Rua Augusta, 123, São Paulo, SP" não está em Uberlândia, MG. Tire uma foto de um endereço local.'
+      },
+      accepted: {
+        name: 'Endereço de Uberlândia (aceito)',
+        address: 'Rua Coronel Antônio Alves, 1234, Uberlândia, MG',
+        success: true,
+        lat: -18.9186,
+        lng: -48.2772
+      }
+    };
+
+    const scenario = testScenarios[scenarioType];
+    console.log(`🧪 TESTE: ${scenario.name}`);
+
+    const newStop: Stop = {
+      id: Date.now(),
+      photoUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZvdG8gVGVzdGU8L3RleHQ+PC9zdmc+',
+      status: 'processing',
+      address: '',
+    };
+
+    setStops(prev => [...prev, newStop]);
+
+    // Simular processamento
+    setTimeout(() => {
+      if (scenario.success) {
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? {
+                ...stop,
+                status: 'confirmed',
+                address: scenario.address,
+                lat: scenario.lat,
+                lng: scenario.lng
+              }
+            : stop
+        ));
+      } else {
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? { ...stop, status: 'error', address: scenario.error }
+            : stop
+        ));
+      }
+    }, 2000);
+  };
+
   const handleConfirmVoiceAddress = async () => {
     const address = voiceText.trim();
     if (!address) { alert('Digite ou dite um endereço.'); return; }
@@ -441,6 +584,30 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
+      {/* Banner de Modo de Teste */}
+      {isTestMode && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                🧪 Modo de Teste Ativo
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>Supabase não configurado. O sistema está simulando OCR e filtros de cidade.</p>
+                <p className="mt-1">
+                  <strong>Para ativar o modo real:</strong> Configure as variáveis no arquivo <code>.env.local</code> e reinicie o servidor.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <div id="stops-section" className="bg-white rounded-xl shadow-custom p-6 scroll-mt-24">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

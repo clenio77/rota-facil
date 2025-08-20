@@ -41,7 +41,7 @@ function extractCEP(address: string): string | null {
 }
 
 // Provider 1: ViaCEP + Nominatim (para CEPs brasileiros)
-async function geocodeWithViaCEP(cep: string): Promise<GeocodeResult | null> {
+async function geocodeWithViaCEP(cep: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   try {
     const cleanCEP = cep.replace(/\D/g, '');
     if (cleanCEP.length !== 8) return null;
@@ -51,9 +51,20 @@ async function geocodeWithViaCEP(cep: string): Promise<GeocodeResult | null> {
 
     if (data.erro) return null;
 
+    // FILTRO RIGOROSO: Se temos localização do usuário, verificar se o CEP é da mesma cidade
+    if (userLocation?.city) {
+      const cepCity = data.localidade.toLowerCase();
+      const userCity = userLocation.city.toLowerCase();
+
+      if (cepCity !== userCity) {
+        console.log(`ViaCEP: REJEITADO - CEP de ${data.localidade} mas usuário está em ${userLocation.city}`);
+        return null;
+      }
+    }
+
     // ViaCEP não retorna coordenadas, usar Nominatim para geocodificar o endereço completo
     const fullAddress = `${data.logradouro}, ${data.bairro}, ${data.localidade}, ${data.uf}, Brasil`;
-    const nominatimResult = await geocodeWithNominatim(fullAddress);
+    const nominatimResult = await geocodeWithNominatim(fullAddress, userLocation);
 
     if (nominatimResult) {
       return {
@@ -99,29 +110,34 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
       const features = data.features
         .filter((feature: MapboxFeature) => {
           const [lng, lat] = feature.center;
-          return isValidBrazilianCoordinate(lat, lng);
+          if (!isValidBrazilianCoordinate(lat, lng)) {
+            return false;
+          }
+
+          // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
+          if (userLocation?.city) {
+            const featureContext = feature.context || [];
+            const featureCity = featureContext.find((ctx) =>
+              ctx.id.startsWith('place') || ctx.id.startsWith('locality')
+            );
+
+            if (!featureCity || featureCity.text.toLowerCase() !== userLocation.city.toLowerCase()) {
+              console.log(`Mapbox: REJEITADO - endereço fora da cidade ${userLocation.city} (encontrado: ${featureCity?.text || 'desconhecida'})`);
+              return false;
+            }
+          }
+
+          return true;
         })
         .map((feature: MapboxFeature): MapboxFeatureResult => {
           const [lng, lat] = feature.center;
           let confidence = feature.relevance || 0.8;
-          
-          // Aplicar boost para resultados da mesma cidade
+
+          // Como já filtramos por cidade, todos os resultados são da cidade correta
           if (userLocation?.city) {
-            const featureContext = feature.context || [];
-            const featureCity = featureContext.find((ctx) => 
-              ctx.id.startsWith('place') || ctx.id.startsWith('locality')
-            );
-            
-            if (featureCity && featureCity.text.toLowerCase() === userLocation.city.toLowerCase()) {
-              confidence = Math.min(1.0, confidence + 0.3); // Boost de 30% para mesma cidade
-              console.log(`Mapbox: boost aplicado para ${featureCity.text}`);
-            } else {
-              // Penalizar resultados de outras cidades
-              confidence = Math.max(0.1, confidence - 0.4);
-              console.log(`Mapbox: penalização aplicada para cidade diferente (${featureCity?.text || 'desconhecida'})`);
-            }
+            confidence = Math.min(1.0, confidence + 0.2); // Boost para cidade confirmada
           }
-          
+
           return {
             feature,
             lat,
@@ -134,17 +150,17 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
         .sort((a: MapboxFeatureResult, b: MapboxFeatureResult) => b.confidence - a.confidence);
 
       if (features.length > 0) {
-        // Filtrar resultados com confiança muito baixa (outras cidades)
-        const validFeatures = features.filter((f: MapboxFeatureResult) => f.confidence >= 0.4);
-        
+        // Como já filtramos por cidade, podemos usar um limiar de confiança mais baixo
+        const validFeatures = features.filter((f: MapboxFeatureResult) => f.confidence >= 0.3);
+
         if (validFeatures.length === 0) {
-          console.log('Mapbox: todos os resultados foram filtrados por baixa confiança (outras cidades)');
+          console.log('Mapbox: todos os resultados foram filtrados por baixa confiança');
           return null;
         }
-        
+
         const best = validFeatures[0];
-        console.log(`Mapbox: melhor resultado selecionado (confiança: ${best.confidence})`);
-        
+        console.log(`Mapbox: resultado da cidade ${userLocation?.city || 'atual'} selecionado (confiança: ${best.confidence})`);
+
         return {
           lat: best.lat,
           lng: best.lng,
@@ -185,37 +201,40 @@ async function geocodeWithNominatim(address: string, userLocation?: { city?: str
         const lat = parseFloat(result.lat);
         const lng = parseFloat(result.lon);
 
-        if (isValidBrazilianCoordinate(lat, lng)) {
-          // Calcular confiança baseada no tipo de resultado
-          let confidence = 0.5;
-          if (result.osm_type === 'way') confidence = 0.7;
-          if (result.class === 'building') confidence = 0.8;
-          if (result.type === 'house') confidence = 0.9;
-
-          // Aplicar filtro de cidade se disponível
-          if (userLocation?.city) {
-            const resultAddress = result.display_name.toLowerCase();
-            const userCity = userLocation.city.toLowerCase();
-            
-            if (resultAddress.includes(userCity)) {
-              confidence = Math.min(1.0, confidence + 0.2); // Boost para mesma cidade
-              console.log(`Nominatim: boost aplicado para cidade ${userCity}`);
-            } else {
-              // Penalizar resultados de outras cidades
-              confidence = Math.max(0.1, confidence - 0.3);
-              console.log(`Nominatim: penalização para cidade diferente`);
-            }
-          }
-
-          return {
-            lat,
-            lng,
-            address: result.display_name,
-            confidence,
-            provider: 'nominatim',
-            formatted_address: result.display_name
-          };
+        if (!isValidBrazilianCoordinate(lat, lng)) {
+          return null;
         }
+
+        // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
+        if (userLocation?.city) {
+          const resultAddress = result.display_name.toLowerCase();
+          const userCity = userLocation.city.toLowerCase();
+
+          if (!resultAddress.includes(userCity)) {
+            console.log(`Nominatim: REJEITADO - endereço fora da cidade ${userLocation.city}`);
+            return null;
+          }
+        }
+
+        // Calcular confiança baseada no tipo de resultado
+        let confidence = 0.5;
+        if (result.osm_type === 'way') confidence = 0.7;
+        if (result.class === 'building') confidence = 0.8;
+        if (result.type === 'house') confidence = 0.9;
+
+        // Como já filtramos por cidade, aplicar boost
+        if (userLocation?.city) {
+          confidence = Math.min(1.0, confidence + 0.2);
+        }
+
+        return {
+          lat,
+          lng,
+          address: result.display_name,
+          confidence,
+          provider: 'nominatim',
+          formatted_address: result.display_name
+        };
       }
 
     return null;
@@ -226,7 +245,7 @@ async function geocodeWithNominatim(address: string, userLocation?: { city?: str
 }
 
 // Provider 4: Google Geocoding (último recurso)
-async function geocodeWithGoogle(address: string): Promise<GeocodeResult | null> {
+async function geocodeWithGoogle(address: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   const googleApiKey = process.env.GOOGLE_GEOCODING_API_KEY;
   if (!googleApiKey) return null;
 
@@ -243,20 +262,34 @@ async function geocodeWithGoogle(address: string): Promise<GeocodeResult | null>
       const result = data.results[0];
       const { lat, lng } = result.geometry.location;
 
-      if (isValidBrazilianCoordinate(lat, lng)) {
-        // Google tem alta confiança
-        let confidence = 0.9;
-        if (result.geometry.location_type === 'ROOFTOP') confidence = 0.95;
-
-        return {
-          lat,
-          lng,
-          address: result.formatted_address,
-          confidence,
-          provider: 'google',
-          formatted_address: result.formatted_address
-        };
+      if (!isValidBrazilianCoordinate(lat, lng)) {
+        return null;
       }
+
+      // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
+      if (userLocation?.city) {
+        const cityComponent = result.address_components.find((component: any) =>
+          component.types.includes('locality') || component.types.includes('administrative_area_level_2')
+        );
+
+        if (!cityComponent || cityComponent.long_name.toLowerCase() !== userLocation.city.toLowerCase()) {
+          console.log(`Google: REJEITADO - endereço fora da cidade ${userLocation.city} (encontrado: ${cityComponent?.long_name || 'desconhecida'})`);
+          return null;
+        }
+      }
+
+      // Google tem alta confiança
+      let confidence = 0.9;
+      if (result.geometry.location_type === 'ROOFTOP') confidence = 0.95;
+
+      return {
+        lat,
+        lng,
+        address: result.formatted_address,
+        confidence,
+        provider: 'google',
+        formatted_address: result.formatted_address
+      };
     }
 
     return null;
@@ -301,7 +334,7 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
 
   // 1. Se temos CEP, tentar ViaCEP primeiro
   if (cep) {
-    const viaCepResult = await geocodeWithViaCEP(cep);
+    const viaCepResult = await geocodeWithViaCEP(cep, userLocation);
     if (viaCepResult && viaCepResult.confidence >= 0.8) {
       console.log('Geocodificação via ViaCEP+Nominatim bem-sucedida');
       return viaCepResult;
@@ -323,7 +356,7 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
   }
 
   // 4. Último recurso: Google (se configurado)
-  const googleResult = await geocodeWithGoogle(address);
+  const googleResult = await geocodeWithGoogle(address, userLocation);
   if (googleResult) {
     console.log('Geocodificação via Google bem-sucedida');
     return googleResult;
@@ -400,16 +433,18 @@ export async function POST(request: NextRequest) {
     if (!result) {
       // Log específico para debug de filtro de localização
       if (userLocation?.city) {
-        console.log(`Geocodificação falhou para "${address}" - possivelmente filtrado por não estar em ${userLocation.city}`);
+        console.log(`Geocodificação falhou para "${address}" - FILTRADO por não estar em ${userLocation.city}`);
       }
-      
-      return NextResponse.json({ 
-        success: false, 
-        error: userLocation?.city 
-          ? `Endereço não encontrado em ${userLocation.city} ou fora do Brasil. Tente especificar a cidade: "endereço, ${userLocation.city}"`
+
+      return NextResponse.json({
+        success: false,
+        error: userLocation?.city
+          ? `❌ Endereço rejeitado: apenas endereços de ${userLocation.city}, ${userLocation.state || ''} são aceitos. Verifique se o endereço está correto e na cidade atual.`
           : 'Endereço não encontrado ou fora do Brasil',
         attempted_address: address,
-        user_city: userLocation?.city || null
+        user_city: userLocation?.city || null,
+        user_state: userLocation?.state || null,
+        filter_active: !!userLocation?.city
       }, { status: 404 });
     }
 
