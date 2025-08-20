@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, Download, Settings, BarChart3, MapPin, Route, Clock, Zap, Navigation } from 'lucide-react';
 import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
 import CityIndicator from './CityIndicator';
 
@@ -156,7 +155,7 @@ export default function GPXOptimizer() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          <Route className="inline-block w-8 h-8 mr-2 text-blue-600" />
+          <span className="inline-block mr-2 text-2xl">🚀</span>
           GPX Optimizer
         </h1>
         <p className="text-gray-600">
@@ -167,7 +166,7 @@ export default function GPXOptimizer() {
       {/* Location Section */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <Navigation className="w-5 h-5 mr-2" />
+          <span className="mr-2">📍</span>
           Localização e Filtros
         </h2>
         
@@ -232,7 +231,7 @@ export default function GPXOptimizer() {
       {/* Upload Section */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <Upload className="w-5 h-5 mr-2" />
+          <span className="mr-2">📁</span>
           Upload do Arquivo GPX
         </h2>
         
@@ -246,7 +245,7 @@ export default function GPXOptimizer() {
           />
           <label htmlFor="gpx-upload" className="cursor-pointer">
             <div className="space-y-2">
-              <Upload className="w-12 h-12 mx-auto text-gray-400" />
+              <div className="text-4xl mx-auto text-gray-400">📁</div>
               <p className="text-lg font-medium text-gray-700">
                 {selectedFile ? selectedFile.name : 'Clique para selecionar arquivo GPX'}
               </p>
@@ -270,7 +269,7 @@ export default function GPXOptimizer() {
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
               >
-                <Settings className="w-4 h-4 mr-1" />
+                <span className="mr-1">⚙️</span>
                 Opções Avançadas
               </button>
             </div>
@@ -367,7 +366,7 @@ export default function GPXOptimizer() {
               </>
             ) : (
               <>
-                <Zap className="w-5 h-5 mr-2" />
+                <span className="mr-2">⚡</span>
                 Otimizar Rota
               </>
             )}
@@ -405,7 +404,7 @@ export default function GPXOptimizer() {
               {result.optimization && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-green-50 p-4 rounded-lg text-center">
-                    <Route className="w-8 h-8 mx-auto text-green-600 mb-2" />
+                    <div className="text-3xl mx-auto text-green-600 mb-2">🛣️</div>
                     <p className="text-sm text-green-700">Distância Economizada</p>
                     <p className="text-2xl font-bold text-green-800">
                       {formatDistance(result.optimization.distanceSaved)}
@@ -416,7 +415,7 @@ export default function GPXOptimizer() {
                   </div>
 
                   <div className="bg-blue-50 p-4 rounded-lg text-center">
-                    <Clock className="w-8 h-8 mx-auto text-blue-600 mb-2" />
+                    <div className="text-3xl mx-auto text-blue-600 mb-2">⏱️</div>
                     <p className="text-sm text-blue-700">Tempo Economizado</p>
                     <p className="text-2xl font-bold text-blue-800">
                       {formatTime(result.optimization.timeSaved)}
@@ -427,13 +426,13 @@ export default function GPXOptimizer() {
                   </div>
 
                   <div className="bg-purple-50 p-4 rounded-lg text-center">
-                    <MapPin className="w-8 h-8 mx-auto text-purple-600 mb-2" />
+                    <div className="text-3xl mx-auto text-purple-600 mb-2">📍</div>
                     <p className="text-sm text-purple-700">Pontos Otimizados</p>
                     <p className="text-2xl font-bold text-purple-800">
                       {result.optimization.totalWaypoints}
                     </p>
                     <p className="text-sm text-purple-600">
-                      {result.optimization.originalWaypointsCount && result.optimization.originalWaypointsCount !== result.optimization.totalWaypoints 
+                      {result.optimization.originalWaypointsCount && result.optimization.originalWaypointsCount !== result.optimization.totalWaypoints
                         ? `de ${result.optimization.originalWaypointsCount} total`
                         : 'Waypoints processados'
                       }
@@ -448,7 +447,7 @@ export default function GPXOptimizer() {
                   onClick={handleDownload}
                   className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 flex items-center mx-auto"
                 >
-                  <Download className="w-5 h-5 mr-2" />
+                  <span className="mr-2">💾</span>
                   Baixar GPX Otimizado
                 </button>
               </div>
@@ -457,7 +456,7 @@ export default function GPXOptimizer() {
               {result.optimization && (
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-semibold mb-2 flex items-center">
-                    <BarChart3 className="w-4 h-4 mr-2" />
+                    <span className="mr-2">📊</span>
                     Estatísticas Detalhadas
                   </h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
