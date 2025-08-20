@@ -174,9 +174,9 @@ export default function HomePage() {
       const response = await fetch('/api/ocr-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           imageUrl: publicUrl,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
 
@@ -230,9 +230,9 @@ export default function HomePage() {
       const response = await fetch('/api/ocr-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           imageUrl: stop.photoUrl,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
 
@@ -412,9 +412,9 @@ export default function HomePage() {
       const res = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           address,
-          userLocation: deviceOrigin || undefined
+          userLocation: deviceOrigin || deviceLocation || undefined
         }),
       });
       const data = await res.json();
@@ -447,6 +447,22 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
             <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
+
+            {/* Indicador de Filtro de Localização */}
+            {(deviceOrigin || deviceLocation) && (
+              <div className="mt-2 inline-flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                <span>📍</span>
+                <span>
+                  Filtro ativo: {(deviceOrigin || deviceLocation)?.city || 'Localizando...'}, {(deviceOrigin || deviceLocation)?.state || ''}
+                </span>
+              </div>
+            )}
+            {isLoading && !deviceLocation && (
+              <div className="mt-2 inline-flex items-center space-x-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+                <span>🔄</span>
+                <span>Detectando sua localização...</span>
+              </div>
+            )}
             <div className="mt-4 space-y-3">
               <div>
                 <Link
