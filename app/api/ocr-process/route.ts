@@ -317,9 +317,7 @@ export async function POST(request: NextRequest) {
       console.log('Resultado do OCR:', {
         text: ocrResult.text,
         confidence: ocrResult.confidence,
-        provider: ocrResult.provider,
-        processingTime: ocrResult.processingTime,
-        improvements: ocrResult.improvements
+        provider: ocrResult.provider
       });
 
       // 3. Corrigir erros comuns de OCR

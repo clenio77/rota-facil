@@ -226,14 +226,15 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
       setShowValidation(false);
       onProcessingComplete({ routeData });
 
-    } catch (error) {
+    } catch (validationError) {
+      console.error('Erro ao processar endereços validados:', validationError);
       onError('Erro ao processar endereços validados');
     } finally {
       setIsValidating(false);
     }
   };
 
-  const generateGoogleMapsUrl = (addresses: any[]) => {
+  const generateGoogleMapsUrl = (addresses: Array<{lat: number; lng: number}>) => {
     if (addresses.length === 0) return '';
 
     const origin = `${addresses[0].lat},${addresses[0].lng}`;

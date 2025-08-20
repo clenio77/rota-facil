@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import PhotoUpload from './components/PhotoUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import RouteResult from './components/RouteResult';
@@ -18,6 +19,8 @@ interface RouteData {
   totalDistance: number;
   totalTime: number;
   googleMapsUrl: string;
+  ectData?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  geocodedItems?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export default function CarteiroPage() {
@@ -45,13 +48,13 @@ export default function CarteiroPage() {
 
           {/* Link de volta */}
           <div className="mt-6">
-            <a
+            <Link
               href="/"
               className="inline-flex items-center space-x-2 text-gray-600 hover:text-blue-600 font-medium transition-colors"
             >
               <span>←</span>
               <span>Voltar para versão básica</span>
-            </a>
+            </Link>
           </div>
 
           {/* Badges de Recursos */}

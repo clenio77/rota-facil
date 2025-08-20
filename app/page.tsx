@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import StopCard from '../components/StopCard';
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
@@ -446,14 +447,14 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
             <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
             <div className="mt-4">
-              <a
+              <Link
                 href="/carteiro"
                 className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 <span className="text-xl">📮</span>
                 <span>Versão Profissional para Carteiros</span>
                 <span className="text-lg">→</span>
-              </a>
+              </Link>
               <div className="mt-2 text-sm text-gray-500">
                 ✨ OCR avançado • Listas ECT • Cache inteligente
               </div>

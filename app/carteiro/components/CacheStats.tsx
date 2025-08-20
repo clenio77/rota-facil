@@ -37,7 +37,8 @@ export default function CacheStats() {
       const removed = cleanExpiredCache();
       loadStats();
       alert(`${removed} entradas expiradas removidas do cache`);
-    } catch (error) {
+    } catch (cleanError) {
+      console.error('Erro ao limpar cache:', cleanError);
       alert('Erro ao limpar cache');
     } finally {
       setIsLoading(false);
@@ -54,7 +55,8 @@ export default function CacheStats() {
       clearCache();
       loadStats();
       alert('Cache limpo completamente');
-    } catch (error) {
+    } catch (clearError) {
+      console.error('Erro ao limpar cache completo:', clearError);
       alert('Erro ao limpar cache');
     } finally {
       setIsLoading(false);

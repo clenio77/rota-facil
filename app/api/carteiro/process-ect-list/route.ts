@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { enhanceECTImageForOCR } from '../../../lib/imagePreprocessing';
-import { parseECTAddresses, isECTList, extractECTMetadata } from '../../../lib/ectParser';
-import { geocodeWithCache } from '../../../lib/geocodeCache';
 
 interface ECTDeliveryItem {
   sequence: number;
@@ -99,19 +96,19 @@ async function geocodeAddresses(items: ECTDeliveryItem[], userLocation?: { city?
       if (result.success) {
         geocodedItems.push({
           ...item,
-          lat: result.lat,
-          lng: result.lng,
-          geocodedAddress: result.address,
-          geocodingProvider: result.provider
+          lat: result.lat as number,
+          lng: result.lng as number,
+          geocodedAddress: result.address as string,
+          geocodingProvider: result.provider as string
         });
         console.log(`✅ Endereço geocodificado: ${item.address}`);
       } else {
         console.log(`❌ Falha na geocodificação: ${item.address}`);
         geocodedItems.push({
           ...item,
-          lat: null,
-          lng: null,
-          geocodingError: result.error
+          lat: undefined,
+          lng: undefined,
+          geocodingError: result.error as string
         });
       }
       
@@ -119,8 +116,8 @@ async function geocodeAddresses(items: ECTDeliveryItem[], userLocation?: { city?
       console.error(`Erro ao geocodificar ${item.address}:`, error);
       geocodedItems.push({
         ...item,
-        lat: null,
-        lng: null,
+        lat: undefined,
+        lng: undefined,
         geocodingError: 'Erro na requisição'
       });
     }
@@ -147,8 +144,8 @@ export async function POST(request: NextRequest) {
     if (userLocationStr) {
       try {
         userLocation = JSON.parse(userLocationStr);
-      } catch (error) {
-        console.log('Erro ao parsear localização do usuário:', error);
+      } catch (parseError) {
+        console.log('Erro ao parsear localização do usuário:', parseError);
       }
     }
 

@@ -96,22 +96,27 @@ export async function POST(request: NextRequest) {
 
     // Combinar dados de todos os arquivos
     const combinedData = combineFileData(processedData);
-    
+
     // Geocodificar endereços se necessário
+    let geocodedAddresses: Array<{ originalAddress: string; geocodedAddress?: string; lat?: number; lng?: number; provider?: string; error?: string }> = [];
     if (combinedData.addresses && combinedData.addresses.length > 0) {
       console.log('Geocodificando endereços extraídos...');
-      const geocodedAddresses = await geocodeAddresses(combinedData.addresses, userLocation);
-      combinedData.geocodedAddresses = geocodedAddresses;
+      geocodedAddresses = await geocodeAddresses(combinedData.addresses, userLocation);
     }
 
+    const finalData = {
+      ...combinedData,
+      geocodedAddresses
+    };
+
     // Gerar dados de rota
-    const routeData = generateRouteData(combinedData);
+    const routeData = generateRouteData(finalData);
 
     console.log('Processamento de arquivos concluído:', {
       totalFiles: files.length,
       processedFiles: processedData.length,
       errors: errors.length,
-      addressesFound: combinedData.addresses?.length || 0
+      addressesFound: finalData.addresses?.length || 0
     });
 
     return NextResponse.json({
@@ -142,13 +147,13 @@ export async function POST(request: NextRequest) {
 }
 
 // Processar arquivo GPX
-async function processGPXFile(file: File): Promise<any> {
+async function processGPXFile(file: File): Promise<{type: string; waypoints: Array<{lat: number; lng: number; name: string}>; totalPoints: number}> {
   try {
     const text = await file.text();
     
     // Extrair waypoints do GPX
     const waypointRegex = /<wpt\s+lat="([^"]+)"\s+lon="([^"]+)">\s*<name>([^<]+)<\/name>/g;
-    const waypoints: any[] = [];
+    const waypoints: Array<{lat: number; lng: number; name: string}> = [];
     
     let match;
     while ((match = waypointRegex.exec(text)) !== null) {
@@ -170,7 +175,7 @@ async function processGPXFile(file: File): Promise<any> {
 }
 
 // Processar arquivo Excel
-async function processExcelFile(file: File): Promise<any> {
+async function processExcelFile(_file: File): Promise<{type: string; message: string; addresses: string[]}> {
   try {
     // Para arquivos Excel, vamos simular extração de dados
     // Em produção, você pode usar bibliotecas como 'xlsx'
@@ -188,13 +193,13 @@ async function processExcelFile(file: File): Promise<any> {
 }
 
 // Processar arquivo KML
-async function processKMLFile(file: File): Promise<any> {
+async function processKMLFile(file: File): Promise<{type: string; placemarks: Array<{name: string; lng: number; lat: number}>; totalPoints: number}> {
   try {
     const text = await file.text();
     
     // Extrair placemarks do KML
     const placemarkRegex = /<Placemark>[\s\S]*?<name>([^<]+)<\/name>[\s\S]*?<coordinates>([^<]+)<\/coordinates>/g;
-    const placemarks: any[] = [];
+    const placemarks: Array<{name: string; lng: number; lat: number}> = [];
     
     let match;
     while ((match = placemarkRegex.exec(text)) !== null) {
@@ -219,7 +224,7 @@ async function processKMLFile(file: File): Promise<any> {
 }
 
 // Processar arquivo XML
-async function processXMLFile(file: File): Promise<any> {
+async function processXMLFile(file: File): Promise<{type: string; addresses: string[]; totalAddresses: number}> {
   try {
     const text = await file.text();
     
@@ -243,7 +248,7 @@ async function processXMLFile(file: File): Promise<any> {
 }
 
 // Processar arquivo CSV
-async function processCSVFile(file: File): Promise<any> {
+async function processCSVFile(file: File): Promise<{type: string; headers: string[]; data: Array<Record<string, string>>; totalRows: number}> {
   try {
     const text = await file.text();
     const lines = text.split('\n').filter(line => line.trim());
@@ -252,7 +257,7 @@ async function processCSVFile(file: File): Promise<any> {
     const headers = lines[0].split(',').map(h => h.trim());
     const data = lines.slice(1).map(line => {
       const values = line.split(',').map(v => v.trim());
-      const row: any = {};
+      const row: Record<string, string> = {};
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
       });
@@ -327,7 +332,8 @@ async function geocodeAddresses(addresses: string[], userLocation?: { city?: str
           error: result.error
         });
       }
-    } catch (error) {
+    } catch (geocodeError) {
+      console.error('Erro na geocodificação:', geocodeError);
       geocoded.push({
         originalAddress: address,
         error: 'Erro na requisição'
@@ -340,15 +346,26 @@ async function geocodeAddresses(addresses: string[], userLocation?: { city?: str
 
 // Gerar dados de rota
 function generateRouteData(combinedData: { totalFiles: number; fileTypes: string[]; addresses: string[]; coordinates: Array<{ lat: number; lng: number; name?: string }>; geocodedAddresses?: Array<{ originalAddress: string; geocodedAddress?: string; lat?: number; lng?: number; provider?: string; error?: string }> }): { stops: Array<{ address?: string; lat: number; lng: number; sequence: number }>; totalDistance: number; totalTime: number; googleMapsUrl: string } {
-  const validStops = combinedData.coordinates || [];
-  
+  const validStops: Array<{ address?: string; lat: number; lng: number; sequence: number }> = [];
+
+  // Adicionar coordenadas dos arquivos
+  if (combinedData.coordinates) {
+    validStops.push(...combinedData.coordinates.map((coord, index) => ({
+      address: coord.name,
+      lat: coord.lat,
+      lng: coord.lng,
+      sequence: index + 1
+    })));
+  }
+
+  // Adicionar endereços geocodificados
   if (combinedData.geocodedAddresses) {
     const validAddresses = combinedData.geocodedAddresses?.filter((a) => a.lat && a.lng) || [];
     validStops.push(...validAddresses.map((a, index: number) => ({
       address: a.geocodedAddress,
-      lat: a.lat,
-      lng: a.lng,
-      sequence: index + 1
+      lat: a.lat!,
+      lng: a.lng!,
+      sequence: validStops.length + index + 1
     })));
   }
 

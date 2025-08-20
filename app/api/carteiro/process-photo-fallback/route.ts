@@ -107,8 +107,9 @@ export async function POST(request: NextRequest) {
     if (userLocationStr) {
       try {
         userLocation = JSON.parse(userLocationStr);
-      } catch (error) {
-        console.log('Erro ao parsear localização do usuário:', error);
+        console.log('Localização do usuário:', userLocation);
+      } catch (parseError) {
+        console.log('Erro ao parsear localização do usuário:', parseError);
       }
     }
 
@@ -140,8 +141,8 @@ export async function POST(request: NextRequest) {
           console.log(`API ${i + 1} bem-sucedida: ${ocrResult.provider}`);
           break;
         }
-      } catch (error) {
-        console.log(`API ${i + 1} falhou, tentando próxima...`);
+      } catch (ocrError) {
+        console.log(`API ${i + 1} falhou, tentando próxima...`, ocrError);
       }
     }
 
