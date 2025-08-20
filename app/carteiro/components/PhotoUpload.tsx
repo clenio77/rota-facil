@@ -3,6 +3,15 @@
 import React, { useState, useRef } from 'react';
 
 import { UserLocation } from '../../../hooks/useGeolocation';
+import AddressValidation from './AddressValidation';
+
+interface ExtractedAddress {
+  id: string;
+  originalText: string;
+  address: string;
+  cep?: string;
+  confidence?: number;
+}
 
 interface PhotoUploadProps {
   onProcessingStart: () => void;
@@ -16,6 +25,9 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'photo' | 'file'>('photo');
+  const [showValidation, setShowValidation] = useState(false);
+  const [extractedAddresses, setExtractedAddresses] = useState<ExtractedAddress[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,9 +179,86 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
     }
   };
 
+  const handleValidatedAddresses = async (validatedAddresses: ExtractedAddress[]) => {
+    setIsValidating(true);
+
+    try {
+      // Geocodificar endereços validados
+      const geocodedAddresses = [];
+
+      for (const addr of validatedAddresses) {
+        try {
+          const response = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              address: addr.address,
+              userLocation: userLocation || undefined
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success && result.lat && result.lng) {
+            geocodedAddresses.push({
+              address: result.address || addr.address,
+              lat: result.lat,
+              lng: result.lng,
+              sequence: geocodedAddresses.length + 1,
+              originalText: addr.originalText,
+              cep: addr.cep,
+              confidence: addr.confidence
+            });
+          }
+        } catch (error) {
+          console.error(`Erro ao geocodificar ${addr.address}:`, error);
+        }
+      }
+
+      // Gerar dados de rota
+      const routeData = {
+        stops: geocodedAddresses,
+        totalDistance: 0,
+        totalTime: 0,
+        googleMapsUrl: generateGoogleMapsUrl(geocodedAddresses)
+      };
+
+      setShowValidation(false);
+      onProcessingComplete({ routeData });
+
+    } catch (error) {
+      onError('Erro ao processar endereços validados');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const generateGoogleMapsUrl = (addresses: any[]) => {
+    if (addresses.length === 0) return '';
+
+    const origin = `${addresses[0].lat},${addresses[0].lng}`;
+    const destination = `${addresses[addresses.length - 1].lat},${addresses[addresses.length - 1].lng}`;
+    const waypoints = addresses.slice(1, -1).map(addr => `${addr.lat},${addr.lng}`).join('|');
+
+    const params = new URLSearchParams({
+      api: '1',
+      origin,
+      destination,
+      travelmode: 'driving'
+    });
+
+    if (waypoints) {
+      params.set('waypoints', waypoints);
+    }
+
+    return `https://www.google.com/maps/dir/?${params.toString()}`;
+  };
+
   const resetSelection = () => {
     setSelectedFiles([]);
     setPreview(null);
+    setShowValidation(false);
+    setExtractedAddresses([]);
     if (photoInputRef.current) {
       photoInputRef.current.value = '';
     }
@@ -333,6 +422,16 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
           </div>
         </div>
       </div>
+
+      {/* Modal de Validação de Endereços */}
+      {showValidation && (
+        <AddressValidation
+          extractedAddresses={extractedAddresses}
+          onConfirm={handleValidatedAddresses}
+          onCancel={() => setShowValidation(false)}
+          isProcessing={isValidating}
+        />
+      )}
     </div>
   );
 }

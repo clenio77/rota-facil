@@ -314,34 +314,87 @@ export function applyImageFilters(imageUrl: string): {
   }
 }
 
+// Pré-processamento específico para listas ECT dos Correios
+export async function enhanceECTImageForOCR(imageBuffer: Buffer): Promise<{ enhancedImageUrl: string; confidence: number }> {
+  try {
+    console.log('Iniciando pré-processamento específico para lista ECT...');
+
+    // Processamento otimizado para documentos ECT
+    const processedBuffer = await sharp(imageBuffer)
+      // Redimensionar para resolução ótima para OCR (300 DPI equivalente)
+      .resize(null, 2000, {
+        withoutEnlargement: true,
+        kernel: sharp.kernel.lanczos3
+      })
+      // Converter para escala de cinza para melhor contraste
+      .grayscale()
+      // Aumentar contraste e nitidez específico para texto
+      .normalize()
+      .sharpen({ sigma: 1.5, m1: 1.0, m2: 2.0 })
+      // Ajustar gamma para melhorar legibilidade
+      .gamma(1.2)
+      // Aplicar threshold adaptativo para texto
+      .threshold(128, { grayscale: false })
+      // Formato PNG para preservar qualidade
+      .png({ quality: 100, compressionLevel: 0 })
+      .toBuffer();
+
+    // Converter para base64
+    const base64Image = `data:image/png;base64,${processedBuffer.toString('base64')}`;
+
+    console.log('Pré-processamento ECT concluído com sucesso');
+
+    return {
+      enhancedImageUrl: base64Image,
+      confidence: 0.9 // Alta confiança para processamento específico ECT
+    };
+  } catch (error) {
+    console.error('Erro no pré-processamento ECT:', error);
+
+    // Fallback para processamento padrão
+    const fallbackBuffer = await sharp(imageBuffer)
+      .grayscale()
+      .normalize()
+      .png()
+      .toBuffer();
+
+    const base64Image = `data:image/png;base64,${fallbackBuffer.toString('base64')}`;
+
+    return {
+      enhancedImageUrl: base64Image,
+      confidence: 0.6
+    };
+  }
+}
+
 // Função principal que combina todas as melhorias
 export async function enhanceImageForOCR(imageUrl: string): Promise<{ enhancedImageUrl: string; confidence: number }> {
   try {
     console.log('Iniciando pré-processamento avançado de imagem para OCR...');
-    
+
     // Aplicar pré-processamento avançado
     const processedImage = await preprocessImageForOCR(imageUrl);
-    
+
     // Calcular confiança baseada na qualidade da imagem
     let confidence = 0.7; // Base
-    
+
     // Boost para imagens processadas
     confidence += 0.2;
-    
+
     // Boost para imagens com boa resolução
     if (processedImage.processedImageUrl.includes('data:image')) {
       confidence += 0.1;
     }
-    
+
     console.log(`Imagem pré-processada com confiança: ${confidence}`);
-    
+
     return {
       enhancedImageUrl: processedImage.processedImageUrl,
       confidence: Math.min(confidence, 1.0)
     };
   } catch (error) {
     console.error('Erro no pré-processamento avançado:', error);
-    
+
     // Fallback para imagem original
     return {
       enhancedImageUrl: imageUrl,

@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { enhanceECTImageForOCR } from '../../../lib/imagePreprocessing';
+import { parseECTAddresses, isECTList, extractECTMetadata } from '../../../lib/ectParser';
+import { geocodeWithCache } from '../../../lib/geocodeCache';
 
 interface ECTDeliveryItem {
   sequence: number;

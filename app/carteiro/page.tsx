@@ -5,6 +5,7 @@ import PhotoUpload from './components/PhotoUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import RouteResult from './components/RouteResult';
 import ECTListResult from './components/ECTListResult';
+import CacheStats from './components/CacheStats';
 import { useGeolocation } from '../../hooks/useGeolocation';
 
 interface RouteData {
@@ -28,16 +29,46 @@ export default function CarteiroPage() {
   const { position: deviceLocation, isLoading: locationLoading } = useGeolocation();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            📮 RotaFácil para Carteiros
+        {/* Header Profissional */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-6 shadow-lg">
+            <span className="text-5xl">📮</span>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            RotaFácil para Carteiros
           </h1>
-          <p className="text-lg text-gray-600">
-            Processe suas listas de entrega e gere rotas otimizadas em segundos
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            Processe suas listas de entrega e gere rotas otimizadas em segundos com tecnologia de ponta
           </p>
+
+          {/* Link de volta */}
+          <div className="mt-6">
+            <a
+              href="/"
+              className="inline-flex items-center space-x-2 text-gray-600 hover:text-blue-600 font-medium transition-colors"
+            >
+              <span>←</span>
+              <span>Voltar para versão básica</span>
+            </a>
+          </div>
+
+          {/* Badges de Recursos */}
+          <div className="flex flex-wrap justify-center gap-3 mt-6">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              ✅ OCR Inteligente
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              🗺️ Geocodificação BR
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+              🚀 Rota Otimizada
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+              📱 100% Gratuito
+            </span>
+          </div>
           
           {/* Indicador de Localização */}
           {deviceLocation && (
@@ -54,40 +85,43 @@ export default function CarteiroPage() {
           )}
         </div>
 
-        {/* Interface Principal */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+        {/* Interface Principal - Design Profissional */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-12 border border-gray-100">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
             🚀 Como funciona?
           </h2>
-          
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <div className="text-center">
-              <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">📸</span>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <div className="text-center group">
+              <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">📸</span>
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">1. Tire uma foto</h3>
-              <p className="text-gray-600 text-sm">
-                Fotografe a lista de entrega do sistema Correios
+              <h3 className="font-bold text-gray-800 mb-3 text-lg">1. Tire uma foto</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Fotografe a lista de entrega do sistema Correios.
+                Nossa IA detecta automaticamente listas ECT.
               </p>
             </div>
-            
-            <div className="text-center">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">🤖</span>
+
+            <div className="text-center group">
+              <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">🤖</span>
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">2. Processamento automático</h3>
-              <p className="text-gray-600 text-sm">
-                IA extrai endereços e gera coordenadas precisas
+              <h3 className="font-bold text-gray-800 mb-3 text-lg">2. Processamento automático</h3>
+              <p className="text-gray-600 leading-relaxed">
+                IA extrai endereços com OCR avançado e geocodifica
+                automaticamente para o Brasil.
               </p>
             </div>
-            
-            <div className="text-center">
-              <div className="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">🗺️</span>
+
+            <div className="text-center group">
+              <div className="bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">🗺️</span>
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">3. Rota otimizada</h3>
-              <p className="text-gray-600 text-sm">
-                Receba rota otimizada para Google Maps
+              <h3 className="font-bold text-gray-800 mb-3 text-lg">3. Rota otimizada</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Receba rota otimizada para Google Maps com sequência
+                inteligente de entregas.
               </p>
             </div>
           </div>
@@ -173,6 +207,9 @@ export default function CarteiroPage() {
             )}
           </ul>
         </div>
+
+        {/* Componente de Estatísticas do Cache */}
+        <CacheStats />
       </div>
     </div>
   );

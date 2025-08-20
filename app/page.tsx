@@ -445,15 +445,18 @@ export default function HomePage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
             <p className="text-gray-600">Use foto (OCR) ou voz para adicionar endereços</p>
-            <div className="mt-2">
+            <div className="mt-4">
               <a
                 href="/carteiro"
-                className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 font-medium"
+                className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                <span>📮</span>
-                <span>Versão para Carteiros</span>
-                <span>→</span>
+                <span className="text-xl">📮</span>
+                <span>Versão Profissional para Carteiros</span>
+                <span className="text-lg">→</span>
               </a>
+              <div className="mt-2 text-sm text-gray-500">
+                ✨ OCR avançado • Listas ECT • Cache inteligente
+              </div>
             </div>
           </div>
           {/* Stats */}
