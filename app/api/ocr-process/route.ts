@@ -159,7 +159,7 @@ async function geocodeWithMapbox(address: string, userLocation?: { lat: number; 
 }
 
 // Provider: Nominatim  
-async function geocodeWithNominatim(address: string): Promise<{lat: number; lng: number; confidence: number; formatted_address?: string} | null> {
+async function geocodeWithNominatim(address: string, userLocation?: { city?: string; state?: string }): Promise<{lat: number; lng: number; confidence: number; formatted_address?: string} | null> {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
@@ -185,6 +185,21 @@ async function geocodeWithNominatim(address: string): Promise<{lat: number; lng:
         if (result.osm_type === 'way') confidence = 0.7;
         if (result.class === 'building') confidence = 0.8;
         if (result.type === 'house') confidence = 0.9;
+
+        // Aplicar filtro de cidade se disponível
+        if (userLocation?.city) {
+          const resultAddress = result.display_name.toLowerCase();
+          const userCity = userLocation.city.toLowerCase();
+          
+          if (resultAddress.includes(userCity)) {
+            confidence = Math.min(1.0, confidence + 0.2); // Boost para mesma cidade
+            console.log(`Nominatim OCR: boost aplicado para cidade ${userCity}`);
+          } else {
+            // Penalizar resultados de outras cidades
+            confidence = Math.max(0.1, confidence - 0.3);
+            console.log(`Nominatim OCR: penalização para cidade diferente`);
+          }
+        }
 
         return {
           lat,
@@ -232,7 +247,7 @@ async function geocodeAddressImproved(address: string, userLocation?: { lat: num
   }
 
   // 3. Tentar Nominatim
-  const nominatimResult = await geocodeWithNominatim(normalizeAddress(address));
+  const nominatimResult = await geocodeWithNominatim(normalizeAddress(address), userLocation);
   if (nominatimResult && nominatimResult.confidence >= 0.5) {
     console.log('Geocodificação via Nominatim bem-sucedida');
     return {

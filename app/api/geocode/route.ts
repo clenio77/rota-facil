@@ -115,6 +115,10 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
             if (featureCity && featureCity.text.toLowerCase() === userLocation.city.toLowerCase()) {
               confidence = Math.min(1.0, confidence + 0.3); // Boost de 30% para mesma cidade
               console.log(`Mapbox: boost aplicado para ${featureCity.text}`);
+            } else {
+              // Penalizar resultados de outras cidades
+              confidence = Math.max(0.1, confidence - 0.4);
+              console.log(`Mapbox: penalização aplicada para cidade diferente (${featureCity?.text || 'desconhecida'})`);
             }
           }
           
@@ -130,7 +134,17 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
         .sort((a: MapboxFeatureResult, b: MapboxFeatureResult) => b.confidence - a.confidence);
 
       if (features.length > 0) {
-        const best = features[0];
+        // Filtrar resultados com confiança muito baixa (outras cidades)
+        const validFeatures = features.filter((f: MapboxFeatureResult) => f.confidence >= 0.4);
+        
+        if (validFeatures.length === 0) {
+          console.log('Mapbox: todos os resultados foram filtrados por baixa confiança (outras cidades)');
+          return null;
+        }
+        
+        const best = validFeatures[0];
+        console.log(`Mapbox: melhor resultado selecionado (confiança: ${best.confidence})`);
+        
         return {
           lat: best.lat,
           lng: best.lng,
@@ -150,7 +164,7 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
 }
 
 // Provider 3: Nominatim (fallback gratuito)
-async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
+async function geocodeWithNominatim(address: string, userLocation?: { city?: string; state?: string }): Promise<GeocodeResult | null> {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
@@ -166,28 +180,43 @@ async function geocodeWithNominatim(address: string): Promise<GeocodeResult | nu
 
     const data = await response.json();
 
-    if (Array.isArray(data) && data.length > 0) {
-      const result = data[0];
-      const lat = parseFloat(result.lat);
-      const lng = parseFloat(result.lon);
+          if (Array.isArray(data) && data.length > 0) {
+        const result = data[0];
+        const lat = parseFloat(result.lat);
+        const lng = parseFloat(result.lon);
 
-      if (isValidBrazilianCoordinate(lat, lng)) {
-        // Calcular confiança baseada no tipo de resultado
-        let confidence = 0.5;
-        if (result.osm_type === 'way') confidence = 0.7;
-        if (result.class === 'building') confidence = 0.8;
-        if (result.type === 'house') confidence = 0.9;
+        if (isValidBrazilianCoordinate(lat, lng)) {
+          // Calcular confiança baseada no tipo de resultado
+          let confidence = 0.5;
+          if (result.osm_type === 'way') confidence = 0.7;
+          if (result.class === 'building') confidence = 0.8;
+          if (result.type === 'house') confidence = 0.9;
 
-        return {
-          lat,
-          lng,
-          address: result.display_name,
-          confidence,
-          provider: 'nominatim',
-          formatted_address: result.display_name
-        };
+          // Aplicar filtro de cidade se disponível
+          if (userLocation?.city) {
+            const resultAddress = result.display_name.toLowerCase();
+            const userCity = userLocation.city.toLowerCase();
+            
+            if (resultAddress.includes(userCity)) {
+              confidence = Math.min(1.0, confidence + 0.2); // Boost para mesma cidade
+              console.log(`Nominatim: boost aplicado para cidade ${userCity}`);
+            } else {
+              // Penalizar resultados de outras cidades
+              confidence = Math.max(0.1, confidence - 0.3);
+              console.log(`Nominatim: penalização para cidade diferente`);
+            }
+          }
+
+          return {
+            lat,
+            lng,
+            address: result.display_name,
+            confidence,
+            provider: 'nominatim',
+            formatted_address: result.display_name
+          };
+        }
       }
-    }
 
     return null;
   } catch (error) {
@@ -281,14 +310,14 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
 
   // 2. Tentar Mapbox (se configurado)
   const mapboxResult = await geocodeWithMapbox(address, userLocation);
-  if (mapboxResult && mapboxResult.confidence >= 0.7) {
+  if (mapboxResult && mapboxResult.confidence >= 0.6) {
     console.log('Geocodificação via Mapbox bem-sucedida');
     return mapboxResult;
   }
 
   // 3. Tentar Nominatim
-  const nominatimResult = await geocodeWithNominatim(address);
-  if (nominatimResult && nominatimResult.confidence >= 0.5) {
+  const nominatimResult = await geocodeWithNominatim(address, userLocation);
+  if (nominatimResult && nominatimResult.confidence >= 0.4) {
     console.log('Geocodificação via Nominatim bem-sucedida');
     return nominatimResult;
   }
@@ -303,7 +332,7 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
   // 5. Se nada funcionou, tentar versões simplificadas do endereço
   if (address.includes(',')) {
     const simplifiedAddress = address.split(',')[0].trim() + ', Brasil';
-    const fallbackResult = await geocodeWithNominatim(simplifiedAddress);
+    const fallbackResult = await geocodeWithNominatim(simplifiedAddress, userLocation);
     if (fallbackResult) {
       console.log('Geocodificação com endereço simplificado bem-sucedida');
       return {
@@ -369,10 +398,18 @@ export async function POST(request: NextRequest) {
     const result = await geocodeAndCache(address, userLocation);
     
     if (!result) {
+      // Log específico para debug de filtro de localização
+      if (userLocation?.city) {
+        console.log(`Geocodificação falhou para "${address}" - possivelmente filtrado por não estar em ${userLocation.city}`);
+      }
+      
       return NextResponse.json({ 
         success: false, 
-        error: 'Endereço não encontrado ou fora do Brasil',
-        attempted_address: address
+        error: userLocation?.city 
+          ? `Endereço não encontrado em ${userLocation.city} ou fora do Brasil. Tente especificar a cidade: "endereço, ${userLocation.city}"`
+          : 'Endereço não encontrado ou fora do Brasil',
+        attempted_address: address,
+        user_city: userLocation?.city || null
       }, { status: 404 });
     }
 
