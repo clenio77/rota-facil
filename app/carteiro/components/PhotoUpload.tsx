@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 
 import { UserLocation } from '../../../hooks/useGeolocation';
 import AddressValidation from './AddressValidation';
+import { ImageOptimizer, ImageOptimizationResult } from '../../../lib/imageOptimizer';
 
 interface ExtractedAddress {
   id: string;
@@ -28,18 +29,53 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
   const [showValidation, setShowValidation] = useState(false);
   const [extractedAddresses, setExtractedAddresses] = useState<ExtractedAddress[]>([]);
   const [isValidating, setIsValidating] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizationResult, setOptimizationResult] = useState<ImageOptimizationResult | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (files: FileList, mode: 'photo' | 'file') => {
+  const handleFileSelect = async (files: FileList, mode: 'photo' | 'file') => {
     const fileArray = Array.from(files);
-    
+
     if (mode === 'photo') {
       // Validar imagens
       const invalidFiles = fileArray.filter(file => !file.type.startsWith('image/'));
       if (invalidFiles.length > 0) {
         onError('Por favor, selecione apenas arquivos de imagem (JPG, PNG, GIF)');
         return;
+      }
+
+      // Otimizar imagens grandes
+      const optimizedFiles: File[] = [];
+      let totalOptimizationResult: ImageOptimizationResult | null = null;
+
+      for (const file of fileArray) {
+        if (ImageOptimizer.needsOptimization(file)) {
+          setIsOptimizing(true);
+          try {
+            const result = await ImageOptimizer.optimizeForOCR(file);
+            optimizedFiles.push(result.optimizedFile);
+            totalOptimizationResult = result; // Guardar resultado da última otimização
+            console.log(`Imagem otimizada: ${result.optimizations.join(', ')}`);
+          } catch (error) {
+            console.error('Erro na otimização:', error);
+            optimizedFiles.push(file); // Usar arquivo original se otimização falhar
+          }
+        } else {
+          optimizedFiles.push(file);
+        }
+      }
+
+      setIsOptimizing(false);
+      setOptimizationResult(totalOptimizationResult);
+      setSelectedFiles(optimizedFiles);
+
+        // Criar preview para primeira imagem otimizada
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setPreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(optimizedFiles[0]);
       }
     } else {
       // Validar arquivos de dados
@@ -52,24 +88,15 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
         onError('Por favor, selecione apenas arquivos válidos: XLS, XLSX, GPX, KML, XML, CSV');
         return;
       }
-    }
 
-    // Validar tamanho (máximo 10MB por arquivo)
-    const oversizedFiles = fileArray.filter(file => file.size > 10 * 1024 * 1024);
-    if (oversizedFiles.length > 0) {
-      onError('Arquivo muito grande. Máximo 10MB permitido por arquivo.');
-      return;
-    }
+      // Validar tamanho (máximo 10MB por arquivo para dados)
+      const oversizedFiles = fileArray.filter(file => file.size > 10 * 1024 * 1024);
+      if (oversizedFiles.length > 0) {
+        onError('Arquivo muito grande. Máximo 10MB permitido por arquivo.');
+        return;
+      }
 
-    setSelectedFiles(fileArray);
-    
-    // Criar preview apenas para imagens
-    if (mode === 'photo' && fileArray.length > 0) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(fileArray[0]);
+      setSelectedFiles(fileArray);
     }
   };
 
@@ -286,6 +313,8 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
     setPreview(null);
     setShowValidation(false);
     setExtractedAddresses([]);
+    setOptimizationResult(null);
+    setIsOptimizing(false);
     if (photoInputRef.current) {
       photoInputRef.current.value = '';
     }
@@ -387,16 +416,51 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
               {selectedFiles.length} {uploadMode === 'photo' ? 'foto(s)' : 'arquivo(s)'} selecionado(s)
               {selectedFiles.length === 1 && ` - ${selectedFiles[0].name} (${(selectedFiles[0].size / 1024 / 1024).toFixed(2)} MB)`}
             </p>
+            {/* Informações de Otimização */}
+            {optimizationResult && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <div className="flex items-center mb-2">
+                  <span className="mr-2">🚀</span>
+                  <span className="font-medium text-blue-800">Imagem Otimizada para OCR</span>
+                </div>
+                <div className="text-blue-700 space-y-1">
+                  <p>📏 Tamanho: {(optimizationResult.originalSize / 1024 / 1024).toFixed(2)} MB → {(optimizationResult.optimizedSize / 1024 / 1024).toFixed(2)} MB</p>
+                  <p>📐 Dimensões: {optimizationResult.dimensions.original.width}x{optimizationResult.dimensions.original.height} → {optimizationResult.dimensions.optimized.width}x{optimizationResult.dimensions.optimized.height}</p>
+                  <p>💾 Compressão: {optimizationResult.compressionRatio.toFixed(1)}x menor</p>
+                  <div className="text-xs opacity-75 mt-2">
+                    {optimizationResult.optimizations.map((opt, index) => (
+                      <div key={index}>• {opt}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Indicador de Otimização */}
+            {isOptimizing && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
+                  <span className="font-medium text-yellow-800">Otimizando imagem para melhor OCR...</span>
+                </div>
+                <p className="text-yellow-700 text-xs mt-1">
+                  Redimensionando e aplicando filtros para melhorar a extração de texto
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-center space-x-3">
               <button
                 onClick={handleProcessFiles}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                disabled={isOptimizing}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 🚀 Processar {uploadMode === 'photo' ? 'Foto(s)' : 'Arquivo(s)'}
               </button>
               <button
                 onClick={resetSelection}
-                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                disabled={isOptimizing}
+                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 🔄 Trocar Foto
               </button>
@@ -438,6 +502,7 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
                   Nossa IA detecta automaticamente listas ECT.</p>
                   <p className="mt-2 text-xs opacity-75">💡 Você pode selecionar múltiplas fotos de uma vez!</p>
                   <p className="mt-2 text-xs opacity-75">🎯 <strong>Listas ECT são detectadas automaticamente!</strong></p>
+                  <p className="mt-2 text-xs opacity-75">🚀 <strong>Fotos grandes são otimizadas automaticamente para melhor OCR!</strong></p>
                 </div>
               ) : (
                 <div>
