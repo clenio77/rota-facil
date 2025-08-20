@@ -53,6 +53,7 @@ interface Stop {
   lat?: number;
   lng?: number;
   sequence?: number;
+  allowOutOfCity?: boolean;
 }
 
 interface OptimizedStop extends Stop {
@@ -107,6 +108,23 @@ export default function HomePage() {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  };
+
+  const addressHasExplicitCity = (input: string) => {
+    const text = input.toLowerCase().trim();
+    // Se o usuário especificar uma cidade após vírgula ou hífen perto do fim do texto
+    // Ex.: "rua x, 123 - araguari" ou "rua x, 123, araguari"
+    const explicitCityPattern = /(?:-|,)\s*([a-zà-ÿ]{3,}(?:\s+[a-zà-ÿ]{3,})*)$/i;
+    const match = text.match(explicitCityPattern);
+    if (!match) return false;
+    // Evitar tratar termos curtos comuns de bairro como cidade quando isolados
+    const candidate = match[1].trim();
+    if (/\d/.test(candidate)) return false;
+    // Se possuir ao menos 4 letras totais e não for apenas "centro"
+    const lettersCount = candidate.replace(/\s+/g, '').length;
+    if (lettersCount < 4) return false;
+    if (candidate === 'centro') return false;
+    return true;
   };
 
   // Sync settings modal with URL hash (#settings)
@@ -196,6 +214,7 @@ export default function HomePage() {
       const result = await response.json();
 
       if (result.success) {
+        // OCR não tem input textual do usuário, então só permitimos fora da cidade se o usuário marcar origem customizada no futuro.
         const center = deviceOrigin || deviceLocation;
         if (center && typeof result.lat === 'number' && typeof result.lng === 'number') {
           const dist = haversineKm(center.lat, center.lng, result.lat, result.lng);
@@ -356,10 +375,11 @@ export default function HomePage() {
   const centerLocation = deviceOrigin || deviceLocation;
   const cityFilteredConfirmedStops = React.useMemo(() => {
     if (!centerLocation) return confirmedStops;
-    return confirmedStops.filter(s =>
-      typeof s.lat === 'number' && typeof s.lng === 'number' &&
-      haversineKm(centerLocation.lat, centerLocation.lng, s.lat, s.lng) <= MAX_CITY_DISTANCE_KM
-    );
+    return confirmedStops.filter(s => {
+      if (s.allowOutOfCity) return true;
+      if (typeof s.lat !== 'number' || typeof s.lng !== 'number') return false;
+      return haversineKm(centerLocation.lat, centerLocation.lng, s.lat, s.lng) <= MAX_CITY_DISTANCE_KM;
+    });
   }, [confirmedStops, centerLocation]);
   const optimizedStops = confirmedStops
     .filter(s => typeof s.sequence === 'number')
@@ -454,12 +474,14 @@ export default function HomePage() {
     if (!address) { alert('Digite ou dite um endereço.'); return; }
     try {
       // Geocodificar no servidor com contexto de localização do usuário
+      const userExplicitCity = addressHasExplicitCity(address);
       const res = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           address,
-          userLocation: deviceOrigin || deviceLocation || undefined
+          // Quando o usuário especifica cidade explicitamente, não enviesar a geocodificação
+          userLocation: userExplicitCity ? undefined : (deviceOrigin || deviceLocation || undefined)
         }),
       });
       const data = await res.json();
@@ -470,8 +492,8 @@ export default function HomePage() {
       const center = deviceOrigin || deviceLocation;
       if (center) {
         const dist = haversineKm(center.lat, center.lng, data.lat, data.lng);
-        if (dist > MAX_CITY_DISTANCE_KM) {
-          alert('Endereço fora da sua cidade atual. Ajuste a cidade ou o endereço.');
+        if (dist > MAX_CITY_DISTANCE_KM && !userExplicitCity) {
+          alert('Endereço fora da sua cidade atual. Inclua a cidade no fim do endereço para permitir.');
           return;
         }
       }
@@ -482,6 +504,7 @@ export default function HomePage() {
         address: data.address || address,
         lat: data.lat,
         lng: data.lng,
+        allowOutOfCity: userExplicitCity || undefined,
       };
       setStops(prev => [...prev, newStop]);
       setIsVoiceDialogOpen(false);
