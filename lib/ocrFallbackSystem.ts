@@ -140,7 +140,7 @@ class ExternalOCRStrategy implements OCRStrategy {
         confidence: 0.7, // OCR.space não retorna confiança
         provider: 'ocr.space'
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -158,7 +158,7 @@ class ExternalOCRStrategy implements OCRStrategy {
         confidence: 0.6,
         provider: 'ocr.space-url'
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -193,7 +193,7 @@ class ExternalOCRStrategy implements OCRStrategy {
         confidence: 0.9, // Google tem alta confiança
         provider: 'google-cloud-vision'
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }

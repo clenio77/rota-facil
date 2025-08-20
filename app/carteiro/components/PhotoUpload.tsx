@@ -202,7 +202,15 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
 
     try {
       // Geocodificar endereços validados
-      const geocodedAddresses = [] as any[];
+      const geocodedAddresses: Array<{
+        address: string;
+        lat: number;
+        lng: number;
+        sequence: number;
+        originalText: string;
+        cep?: string;
+        confidence?: number;
+      }> = [];
 
       for (const addr of validatedAddresses) {
         try {
@@ -402,6 +410,7 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
         <div className="text-center">
           <h4 className="text-lg font-medium text-gray-900 mb-4">Preview da Imagem</h4>
           <div className="inline-block border-2 border-gray-200 rounded-lg overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={preview}
               alt="Preview"

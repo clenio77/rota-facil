@@ -40,7 +40,7 @@ export default function ProcessingStatus() {
       clearInterval(interval);
       clearInterval(stepInterval);
     };
-  }, []);
+  }, [steps.length]);
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
