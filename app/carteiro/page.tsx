@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import PhotoUpload from './components/PhotoUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import RouteResult from './components/RouteResult';
+import ECTListResult from './components/ECTListResult';
 import { useGeolocation } from '../../hooks/useGeolocation';
 
 interface RouteData {
@@ -113,7 +114,18 @@ export default function CarteiroPage() {
 
         {/* Resultado da Rota */}
         {routeData && (
-          <RouteResult routeData={routeData} />
+          <>
+            {/* Verificar se é resultado de lista ECT */}
+            {routeData.ectData ? (
+              <ECTListResult 
+                ectData={routeData.ectData}
+                geocodedItems={routeData.geocodedItems}
+                routeData={routeData}
+              />
+            ) : (
+              <RouteResult routeData={routeData} />
+            )}
+          </>
         )}
 
         {/* Mensagem de Erro */}
