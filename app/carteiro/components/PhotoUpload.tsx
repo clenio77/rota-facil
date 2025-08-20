@@ -112,38 +112,29 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
 
     try {
       onProcessingStart();
-      
-      const formData = new FormData();
-      
-              // Adicionar todos os arquivos selecionados
-        selectedFiles.forEach((file) => {
-        formData.append(uploadMode === 'photo' ? 'photos' : 'files', file);
-      });
-      
-      // Adicionar localização do usuário se disponível
-      if (userLocation) {
-        formData.append('userLocation', JSON.stringify({
-          lat: userLocation.lat,
-          lng: userLocation.lng,
-          city: userLocation.city,
-          state: userLocation.state
-        }));
-      }
-      
-      // Adicionar tipo de upload
-      formData.append('uploadType', uploadMode);
-      
-      // Detectar automaticamente se é lista ECT ou foto comum
-      let endpoint = '/api/carteiro/process-photo-fallback';
-      
+
+      const userLocationPayload = userLocation
+        ? JSON.stringify({
+            lat: userLocation.lat,
+            lng: userLocation.lng,
+            city: userLocation.city,
+            state: userLocation.state,
+          })
+        : undefined;
+
       if (uploadMode === 'photo') {
-        // Tentar primeiro como lista ECT (mais específico)
+        // 1) Tenta ECT primeiro com a primeira foto
         try {
+          const ectForm = new FormData();
+          ectForm.append('uploadType', uploadMode);
+          if (userLocationPayload) ectForm.append('userLocation', userLocationPayload);
+          ectForm.append('photo', selectedFiles[0]);
+
           const ectResponse = await fetch('/api/carteiro/process-ect-list', {
             method: 'POST',
-            body: formData,
+            body: ectForm,
           });
-          
+
           if (ectResponse.ok) {
             const ectResult = await ectResponse.json();
             if (ectResult.success && ectResult.ectData) {
@@ -155,20 +146,47 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
         } catch (error) {
           console.log('Tentando como foto comum...', error);
         }
-      } else {
-        endpoint = '/api/carteiro/process-files';
+
+        // 2) Fallback: OCR genérico para a primeira foto
+        const fbForm = new FormData();
+        fbForm.append('uploadType', uploadMode);
+        if (userLocationPayload) fbForm.append('userLocation', userLocationPayload);
+        fbForm.append('photo', selectedFiles[0]);
+
+        const response = await fetch('/api/carteiro/process-photo-fallback', {
+          method: 'POST',
+          body: fbForm,
+        });
+
+        if (!response.ok) {
+          throw new Error('Erro no processamento da foto');
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          onProcessingComplete(result);
+        } else {
+          onError(result.error || 'Erro desconhecido no processamento');
+        }
+        return;
       }
-      const response = await fetch(endpoint, {
+
+      // 3) Arquivos (XLS, GPX, etc.)
+      const filesForm = new FormData();
+      filesForm.append('uploadType', uploadMode);
+      if (userLocationPayload) filesForm.append('userLocation', userLocationPayload);
+      selectedFiles.forEach((file) => filesForm.append('files', file));
+
+      const response = await fetch('/api/carteiro/process-files', {
         method: 'POST',
-        body: formData,
+        body: filesForm,
       });
 
       if (!response.ok) {
-        throw new Error(`Erro no processamento dos ${uploadMode === 'photo' ? 'fotos' : 'arquivos'}`);
+        throw new Error('Erro no processamento dos arquivos');
       }
 
       const result = await response.json();
-      
       if (result.success) {
         onProcessingComplete(result);
       } else {
@@ -184,7 +202,7 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
 
     try {
       // Geocodificar endereços validados
-      const geocodedAddresses = [];
+      const geocodedAddresses = [] as any[];
 
       for (const addr of validatedAddresses) {
         try {
@@ -407,8 +425,8 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
               {uploadMode === 'photo' ? (
                 <div>
                   <p className="font-medium mb-2">📸 Modo Foto:</p>
-                  <p>Tire fotos da tela do sistema Correios mostrando a lista de entregas. 
-                  Certifique-se de que todos os endereços estão visíveis e legíveis.</p>
+                  <p>Tire fotos da tela do sistema Correios.
+                  Nossa IA detecta automaticamente listas ECT.</p>
                   <p className="mt-2 text-xs opacity-75">💡 Você pode selecionar múltiplas fotos de uma vez!</p>
                   <p className="mt-2 text-xs opacity-75">🎯 <strong>Listas ECT são detectadas automaticamente!</strong></p>
                 </div>

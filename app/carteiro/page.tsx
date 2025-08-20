@@ -34,6 +34,13 @@ export default function CarteiroPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        {/* Botão fixo de voltar para a tela principal */}
+        <div className="sticky top-0 z-40 flex justify-start mb-4">
+          <Link href="/" className="inline-flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-2 rounded-lg shadow hover:shadow-md border border-gray-200">
+            <span>←</span>
+            <span className="text-sm font-medium">Voltar</span>
+          </Link>
+        </div>
         {/* Header Profissional */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-6 shadow-lg">
