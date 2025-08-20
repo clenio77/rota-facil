@@ -70,13 +70,12 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
       setOptimizationResult(totalOptimizationResult);
       setSelectedFiles(optimizedFiles);
 
-        // Criar preview para primeira imagem otimizada
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreview(e.target?.result as string);
-        };
-        reader.readAsDataURL(optimizedFiles[0]);
-      }
+      // Criar preview para primeira imagem otimizada
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(optimizedFiles[0]);
     } else {
       // Validar arquivos de dados
       const validExtensions = ['.xls', '.xlsx', '.gpx', '.kml', '.xml', '.csv'];

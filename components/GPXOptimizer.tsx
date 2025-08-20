@@ -74,7 +74,7 @@ export default function GPXOptimizer() {
   });
 
   // Geolocalização
-  const { position: deviceLocation, isLoading: locationLoading } = useGeolocation();
+  const { position: deviceLocation } = useGeolocation();
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
 
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {

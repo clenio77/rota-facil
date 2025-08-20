@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import GPXOptimizer from '../../components/GPXOptimizer';
 
 export const metadata: Metadata = {
@@ -15,25 +16,25 @@ export default function GPXOptimizerPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <a href="/" className="text-xl font-bold text-blue-600">
+              <Link href="/" className="text-xl font-bold text-blue-600">
                 RotaFácil
-              </a>
+              </Link>
               <span className="ml-2 text-gray-400">|</span>
               <span className="ml-2 text-gray-600">GPX Optimizer</span>
             </div>
             <div className="flex items-center space-x-4">
-              <a 
-                href="/carteiro" 
+              <Link
+                href="/carteiro"
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Carteiro
-              </a>
-              <a 
-                href="/" 
+              </Link>
+              <Link
+                href="/"
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Início
-              </a>
+              </Link>
             </div>
           </div>
         </div>
