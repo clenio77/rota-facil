@@ -169,16 +169,10 @@ export async function POST(request: NextRequest) {
       textLength: ocrResult.text.length
     });
 
-    // Simular dados de rota (em produção, isso viria da otimização real)
+    // Em vez de coordenadas fixas, apenas retorna o texto para que a UI trate
+    // ou usemos uma geocodificação posterior se necessário.
     const mockRouteData = {
-      stops: [
-        {
-          address: 'Endereço extraído via API externa',
-          lat: -23.5505, // Coordenadas de exemplo
-          lng: -46.6333,
-          sequence: 1
-        }
-      ],
+      stops: [],
       totalDistance: 0,
       totalTime: 0,
       googleMapsUrl: 'https://www.google.com/maps'
@@ -196,7 +190,7 @@ export async function POST(request: NextRequest) {
       extractionMethod: `fallback-${ocrResult.provider}`,
       suggestions: [
         'Texto extraído via API externa de OCR',
-        'Verifique se os endereços estão corretos',
+        'Cole o endereço acima no campo de voz da home para geocodificar com a sua localização',
         'Use o modo manual se necessário'
       ]
     });

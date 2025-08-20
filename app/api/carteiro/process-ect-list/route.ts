@@ -70,16 +70,53 @@ function extractECTListData(text: string): ECTListData | null {
   }
 }
 
+// Normaliza nomes de estados para a sigla (UF)
+function normalizeUF(state?: string): string | undefined {
+  if (!state) return undefined;
+  const raw = state.trim().toLowerCase();
+  if (/^[a-z]{2}$/i.test(state) && state.length === 2) return state.toUpperCase();
+  const deaccent = (s: string) => s
+    .replace(/[àáâãäå]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôõö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    .replace(/[ç]/g, 'c');
+  const key = deaccent(raw);
+  const map: Record<string, string> = {
+    'acre': 'AC', 'alagoas': 'AL', 'amapa': 'AP', 'amazonas': 'AM', 'bahia': 'BA',
+    'ceara': 'CE', 'distrito federal': 'DF', 'espirito santo': 'ES', 'goias': 'GO',
+    'maranhao': 'MA', 'mato grosso': 'MT', 'mato grosso do sul': 'MS', 'minas gerais': 'MG',
+    'para': 'PA', 'paraiba': 'PB', 'parana': 'PR', 'pernambuco': 'PE', 'piaui': 'PI',
+    'rio de janeiro': 'RJ', 'rio grande do norte': 'RN', 'rio grande do sul': 'RS',
+    'rondonia': 'RO', 'roraima': 'RR', 'santa catarina': 'SC', 'sao paulo': 'SP',
+    'sergipe': 'SE', 'tocantins': 'TO'
+  };
+  return map[key] || undefined;
+}
+
+function toTitleCaseCity(city?: string): string | undefined {
+  if (!city) return undefined;
+  return city
+    .toLowerCase()
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 // Função para geocodificar endereços
 async function geocodeAddresses(items: ECTDeliveryItem[], userLocation?: { city?: string; state?: string }): Promise<Array<ECTDeliveryItem & { lat?: number; lng?: number; geocodedAddress?: string; geocodingProvider?: string; geocodingError?: string }>> {
   console.log('Geocodificando endereços...');
   
   const geocodedItems = [];
   
+  const cityHint = toTitleCaseCity(userLocation?.city) || 'Uberlândia';
+  const ufHint = normalizeUF(userLocation?.state) || 'MG';
+
   for (const item of items) {
     try {
-      // Construir endereço completo
-      const fullAddress = `${item.address}, ${item.cep}, Uberlândia, MG, Brasil`;
+      // Construir endereço completo com cidade/UF do usuário, quando disponível
+      const fullAddress = `${item.address}, ${item.cep}, ${cityHint}, ${ufHint}, Brasil`;
       
       // Chamar API de geocodificação
       const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/geocode`, {
