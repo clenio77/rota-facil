@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createWorker } from 'tesseract.js';
 import { getSupabase } from '../../../lib/supabaseClient';
 import { enhanceImageForOCR } from '../../../lib/imagePreprocessing';
+import { executeOCRWithFallback } from '../../../lib/ocrFallbackSystem';
+import { extractAddressIntelligently, validateExtractedAddress } from '../../../lib/smartAddressExtractor';
 // Cache está integrado na API de geocodificação via geocodeAddressWithProviders
 import { validateBrazilianAddress, correctCommonOCRErrors } from '../../../lib/brazilianAddressValidator';
 
@@ -196,28 +197,68 @@ async function geocodeWithViaCEP(cep: string): Promise<{lat: number; lng: number
 }
 
 // Provider: Mapbox
-async function geocodeWithMapbox(address: string): Promise<{lat: number; lng: number; confidence: number; formatted_address?: string} | null> {
+async function geocodeWithMapbox(address: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<{lat: number; lng: number; confidence: number; formatted_address?: string} | null> {
   const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
   if (!mapboxToken) return null;
 
   try {
+    // Construir query com contexto de localização se disponível
+    let query = address;
+    if (userLocation?.city) {
+      query = `${address}, ${userLocation.city}`;
+      if (userLocation.state) {
+        query += `, ${userLocation.state}`;
+      }
+    }
+    
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?` +
-      `country=BR&types=address,poi&limit=1&language=pt&access_token=${mapboxToken}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+      `country=BR&types=address,poi&limit=5&language=pt&access_token=${mapboxToken}`
     );
 
     const data = await response.json();
 
     if (data.features && data.features.length > 0) {
-      const feature = data.features[0];
-      const [lng, lat] = feature.center;
+      // Filtrar e ordenar resultados por relevância e proximidade
+      const features = data.features
+        .filter((feature: any) => {
+          const [lng, lat] = feature.center;
+          return isValidBrazilianCoordinate(lat, lng);
+        })
+        .map((feature: any) => {
+          const [lng, lat] = feature.center;
+          let confidence = feature.relevance || 0.8;
+          
+          // Aplicar boost para resultados da mesma cidade
+          if (userLocation?.city) {
+            const featureContext = feature.context || [];
+            const featureCity = featureContext.find((ctx: any) => 
+              ctx.id.startsWith('place') || ctx.id.startsWith('locality')
+            );
+            
+            if (featureCity && featureCity.text.toLowerCase() === userLocation.city.toLowerCase()) {
+              confidence = Math.min(1.0, confidence + 0.3); // Boost de 30% para mesma cidade
+              console.log(`Mapbox OCR: boost aplicado para ${featureCity.text}`);
+            }
+          }
+          
+          return {
+            feature,
+            lat,
+            lng,
+            confidence,
+            formatted_address: feature.place_name
+          };
+        })
+        .sort((a, b) => b.confidence - a.confidence);
 
-      if (isValidBrazilianCoordinate(lat, lng)) {
+      if (features.length > 0) {
+        const best = features[0];
         return {
-          lat,
-          lng,
-          confidence: feature.relevance || 0.8,
-          formatted_address: feature.place_name
+          lat: best.lat,
+          lng: best.lng,
+          confidence: best.confidence,
+          formatted_address: best.formatted_address
         };
       }
     }
@@ -274,13 +315,13 @@ async function geocodeWithNominatim(address: string): Promise<{lat: number; lng:
 }
 
 // Função melhorada para geocodificar com múltiplos provedores
-async function geocodeAddressImproved(address: string): Promise<{ lat: number; lng: number; formatted_address?: string } | null> {
+async function geocodeAddressImproved(address: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<{ lat: number; lng: number; formatted_address?: string } | null> {
   // Importar as funções de geocodificação diretamente para evitar loop
-  return await geocodeAddressWithProviders(address);
+  return await geocodeAddressWithProviders(address, userLocation);
 }
 
 // Implementação direta dos provedores para evitar chamada HTTP circular
-async function geocodeAddressWithProviders(address: string): Promise<{ lat: number; lng: number; formatted_address?: string } | null> {
+async function geocodeAddressWithProviders(address: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<{ lat: number; lng: number; formatted_address?: string } | null> {
   const normalizedAddress = normalizeAddress(address);
   const cep = extractCEP(address);
 
@@ -378,7 +419,7 @@ function validateExtractedAddress(address: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl } = await request.json();
+    const { imageUrl, userLocation } = await request.json();
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -394,76 +435,85 @@ export async function POST(request: NextRequest) {
     console.log('Melhorias aplicadas:', imageEnhancement.improvements);
     console.log('Confiança da imagem:', (imageEnhancement.totalConfidence * 100).toFixed(1) + '%');
 
-    // 2. Criar worker do Tesseract com configurações otimizadas
-    const worker = await createWorker('por');
-
-    try {
-      // 3. Processar imagem melhorada
-      const { data: { text, confidence } } = await worker.recognize(imageEnhancement.enhancedUrl);
+          // 2. Executar OCR com sistema de fallback robusto
+      console.log('Executando OCR com sistema de fallback...');
+      const ocrResult = await executeOCRWithFallback(imageEnhancement.enhancedUrl, 0.3);
       
-      console.log('Texto extraído pelo OCR:', text);
-      console.log('Confiança do OCR:', confidence);
+      console.log('Resultado do OCR:', {
+        text: ocrResult.text,
+        confidence: ocrResult.confidence,
+        provider: ocrResult.provider,
+        processingTime: ocrResult.processingTime,
+        improvements: ocrResult.improvements
+      });
 
-      // 4. Corrigir erros comuns de OCR primeiro
-      const correctedText = correctCommonOCRErrors(text);
+      // 3. Corrigir erros comuns de OCR
+      const correctedText = correctCommonOCRErrors(ocrResult.text);
       console.log('Texto corrigido:', correctedText);
 
-      // 5. Extrair endereço do texto com método melhorado
-      const extractionResult = extractAddressImproved(correctedText);
+      // 4. Extrair endereço usando sistema inteligente
+      console.log('Extraindo endereço com sistema inteligente...');
+      const extractionResult = await extractAddressIntelligently(correctedText);
       let address = extractionResult.address;
 
-      // 6. Validar e melhorar endereço brasileiro
-      if (address) {
-        const brazilianValidation = validateBrazilianAddress(address);
-        console.log('Validação brasileira:', brazilianValidation);
-        
-        if (brazilianValidation.confidence > extractionResult.confidence) {
-          // Se a validação brasileira é mais confiante, usar endereço corrigido
-          address = brazilianValidation.correctedAddress;
-          extractionResult.confidence = brazilianValidation.confidence;
-          console.log('Endereço melhorado:', address);
-        }
-        
-        // Se não passou na validação brasileira, tentar novamente com texto original
-        if (!brazilianValidation.isValid && extractionResult.confidence < 0.5) {
-          const fallbackExtraction = extractAddressImproved(text);
-          if (fallbackExtraction.confidence > extractionResult.confidence) {
-            address = fallbackExtraction.address;
-            extractionResult.confidence = fallbackExtraction.confidence;
-            console.log('Usando extração fallback:', address);
+              // 5. Validar e melhorar endereço brasileiro
+        if (address) {
+          const brazilianValidation = validateBrazilianAddress(address);
+          console.log('Validação brasileira:', brazilianValidation);
+          
+          if (brazilianValidation.confidence > extractionResult.confidence) {
+            // Se a validação brasileira é mais confiante, usar endereço corrigido
+            address = brazilianValidation.correctedAddress;
+            extractionResult.confidence = brazilianValidation.confidence;
+            console.log('Endereço melhorado:', address);
+          }
+          
+          // Validação adicional com sistema inteligente
+          const smartValidation = validateExtractedAddress(address);
+          console.log('Validação inteligente:', smartValidation);
+          
+          if (smartValidation.confidence > extractionResult.confidence) {
+            extractionResult.confidence = smartValidation.confidence;
+            console.log('Confiança atualizada pela validação inteligente');
           }
         }
-      }
       
       console.log('Endereço extraído:', address);
       console.log('Confiança da extração:', extractionResult.confidence);
       
-      if (!address || !validateExtractedAddress(address)) {
+      if (!address || !validateExtractedAddress(address).isValid) {
         return NextResponse.json({
           success: false,
           error: 'Não foi possível extrair um endereço válido da imagem',
-          extractedText: text,
-          ocrConfidence: confidence,
+          extractedText: ocrResult.text,
+          ocrConfidence: ocrResult.confidence,
           extractionConfidence: extractionResult.confidence,
+          extractionMethod: extractionResult.method,
+          suggestions: extractionResult.suggestions,
           debug: {
-            cleanedText: text.replace(/\s+/g, ' ').trim(),
-            extractedAddress: address
+            originalText: ocrResult.text,
+            cleanedText: correctedText,
+            extractedAddress: address,
+            processingSteps: extractionResult.debug.processingSteps,
+            candidates: extractionResult.debug.candidates
           }
         });
       }
 
-      // Geocodificar endereço
+      // Geocodificar endereço com contexto de localização
       console.log('Iniciando geocodificação para:', address);
-      const coordinates = await geocodeAddressImproved(address);
+      const coordinates = await geocodeAddressImproved(address, userLocation);
 
       if (!coordinates) {
         return NextResponse.json({
           success: false,
           error: 'Endereço extraído mas não foi possível geocodificar',
           extractedAddress: address,
-          extractedText: text,
-          ocrConfidence: confidence,
-          extractionConfidence: extractionResult.confidence
+          extractedText: ocrResult.text,
+          ocrConfidence: ocrResult.confidence,
+          extractionConfidence: extractionResult.confidence,
+          extractionMethod: extractionResult.method,
+          suggestions: extractionResult.suggestions
         });
       }
 
@@ -494,19 +544,21 @@ export async function POST(request: NextRequest) {
         address: coordinates.formatted_address || address,
         lat: coordinates.lat,
         lng: coordinates.lng,
-        extractedText: text,
-        ocrConfidence: confidence,
+        extractedText: ocrResult.text,
+        ocrConfidence: ocrResult.confidence,
         extractionConfidence: extractionResult.confidence,
+        extractionMethod: extractionResult.method,
+        suggestions: extractionResult.suggestions,
         id: data?.id,
         debug: {
           originalExtracted: address,
-          finalAddress: coordinates.formatted_address || address
+          finalAddress: coordinates.formatted_address || address,
+          processingSteps: extractionResult.debug.processingSteps,
+          candidates: extractionResult.debug.candidates
         }
       });
 
-    } finally {
-      await worker.terminate();
-    }
+    // Worker é gerenciado pelo sistema de fallback
 
   } catch (error) {
     console.error('Erro no processamento OCR:', error);

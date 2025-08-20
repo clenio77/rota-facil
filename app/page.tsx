@@ -3,7 +3,9 @@
 import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import StopCard from '../components/StopCard';
+import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
+import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
 // SpeechRecognition types for browsers (ambient declarations)
 // Minimal subset to type usage without depending on lib.dom updates
 interface MinimalSpeechRecognitionEventResult {
@@ -86,7 +88,8 @@ export default function HomePage() {
   const [voiceText, setVoiceText] = useState('');
   const recognitionRef = useRef<MinimalSpeechRecognition | null>(null);
   const [useDeviceOrigin, setUseDeviceOrigin] = useState(false);
-  const [deviceOrigin, setDeviceOrigin] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const { position: deviceLocation, isLoading: locationLoading, error: locationError, refresh: refreshLocation } = useGeolocation();
+  const [deviceOrigin, setDeviceOrigin] = useState<UserLocation | undefined>(undefined);
   const [roundtrip, setRoundtrip] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
@@ -165,11 +168,14 @@ export default function HomePage() {
           : stop
       ));
 
-      // Chamar API de OCR
+      // Chamar API de OCR com contexto de localização
       const response = await fetch('/api/ocr-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: publicUrl }),
+        body: JSON.stringify({ 
+          imageUrl: publicUrl,
+          userLocation: deviceOrigin || undefined
+        }),
       });
 
       const result = await response.json();
@@ -222,7 +228,10 @@ export default function HomePage() {
       const response = await fetch('/api/ocr-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: stop.photoUrl }),
+        body: JSON.stringify({ 
+          imageUrl: stop.photoUrl,
+          userLocation: deviceOrigin || undefined
+        }),
       });
 
       const result = await response.json();
@@ -397,11 +406,14 @@ export default function HomePage() {
     const address = voiceText.trim();
     if (!address) { alert('Digite ou dite um endereço.'); return; }
     try {
-      // Geocodificar no servidor para evitar restrições do Nominatim no cliente
+      // Geocodificar no servidor com contexto de localização do usuário
       const res = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ 
+          address,
+          userLocation: deviceOrigin || undefined
+        }),
       });
       const data = await res.json();
       if (!data.success || !data.lat || !data.lng) {
@@ -501,6 +513,20 @@ export default function HomePage() {
               )}
             </button>
           )}
+          {/* City Indicator */}
+          <div className="sm:col-span-2">
+            <CityIndicator
+              currentLocation={deviceLocation}
+              onLocationChange={(location) => {
+                setDeviceOrigin(location);
+                if (useDeviceOrigin) {
+                  setDeviceOrigin(location);
+                }
+              }}
+              className="mb-3"
+            />
+          </div>
+
           {/* Settings toggles */}
           <div className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
@@ -511,18 +537,18 @@ export default function HomePage() {
                 onChange={(e) => {
                   const checked = e.target.checked;
                   setUseDeviceOrigin(checked);
-                  if (checked && navigator?.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => setDeviceOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                      () => alert('Não foi possível obter sua localização.'),
-                      { enableHighAccuracy: true, timeout: 8000 }
-                    );
+                  if (checked && deviceLocation) {
+                    setDeviceOrigin(deviceLocation);
+                  } else if (checked && !deviceLocation && !locationLoading) {
+                    refreshLocation();
                   }
                 }}
               />
               <span className="text-sm text-gray-700">Usar minha localização como ponto de partida</span>
               {deviceOrigin && useDeviceOrigin && (
-                <span className="ml-auto text-xs text-gray-500">{deviceOrigin.lat.toFixed(4)}, {deviceOrigin.lng.toFixed(4)}</span>
+                <span className="ml-auto text-xs text-gray-500">
+                  {deviceOrigin.city ? `${deviceOrigin.city} - ${deviceOrigin.state}` : `${deviceOrigin.lat.toFixed(4)}, ${deviceOrigin.lng.toFixed(4)}`}
+                </span>
               )}
             </label>
 

@@ -1,57 +1,181 @@
-// RotaFácil - Pré-processamento de Imagem para OCR
-// Melhorias gratuitas para aumentar precisão do reconhecimento de texto
+// RotaFácil - Pré-processamento Avançado de Imagem para OCR
+// Sistema robusto com múltiplas estratégias de melhoria
 
-// Função para converter base64 para ImageData (simulado)
+import sharp from 'sharp';
+
+// Interface para resultado de processamento
 interface ImageProcessingResult {
   processedImageUrl: string;
   improvements: string[];
   confidence: number;
+  processingTime: number;
 }
 
-// Função principal de pré-processamento
+// Função para aplicar filtros avançados de imagem
+async function applyAdvancedFilters(imageBuffer: Buffer): Promise<{ processedBuffer: Buffer; filters: string[] }> {
+  const filters: string[] = [];
+  let processedBuffer = imageBuffer;
+
+  try {
+    // 1. Converter para escala de cinza (melhora OCR)
+    processedBuffer = await sharp(imageBuffer)
+      .grayscale()
+      .toBuffer();
+    filters.push('Conversão para escala de cinza');
+
+    // 2. Aplicar sharpening para melhorar definição do texto
+    processedBuffer = await sharp(processedBuffer)
+      .sharpen({ sigma: 1.5, flat: 1.0, jagged: 2.0 })
+      .toBuffer();
+    filters.push('Sharpening aplicado');
+
+    // 3. Ajustar contraste para destacar texto
+    processedBuffer = await sharp(processedBuffer)
+      .linear(1.2, -0.1) // Aumentar contraste
+      .toBuffer();
+    filters.push('Contraste ajustado');
+
+    // 4. Redimensionar para resolução ideal para OCR
+    const metadata = await sharp(processedBuffer).metadata();
+    if (metadata.width && metadata.width < 1200) {
+      processedBuffer = await sharp(processedBuffer)
+        .resize(1200, null, { 
+          withoutEnlargement: false,
+          kernel: sharp.kernel.lanczos3
+        })
+        .toBuffer();
+      filters.push('Redimensionamento para resolução ideal');
+    }
+
+    // 5. Aplicar filtro de redução de ruído
+    processedBuffer = await sharp(processedBuffer)
+      .median(1) // Filtro de mediana para reduzir ruído
+      .toBuffer();
+    filters.push('Redução de ruído aplicada');
+
+  } catch (error) {
+    console.error('Erro ao aplicar filtros avançados:', error);
+    // Retornar imagem original se falhar
+    return { processedBuffer: imageBuffer, filters: ['Falha nos filtros avançados'] };
+  }
+
+  return { processedBuffer, filters };
+}
+
+// Função para detectar orientação da imagem
+async function detectAndCorrectOrientation(imageBuffer: Buffer): Promise<{ correctedBuffer: Buffer; wasCorrected: boolean }> {
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    
+    // Se a imagem tem orientação incorreta, corrigir
+    if (metadata.orientation && metadata.orientation > 1) {
+      const correctedBuffer = await sharp(imageBuffer)
+        .rotate() // Corrigir orientação automaticamente
+        .toBuffer();
+      
+      return { correctedBuffer, wasCorrected: true };
+    }
+    
+    return { correctedBuffer: imageBuffer, wasCorrected: false };
+  } catch (error) {
+    console.error('Erro ao detectar orientação:', error);
+    return { correctedBuffer: imageBuffer, wasCorrected: false };
+  }
+}
+
+// Função para otimizar imagem para OCR específico
+async function optimizeForTextRecognition(imageBuffer: Buffer): Promise<{ optimizedBuffer: Buffer; optimizations: string[] }> {
+  const optimizations: string[] = [];
+  let optimizedBuffer = imageBuffer;
+
+  try {
+    // 1. Binarização adaptativa (converter para preto e branco)
+    optimizedBuffer = await sharp(imageBuffer)
+      .threshold(128) // Limiar adaptativo
+      .toBuffer();
+    optimizations.push('Binarização adaptativa');
+
+    // 2. Morfologia para limpar texto
+    optimizedBuffer = await sharp(optimizedBuffer)
+      .morphology({
+        operation: 'open',
+        kernel: sharp.kernel.octagon
+      })
+      .toBuffer();
+    optimizations.push('Limpeza morfológica');
+
+    // 3. Aplicar filtro de suavização para reduzir artefatos
+    optimizedBuffer = await sharp(optimizedBuffer)
+      .gaussian(0.5)
+      .toBuffer();
+    optimizations.push('Suavização gaussiana');
+
+  } catch (error) {
+    console.error('Erro na otimização para texto:', error);
+    return { optimizedBuffer: imageBuffer, optimizations: ['Falha na otimização'] };
+  }
+
+  return { optimizedBuffer, optimizations };
+}
+
+// Função principal de pré-processamento avançado
 export async function preprocessImageForOCR(imageUrl: string): Promise<ImageProcessingResult> {
+  const startTime = Date.now();
   const improvements: string[] = [];
   let confidence = 0.5;
 
   try {
-    // Para uma implementação mais robusta, poderíamos usar Canvas API no servidor
-    // Por enquanto, vamos fazer melhorias básicas que não requerem processamento de imagem pesado
+    console.log('Iniciando pré-processamento avançado de imagem para OCR...');
     
-    console.log('Iniciando pré-processamento de imagem para OCR...');
+    // 1. Baixar imagem
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Falha ao baixar imagem: ${response.status}`);
+    }
     
-    // 1. Verificar qualidade da URL
-    if (imageUrl && imageUrl.includes('supabase')) {
-      improvements.push('URL Supabase válida');
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    improvements.push('Imagem baixada com sucesso');
+    confidence += 0.1;
+
+    // 2. Detectar e corrigir orientação
+    const { correctedBuffer, wasCorrected } = await detectAndCorrectOrientation(imageBuffer);
+    if (wasCorrected) {
+      improvements.push('Orientação da imagem corrigida');
       confidence += 0.1;
     }
+
+    // 3. Aplicar filtros avançados
+    const { processedBuffer, filters } = await applyAdvancedFilters(correctedBuffer);
+    improvements.push(...filters);
+    confidence += 0.2;
+
+    // 4. Otimizar especificamente para reconhecimento de texto
+    const { optimizedBuffer, optimizations } = await optimizeForTextRecognition(processedBuffer);
+    improvements.push(...optimizations);
+    confidence += 0.2;
+
+    // 5. Converter para base64 para retorno
+    const base64Image = `data:image/png;base64,${optimizedBuffer.toString('base64')}`;
     
-    // 2. Adicionar parâmetros de otimização ao URL se for Supabase
-    let processedUrl = imageUrl;
-    if (imageUrl.includes('supabase.co/storage')) {
-      // Aplicar transformações Supabase para melhor OCR
-      const url = new URL(imageUrl);
-      url.searchParams.set('quality', '95'); // Alta qualidade
-      url.searchParams.set('format', 'webp'); // Formato otimizado
-      url.searchParams.set('width', '1200'); // Largura ideal para OCR
-      processedUrl = url.toString();
-      improvements.push('Otimização Supabase aplicada');
-      confidence += 0.2;
-    }
-    
-    improvements.push('Pré-processamento básico concluído');
-    
+    const processingTime = Date.now() - startTime;
+    improvements.push(`Processamento concluído em ${processingTime}ms`);
+
     return {
-      processedImageUrl: processedUrl,
+      processedImageUrl: base64Image,
       improvements,
-      confidence: Math.min(confidence, 1.0)
+      confidence: Math.min(confidence, 1.0),
+      processingTime
     };
     
   } catch (error) {
-    console.error('Erro no pré-processamento:', error);
+    console.error('Erro no pré-processamento avançado:', error);
+    const processingTime = Date.now() - startTime;
+    
     return {
       processedImageUrl: imageUrl, // Retornar original se falhar
-      improvements: ['Falha no pré-processamento, usando imagem original'],
-      confidence: 0.3
+      improvements: [`Falha no pré-processamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`],
+      confidence: 0.3,
+      processingTime
     };
   }
 }
@@ -201,9 +325,9 @@ export async function enhanceImageForOCR(imageUrl: string): Promise<{
   improvements: string[];
   totalConfidence: number;
 }> {
-  console.log('Iniciando melhorias de imagem para OCR...');
+  console.log('Iniciando melhorias avançadas de imagem para OCR...');
   
-  // 1. Pré-processamento básico
+  // 1. Pré-processamento avançado
   const preprocessed = await preprocessImageForOCR(imageUrl);
   
   // 2. Aplicar filtros
@@ -224,8 +348,8 @@ export async function enhanceImageForOCR(imageUrl: string): Promise<{
   
   // 6. Calcular confiança total
   const totalConfidence = (
-    preprocessed.confidence * 0.3 +
-    qualityAssessment.score * 0.4 +
+    preprocessed.confidence * 0.4 +
+    qualityAssessment.score * 0.3 +
     (tesseractConfig.whitelist ? 0.3 : 0.2)
   );
   
@@ -233,7 +357,7 @@ export async function enhanceImageForOCR(imageUrl: string): Promise<{
   console.log(`Confiança final: ${(totalConfidence * 100).toFixed(1)}%`);
   
   return {
-    enhancedUrl: filtered.filteredUrl,
+    enhancedUrl: preprocessed.processedImageUrl, // Usar imagem processada
     tesseractConfig,
     qualityAssessment,
     improvements: allImprovements,

@@ -73,30 +73,71 @@ async function geocodeWithViaCEP(cep: string): Promise<GeocodeResult | null> {
 }
 
 // Provider 2: Mapbox Geocoding API
-async function geocodeWithMapbox(address: string): Promise<GeocodeResult | null> {
+async function geocodeWithMapbox(address: string, userLocation?: { city?: string; state?: string }): Promise<GeocodeResult | null> {
   const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
   if (!mapboxToken) return null;
 
   try {
+    // Construir query com contexto de localização se disponível
+    let query = address;
+    if (userLocation?.city) {
+      query = `${address}, ${userLocation.city}`;
+      if (userLocation.state) {
+        query += `, ${userLocation.state}`;
+      }
+    }
+    
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?` +
-      `country=BR&types=address,poi&limit=1&language=pt&access_token=${mapboxToken}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+      `country=BR&types=address,poi&limit=5&language=pt&access_token=${mapboxToken}`
     );
 
     const data = await response.json();
 
     if (data.features && data.features.length > 0) {
-      const feature = data.features[0];
-      const [lng, lat] = feature.center;
+      // Filtrar e ordenar resultados por relevância e proximidade
+      const features = data.features
+        .filter((feature: any) => {
+          const [lng, lat] = feature.center;
+          return isValidBrazilianCoordinate(lat, lng);
+        })
+        .map((feature: any) => {
+          const [lng, lat] = feature.center;
+          let confidence = feature.relevance || 0.8;
+          
+          // Aplicar boost para resultados da mesma cidade
+          if (userLocation?.city) {
+            const featureContext = feature.context || [];
+            const featureCity = featureContext.find((ctx: any) => 
+              ctx.id.startsWith('place') || ctx.id.startsWith('locality')
+            );
+            
+            if (featureCity && featureCity.text.toLowerCase() === userLocation.city.toLowerCase()) {
+              confidence = Math.min(1.0, confidence + 0.3); // Boost de 30% para mesma cidade
+              console.log(`Mapbox: boost aplicado para ${featureCity.text}`);
+            }
+          }
+          
+          return {
+            feature,
+            lat,
+            lng,
+            confidence,
+            address: feature.place_name,
+            formatted_address: feature.place_name
+          };
+        })
+        .sort((a, b) => b.confidence - a.confidence);
 
-      if (isValidBrazilianCoordinate(lat, lng)) {
+      if (features.length > 0) {
+        const best = features[0];
         return {
-          lat,
-          lng,
-          address: feature.place_name,
-          confidence: feature.relevance || 0.8,
+          lat: best.lat,
+          lng: best.lng,
+          address: best.address,
+          confidence: best.confidence,
           provider: 'mapbox',
-          formatted_address: feature.place_name
+          formatted_address: best.formatted_address
         };
       }
     }
@@ -197,21 +238,33 @@ async function geocodeWithGoogle(address: string): Promise<GeocodeResult | null>
 }
 
 // Função principal de geocodificação com hierarquia de provedores
-async function geocodeAddressImproved(originalAddress: string): Promise<GeocodeResult | null> {
+async function geocodeAddressImproved(originalAddress: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   const address = normalizeAddress(originalAddress);
   const cep = extractCEP(address);
 
   console.log(`Geocodificando: "${address}" (CEP: ${cep})`);
+  if (userLocation) {
+    console.log(`Contexto do usuário: ${userLocation.city || 'cidade desconhecida'} - ${userLocation.state || 'estado desconhecido'}`);
+  }
 
   // 0. Verificar cache primeiro (melhoria gratuita!)
   const cachedResult = await searchGeocodingCache(originalAddress);
   if (cachedResult) {
     console.log('Resultado encontrado no cache');
+    
+    // Aplicar boost de confiança se o resultado for da mesma cidade
+    let confidence = cachedResult.confidence;
+    if (userLocation?.city && cachedResult.city && 
+        cachedResult.city.toLowerCase() === userLocation.city.toLowerCase()) {
+      confidence = Math.min(1.0, confidence + 0.2); // Boost de 20% para mesma cidade
+      console.log(`Boost aplicado: resultado da mesma cidade (${cachedResult.city})`);
+    }
+    
     return {
       lat: cachedResult.lat,
       lng: cachedResult.lng,
       address: cachedResult.formatted_address,
-      confidence: cachedResult.confidence,
+      confidence,
       provider: cachedResult.provider,
       formatted_address: cachedResult.formatted_address
     };
@@ -227,7 +280,7 @@ async function geocodeAddressImproved(originalAddress: string): Promise<GeocodeR
   }
 
   // 2. Tentar Mapbox (se configurado)
-  const mapboxResult = await geocodeWithMapbox(address);
+  const mapboxResult = await geocodeWithMapbox(address, userLocation);
   if (mapboxResult && mapboxResult.confidence >= 0.7) {
     console.log('Geocodificação via Mapbox bem-sucedida');
     return mapboxResult;
@@ -265,8 +318,8 @@ async function geocodeAddressImproved(originalAddress: string): Promise<GeocodeR
 }
 
 // Wrapper para salvar resultado no cache
-async function geocodeAndCache(originalAddress: string): Promise<GeocodeResult | null> {
-  const result = await geocodeAddressImproved(originalAddress);
+async function geocodeAndCache(originalAddress: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
+  const result = await geocodeAddressImproved(originalAddress, userLocation);
   
   if (result && !result.provider.includes('cache')) {
     // Salvar apenas se não veio do cache
@@ -284,7 +337,7 @@ async function geocodeAndCache(originalAddress: string): Promise<GeocodeResult |
 
 export async function POST(request: NextRequest) {
   try {
-    const { address } = await request.json();
+    const { address, userLocation } = await request.json();
     
     if (!address || typeof address !== 'string' || address.trim().length < 3) {
       return NextResponse.json({ 
@@ -293,7 +346,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const result = await geocodeAndCache(address);
+    const result = await geocodeAndCache(address, userLocation);
     
     if (!result) {
       return NextResponse.json({ 
