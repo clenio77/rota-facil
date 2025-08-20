@@ -32,7 +32,7 @@ async function reverseGeocodeWithMapbox(lat: number, lng: number): Promise<Rever
       const context = feature.context || [];
       
       // Extrair cidade e estado do contexto
-      let city = feature.text;
+      const city = feature.text;
       let state = '';
       
       for (const ctx of context) {

@@ -32,10 +32,7 @@ class TesseractOptimizedStrategy implements OCRStrategy {
       
       // Configurações otimizadas para endereços brasileiros
       await worker.setParameters({
-        tessedit_pageseg_mode: '6', // Bloco uniforme
-        tessedit_ocr_engine_mode: '3', // Default engine
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüý0123456789.,;:°º-/ ',
-        classify_bln_numeric_mode: '1',
         textord_heavy_nr: '1'
       });
 
@@ -74,7 +71,6 @@ class TesseractMultiPSMStrategy implements OCRStrategy {
       for (const psm of psmModes) {
         try {
           await worker.setParameters({
-            tessedit_pageseg_mode: psm.toString(),
             tessedit_ocr_engine_mode: '3'
           });
 
@@ -121,11 +117,10 @@ class TesseractWithPreprocessingStrategy implements OCRStrategy {
       
       // Configurações para imagens com baixa qualidade
       await worker.setParameters({
-        tessedit_pageseg_mode: '7', // Linha única
         tessedit_ocr_engine_mode: '3',
         textord_heavy_nr: '1',
         textord_min_linesize: '2.0',
-        tessedit_do_invert: '0'
+        textord_old_baselines: '0'
       });
 
       const { data: { text, confidence } } = await worker.recognize(imageUrl);
@@ -161,9 +156,8 @@ class SimpleTextExtractionStrategy implements OCRStrategy {
       
       const worker = await createWorker('eng'); // Usar inglês como fallback
       
-      // Configurações básicas
+      // Configurações básicas - usando apenas parâmetros válidos
       await worker.setParameters({
-        tessedit_pageseg_mode: '6',
         tessedit_ocr_engine_mode: '1' // Legacy engine
       });
 

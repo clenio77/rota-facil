@@ -97,18 +97,18 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
     if (data.features && data.features.length > 0) {
       // Filtrar e ordenar resultados por relevância e proximidade
       const features = data.features
-        .filter((feature: any) => {
+        .filter((feature: MapboxFeature) => {
           const [lng, lat] = feature.center;
           return isValidBrazilianCoordinate(lat, lng);
         })
-        .map((feature: any) => {
+        .map((feature: MapboxFeature): MapboxFeatureResult => {
           const [lng, lat] = feature.center;
           let confidence = feature.relevance || 0.8;
           
           // Aplicar boost para resultados da mesma cidade
           if (userLocation?.city) {
             const featureContext = feature.context || [];
-            const featureCity = featureContext.find((ctx: any) => 
+            const featureCity = featureContext.find((ctx) => 
               ctx.id.startsWith('place') || ctx.id.startsWith('locality')
             );
             
@@ -127,7 +127,7 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
             formatted_address: feature.place_name
           };
         })
-        .sort((a, b) => b.confidence - a.confidence);
+        .sort((a: MapboxFeatureResult, b: MapboxFeatureResult) => b.confidence - a.confidence);
 
       if (features.length > 0) {
         const best = features[0];
@@ -333,6 +333,26 @@ async function geocodeAndCache(originalAddress: string, userLocation?: { lat: nu
   }
   
   return result;
+}
+
+// Interfaces para dados do Mapbox
+interface MapboxFeature {
+  center: [number, number];
+  relevance: number;
+  place_name: string;
+  context?: Array<{
+    id: string;
+    text: string;
+  }>;
+}
+
+interface MapboxFeatureResult {
+  feature: MapboxFeature;
+  lat: number;
+  lng: number;
+  confidence: number;
+  address: string;
+  formatted_address: string;
 }
 
 export async function POST(request: NextRequest) {

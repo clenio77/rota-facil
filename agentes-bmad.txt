@@ -1,0 +1,69 @@
+Título: O Loop de Agentes do BMAD-Method: Um Ciclo Contínuo para a Produção
+
+Descrição: Este documento descreve o fluxo de trabalho cíclico para orquestrar os agentes de IA do BMAD-Method, desde a concepção de uma ideia até a implantação total em produção, incluindo o agente Analista/Criticador para garantir a qualidade.
+
+---
+
+### FASE 1: O LOOP DE ESTRATÉGIA E CRÍTICA ###
+
+Este é o ponto de partida para qualquer nova funcionalidade ou grande melhoria. O objetivo é transformar uma visão em um plano acionável e à prova de falhas.
+
+1. Agente Analista de Negócios (Business Analyst - BA):
+O ciclo começa aqui. O BA engaja o stakeholder para capturar a visão e os objetivos de negócio. Ele refina o conceito inicial até que um "Briefing de Projeto" claro seja formado, servindo como a semente para a próxima iteração.
+
+2. Agente Gerente de Projetos (PM) & Agente Arquiteto (Architect):
+Trabalhando em paralelo, estes agentes transformam o briefing em artefatos concretos:
+- O PM cria o Product Requirements Document (PRD), detalhando o "o quê" e o "porquê" da funcionalidade.
+- O Arquiteto desenvolve o Documento de Arquitetura, definindo o "como" técnico da implementação.
+
+3. Agente Analista/Criticador (Analyst/Critic):
+PONTO DE CONTROLE CRÍTICO. Antes que qualquer linha de código seja planejada, este agente entra em ação. Ele recebe o PRD e o Documento de Arquitetura e sua única missão é encontrar falhas, inconsistências, ambiguidades e riscos. Ele faz perguntas como:
+- "A arquitetura proposta realmente suporta os requisitos de escalabilidade do PRD?"
+- "Esta funcionalidade está claramente definida ou deixa margem para interpretações erradas?"
+- "Os critérios de aceitação são testáveis?"
+- "Identificamos todas as dependências técnicas e de negócio?"
+
+4. Loop de Refinamento:
+Se o Criticador encontrar problemas, os documentos são devolvidos ao PM e ao Arquiteto para revisão. Este é um mini-loop que se repete até que o Criticador aprove os planos, garantindo que apenas especificações de alta qualidade sigam em frente.
+
+---
+
+### FASE 2: O LOOP DE DESENVOLVIMENTO ÁGIL (SPRINT) ###
+
+Com os planos validados, o ciclo entra na fase de execução, que opera como seu próprio loop iterativo dentro de cada sprint.
+
+5. Agente Dono do Produto (Product Owner - PO):
+Com os documentos aprovados, o PO decompõe o PRD e a Arquitetura em Épicos e Histórias de Usuário, priorizando o backlog para focar na entrega de maior valor.
+
+6. Agente Scrum Master (SM):
+O SM organiza as histórias priorizadas em um sprint e gerencia o fluxo de trabalho, garantindo que o ciclo de desenvolvimento ocorra sem impedimentos.
+
+7. O Loop de Sprint (Dev <-> QA):
+Este é o coração do desenvolvimento.
+a) Agente de Desenvolvimento (Dev Agent): Pega uma história do sprint e implementa o código conforme as especificações.
+b) Agente de Garantia de Qualidade (QA Agent): Testa o código implementado. Se um bug for encontrado, a história retorna ao passo (a) para o Dev Agent.
+Este ciclo Dev <-> QA se repete quantas vezes forem necessárias até que a história cumpra todos os critérios de aceitação e seja considerada "Pronta".
+
+---
+
+### FASE 3: O LOOP DE IMPLANTAÇÃO E MONITORAMENTO ###
+
+Uma vez que um conjunto de histórias (um incremento do produto) está "Pronto", o ciclo avança para a entrega aos usuários finais.
+
+8. Implantação Gradual (Canary/Blue-Green):
+A nova versão é liberada para uma pequena porcentagem de usuários (ex: 1%, 10%).
+
+9. Monitoramento e Feedback:
+A performance da aplicação é monitorada de perto. Este passo pode acionar um alerta que envia a aplicação de volta ao Loop de Sprint se problemas críticos forem detectados (um rollback), ou simplesmente coletar dados para o próximo ciclo de planejamento.
+
+10. Incremento e Validação:
+A exposição é aumentada gradualmente (50%, 75%). A cada etapa, o loop de monitoramento continua.
+
+11. Produção Total (100%):
+A versão é liberada para todos os usuários.
+
+---
+
+### O REINÍCIO DO CICLO ###
+
+Com a versão em 100% de produção, o ciclo não termina. O feedback coletado durante o monitoramento, os novos insights de negócio e as próximas prioridades do backlog alimentam o Agente Analista de Negócios (BA), que inicia o Loop de Estratégia e Crítica novamente para a próxima evolução do produto. Este processo cíclico garante que o desenvolvimento seja contínuo, iterativo e sempre alinhado com a qualidade e os objetivos de negócio.

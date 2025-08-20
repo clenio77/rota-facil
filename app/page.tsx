@@ -88,7 +88,7 @@ export default function HomePage() {
   const [voiceText, setVoiceText] = useState('');
   const recognitionRef = useRef<MinimalSpeechRecognition | null>(null);
   const [useDeviceOrigin, setUseDeviceOrigin] = useState(false);
-  const { position: deviceLocation, isLoading: locationLoading, error: locationError, refresh: refreshLocation } = useGeolocation();
+  const { position: deviceLocation, isLoading, refresh } = useGeolocation();
   const [deviceOrigin, setDeviceOrigin] = useState<UserLocation | undefined>(undefined);
   const [roundtrip, setRoundtrip] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -539,8 +539,8 @@ export default function HomePage() {
                   setUseDeviceOrigin(checked);
                   if (checked && deviceLocation) {
                     setDeviceOrigin(deviceLocation);
-                  } else if (checked && !deviceLocation && !locationLoading) {
-                    refreshLocation();
+                  } else if (checked && !deviceLocation && !isLoading) {
+                    refresh();
                   }
                 }}
               />
