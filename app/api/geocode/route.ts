@@ -91,6 +91,62 @@ function normalizeStr(str: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+// Extração simples de rua e número do texto
+function extractStreetAndNumberLoose(text: string): { street: string; number?: string } | null {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  // Padrões comuns: "Rua X, 123" | "Avenida X 123" | "X 123"
+  const numMatch = cleaned.match(/(.*?)[,\s]+(\d{1,6})(?:\D|$)/);
+  if (numMatch) {
+    const street = numMatch[1].replace(/[.,]$/,'').trim();
+    const number = numMatch[2];
+    if (street && number) return { street, number };
+  }
+  // Sem número explícito
+  return null;
+}
+
+// Busca ViaCEP por UF/Cidade/Logradouro e geocodifica com número (quando possível)
+async function geocodeWithViaCepAddressLookup(address: string, userLocation?: { lat?: number; lng?: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
+  try {
+    if (!userLocation?.city || !userLocation?.state) return null;
+
+    const parts = extractStreetAndNumberLoose(address);
+    if (!parts) return null; // só aplicável quando há número explícito
+
+    const uf = userLocation.state.toUpperCase();
+    const city = encodeURIComponent(userLocation.city);
+    const streetQuery = encodeURIComponent(parts.street);
+    const url = `https://viacep.com.br/ws/${uf}/${city}/${streetQuery}/json/`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    // Escolher o melhor logradouro (normalização simples)
+    const target = data.find((d: any) => normalizeStr(d.logradouro || '').includes(normalizeStr(parts.street))) || data[0];
+    const street = target.logradouro || parts.street;
+    const bairro = target.bairro || '';
+    const localidade = target.localidade || userLocation.city;
+    const ufRet = target.uf || uf;
+    const cep = (target.cep || '').replace(/\D/g, '');
+
+    // Geocodificar usando Nominatim estruturado com número + cidade/UF
+    const structuredStreet = [street, parts.number].filter(Boolean).join(' ');
+    const result = await geocodeWithNominatim(structuredStreet, { ...userLocation, city: localidade, state: ufRet });
+    if (!result) return null;
+
+    return {
+      ...result,
+      confidence: Math.max(0.93, result.confidence || 0),
+      provider: 'viacep-addr+nominatim',
+      formatted_address: `${street}, ${parts.number || ''}${parts.number ? ', ' : ''}${bairro ? bairro + ', ' : ''}${localidade} - ${ufRet}, ${cep}`.trim()
+    };
+  } catch (e) {
+    console.error('Erro ViaCEP (logradouro):', e);
+    return null;
+  }
+}
+
+
 // Utilitário: distância Haversine (km)
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (v: number) => (v * Math.PI) / 180;
@@ -535,6 +591,13 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
   if (mapboxResult && mapboxResult.confidence >= 0.6) {
     console.log('Geocodificação via Mapbox bem-sucedida');
     return mapboxResult;
+  }
+
+  // 2b. Se temos cidade/UF e número, tentar ViaCEP por logradouro para obter CEP correto e geocodificar com número preciso
+  const viaCepAddrResult = await geocodeWithViaCepAddressLookup(address, userLocation);
+  if (viaCepAddrResult && viaCepAddrResult.confidence >= 0.9) {
+    console.log('Geocodificação via ViaCEP (logradouro)+Nominatim bem-sucedida');
+    return viaCepAddrResult;
   }
 
   // 3. Tentar Photon (open-source, sem chave)
