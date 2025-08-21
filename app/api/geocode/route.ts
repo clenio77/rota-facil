@@ -216,69 +216,126 @@ async function geocodeWithMapbox(address: string, userLocation?: { lat?: number;
 }
 
 // Provider 3: Nominatim (fallback gratuito)
-async function geocodeWithNominatim(address: string, userLocation?: { city?: string; state?: string }): Promise<GeocodeResult | null> {
+async function geocodeWithNominatim(address: string, userLocation?: { lat?: number; lng?: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?` +
-      `format=json&q=${encodeURIComponent(address)}&` +
-      `countrycodes=br&limit=1&addressdetails=1&extratags=1&namedetails=1`,
-      {
+    // 1) Tente busca estruturada se soubermos a cidade/estado do usuário
+    if (userLocation?.city) {
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('countrycodes', 'br');
+      url.searchParams.set('limit', '5');
+      url.searchParams.set('addressdetails', '1');
+      url.searchParams.set('extratags', '1');
+      url.searchParams.set('namedetails', '1');
+      url.searchParams.set('street', address); // rua + número que o usuário falou
+      url.searchParams.set('city', userLocation.city);
+      if (userLocation.state) url.searchParams.set('state', userLocation.state);
+      url.searchParams.set('country', 'Brasil');
+
+      const response = await fetch(url.toString(), {
         headers: {
           'User-Agent': 'RotaFacil/1.0 (contato@rotafacil.com)',
           'Accept-Language': 'pt-BR,pt;q=0.9',
         },
+      });
+      const data = await response.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        const results = data
+          .map((r: any) => ({ ...r, lat: parseFloat(r.lat), lon: parseFloat(r.lon) }))
+          .filter((r: any) => isValidBrazilianCoordinate(r.lat, r.lon))
+          .filter((r: any) => normalizeStr(r.display_name || '').includes(normalizeStr(userLocation.city!)));
+
+        if (results.length > 0) {
+          const r = results[0];
+          let confidence = 0.85;
+          if (r.osm_type === 'way') confidence = 0.9;
+          if (r.class === 'building') confidence = 0.92;
+          if (r.type === 'house') confidence = 0.95;
+
+          return {
+            lat: r.lat,
+            lng: r.lon,
+            address: r.display_name,
+            confidence,
+            provider: 'nominatim-structured',
+            formatted_address: r.display_name
+          };
+        }
       }
-    );
+    }
+
+    // 2) Fallback: busca por q= com possível viewbox limitado às coordenadas do dispositivo
+    const url2 = new URL('https://nominatim.openstreetmap.org/search');
+    url2.searchParams.set('format', 'json');
+    url2.searchParams.set('q', address);
+    url2.searchParams.set('countrycodes', 'br');
+    url2.searchParams.set('limit', '5');
+    url2.searchParams.set('addressdetails', '1');
+    url2.searchParams.set('extratags', '1');
+    url2.searchParams.set('namedetails', '1');
+
+    if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+      // Aproxima uma caixa de ~50km
+      const lat = userLocation.lat;
+      const lng = userLocation.lng;
+      const dLat = 0.6;
+      const dLng = 0.6 / Math.max(0.1, Math.cos((lat * Math.PI) / 180));
+      const left = lng - dLng;
+      const right = lng + dLng;
+      const top = lat + dLat;
+      const bottom = lat - dLat;
+      url2.searchParams.set('viewbox', `${left},${top},${right},${bottom}`);
+      url2.searchParams.set('bounded', '1');
+    }
+
+    const response = await fetch(url2.toString(), {
+      headers: {
+        'User-Agent': 'RotaFacil/1.0 (contato@rotafacil.com)',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+    });
 
     const data = await response.json();
 
-          if (Array.isArray(data) && data.length > 0) {
-        const result = data[0];
-        const lat = parseFloat(result.lat);
-        const lng = parseFloat(result.lon);
+    if (Array.isArray(data) && data.length > 0) {
+      const result = data[0];
+      const lat = parseFloat(result.lat);
+      const lng = parseFloat(result.lon);
 
-        if (!isValidBrazilianCoordinate(lat, lng)) {
+      if (!isValidBrazilianCoordinate(lat, lng)) {
+        return null;
+      }
+
+      if (userLocation?.city) {
+        const resultAddress = normalizeStr(result.display_name);
+        const userCity = normalizeStr(userLocation.city);
+        if (!resultAddress.includes(userCity)) {
+          console.log(`Nominatim: REJEITADO - endereço fora da cidade ${userLocation.city}`);
           return null;
         }
-
-        // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
-        if (userLocation?.city) {
-          const resultAddress = normalizeStr(result.display_name);
-          const userCity = normalizeStr(userLocation.city);
-
-          if (!resultAddress.includes(userCity)) {
-            console.log(`Nominatim: REJEITADO - endereço fora da cidade ${userLocation.city}`);
-            return null;
-          }
-        } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
-          // Sem cidade: filtrar por raio usando coordenadas
-          const dist = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
-          if (dist > MAX_LOCAL_DISTANCE_KM) {
-            console.log(`Nominatim: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
-            return null;
-          }
+      } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+        const dist = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+        if (dist > MAX_LOCAL_DISTANCE_KM) {
+          console.log(`Nominatim: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
+          return null;
         }
-
-        // Calcular confiança baseada no tipo de resultado
-        let confidence = 0.5;
-        if (result.osm_type === 'way') confidence = 0.7;
-        if (result.class === 'building') confidence = 0.8;
-        if (result.type === 'house') confidence = 0.9;
-
-        // Como já filtramos por cidade, aplicar boost
-        if (userLocation?.city) {
-          confidence = Math.min(1.0, confidence + 0.2);
-        }
-
-        return {
-          lat,
-          lng,
-          address: result.display_name,
-          confidence,
-          provider: 'nominatim',
-          formatted_address: result.display_name
-        };
       }
+
+      let confidence = 0.6;
+      if (result.osm_type === 'way') confidence = 0.7;
+      if (result.class === 'building') confidence = 0.8;
+      if (result.type === 'house') confidence = 0.9;
+
+      return {
+        lat,
+        lng,
+        address: result.display_name,
+        confidence,
+        provider: 'nominatim',
+        formatted_address: result.display_name
+      };
+    }
 
     return null;
   } catch (error) {
