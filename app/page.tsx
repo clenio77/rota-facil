@@ -773,33 +773,25 @@ export default function HomePage() {
     if (!address) { alert('Digite ou dite um endereço.'); return; }
 
     try {
-      // 🎯 FORÇAR BUSCA NA CIDADE ATUAL
+      // 🎯 Política: padrão buscar na cidade do dispositivo; se o usuário falar outra cidade/UF no texto, respeitar o texto e NÃO forçar local
       const currentLocation = deviceOrigin || deviceLocation;
 
-      // Comparação sem acentos para evitar duplicidade/erros (Uberlandia vs Uberlândia)
+      // Comparação sem acentos
       const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-      // Se temos localização e o endereço não contém cidade, adicionar automaticamente
-      if (currentLocation?.city && !normalize(address).includes(normalize(currentLocation.city))) {
-        // Verificar se o endereço já tem formato completo (contém vírgula ou hífen)
-        const hasCompleteFormat = address.includes(',') || address.includes('-') ||
-                                 normalize(address).includes('rua') ||
-                                 normalize(address).includes('av') ||
-                                 normalize(address).includes('avenida');
+      // Detectar se o usuário já informou cidade/UF explícita no texto (ex.: ", araguari" ou "mg", "sp")
+      const hasExplicitCityOrUF = (() => {
+        const n = normalize(address);
+        const hasUF = /(\bac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|se|sp|to\b)/.test(n);
+        const manyCommas = address.split(',').length >= 3; // rua, numero, cidade
+        const hasBrasil = n.includes('brasil');
+        return hasUF || manyCommas || hasBrasil;
+      })();
 
-        if (hasCompleteFormat) {
-          // Endereço parece completo, adicionar apenas a cidade
-          address = `${address}, ${currentLocation.city}`;
-        } else {
-          // Endereço simples (ex: "centro", "praça da matriz"), adicionar cidade
-          address = `${address}, ${currentLocation.city}`;
-        }
-
-        // Adicionar estado se disponível
-        if (currentLocation.state) {
-          address += `, ${currentLocation.state}`;
-        }
-
+      // Se NÃO tem cidade/UF no texto e temos localização, complementar com cidade/UF do dispositivo
+      if (currentLocation?.city && !hasExplicitCityOrUF && !normalize(address).includes(normalize(currentLocation.city))) {
+        address = `${address}, ${currentLocation.city}`;
+        if (currentLocation.state) address += `, ${currentLocation.state}`;
         console.log('🎯 Endereço expandido para busca local:', address);
       }
 
@@ -809,8 +801,11 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address,
-          userLocation: currentLocation,
-          forceLocalSearch: true // Flag para priorizar resultados locais
+          // Se o usuário informou outra cidade/UF, mandar só coordenadas (sem cidade/estado) para não forçar filtro rígido
+          userLocation: hasExplicitCityOrUF && currentLocation
+            ? { lat: currentLocation.lat, lng: currentLocation.lng }
+            : currentLocation,
+          forceLocalSearch: !hasExplicitCityOrUF
         }),
       });
 

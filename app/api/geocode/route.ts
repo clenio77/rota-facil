@@ -215,6 +215,76 @@ async function geocodeWithMapbox(address: string, userLocation?: { lat?: number;
   }
 }
 
+// Provider 2b: Photon (Komoot) - open source, sem chave
+async function geocodeWithPhoton(address: string, userLocation?: { lat?: number; lng?: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
+  try {
+    // Montar query com viés local quando possível
+    const params: string[] = [
+      `q=${encodeURIComponent(address)}`,
+      'lang=pt',
+      'limit=5'
+    ];
+    if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+      params.push(`lat=${userLocation.lat}`);
+      params.push(`lon=${userLocation.lng}`);
+    }
+    const url = `https://photon.komoot.io/api/?${params.join('&')}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data || !Array.isArray(data.features) || data.features.length === 0) return null;
+
+    type PhotonFeature = { geometry: { coordinates: [number, number] }; properties: { name?: string; city?: string; state?: string; country?: string; countrycode?: string; street?: string; housenumber?: string; }; };
+
+    const results = (data.features as PhotonFeature[])
+      .map((f) => {
+        const [lng, lat] = f.geometry.coordinates;
+        const nameParts = [
+          f.properties.street || f.properties.name,
+          f.properties.housenumber,
+          f.properties.city,
+          f.properties.state
+        ].filter(Boolean);
+        const place = nameParts.join(', ');
+        return { lat, lng, place, props: f.properties };
+      })
+      .filter((r) => isValidBrazilianCoordinate(r.lat, r.lng) && (!r.props.countrycode || r.props.countrycode.toLowerCase() === 'br'))
+      .filter((r) => {
+        if (userLocation?.city) {
+          // Quando o servidor vem com city/state, filtra estritamente. Caso forceLocalSearch=false, o POST já removeu city/state.
+          const rc = normalizeStr(r.props.city || '');
+          const uc = normalizeStr(userLocation.city);
+          if (!rc || rc !== uc) {
+            console.log(`Photon: REJEITADO - fora da cidade ${userLocation.city} (encontrado: ${r.props.city || 'desconhecida'})`);
+            return false;
+          }
+        } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+          const dist = haversineKm(userLocation.lat, userLocation.lng, r.lat, r.lng);
+          if (dist > MAX_LOCAL_DISTANCE_KM) {
+            console.log(`Photon: REJEITADO por distância`);
+            return false;
+          }
+        }
+        return true;
+      });
+
+    if (results.length === 0) return null;
+    const best = results[0];
+    return {
+      lat: best.lat,
+      lng: best.lng,
+      address: best.place || `${address}${userLocation?.city ? ', ' + userLocation.city : ''}`,
+      confidence: 0.7,
+      provider: 'photon',
+      formatted_address: best.place || `${address}`
+    };
+  } catch (e) {
+    console.error('Erro Photon:', e);
+    return null;
+  }
+}
+
+
 // Provider 3: Nominatim (fallback gratuito)
 async function geocodeWithNominatim(address: string, userLocation?: { lat?: number; lng?: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   try {
@@ -424,15 +494,15 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
   const cachedResult = await searchGeocodingCache(originalAddress);
   if (cachedResult) {
     console.log('Resultado encontrado no cache');
-    
+
     // Aplicar boost de confiança se o resultado for da mesma cidade
     let confidence = cachedResult.confidence;
-    if (userLocation?.city && cachedResult.city && 
+    if (userLocation?.city && cachedResult.city &&
         cachedResult.city.toLowerCase() === userLocation.city.toLowerCase()) {
       confidence = Math.min(1.0, confidence + 0.2); // Boost de 20% para mesma cidade
       console.log(`Boost aplicado: resultado da mesma cidade (${cachedResult.city})`);
     }
-    
+
     return {
       lat: cachedResult.lat,
       lng: cachedResult.lng,
@@ -459,21 +529,28 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     return mapboxResult;
   }
 
-  // 3. Tentar Nominatim
+  // 3. Tentar Photon (open-source, sem chave)
+  const photonResult = await geocodeWithPhoton(address, userLocation);
+  if (photonResult && photonResult.confidence >= 0.6) {
+    console.log('Geocodificação via Photon bem-sucedida');
+    return photonResult;
+  }
+
+  // 4. Tentar Nominatim
   const nominatimResult = await geocodeWithNominatim(address, userLocation);
   if (nominatimResult && nominatimResult.confidence >= 0.4) {
     console.log('Geocodificação via Nominatim bem-sucedida');
     return nominatimResult;
   }
 
-  // 4. Último recurso: Google (se configurado)
+  // 5. Último recurso: Google (se configurado)
   const googleResult = await geocodeWithGoogle(address, userLocation);
   if (googleResult) {
     console.log('Geocodificação via Google bem-sucedida');
     return googleResult;
   }
 
-  // 5. Se nada funcionou, tentar versões simplificadas do endereço
+  // 6. Se nada funcionou, tentar versões simplificadas do endereço
   if (address.includes(',')) {
     const simplifiedAddress = address.split(',')[0].trim() + ', Brasil';
     const fallbackResult = await geocodeWithNominatim(simplifiedAddress, userLocation);
@@ -493,7 +570,7 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
 // Wrapper para salvar resultado no cache
 async function geocodeAndCache(originalAddress: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   const result = await geocodeAddressImproved(originalAddress, userLocation);
-  
+
   if (result && !result.provider.includes('cache')) {
     // Salvar apenas se não veio do cache
     await saveToGeocodingCache(originalAddress, {
@@ -504,7 +581,7 @@ async function geocodeAndCache(originalAddress: string, userLocation?: { lat: nu
       provider: result.provider
     });
   }
-  
+
   return result;
 }
 
@@ -531,16 +608,21 @@ interface MapboxFeatureResult {
 export async function POST(request: NextRequest) {
   try {
     const { address, userLocation, forceLocalSearch } = await request.json();
-    
+
     if (!address || typeof address !== 'string' || address.trim().length < 3) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Endereço inválido ou muito curto' 
+      return NextResponse.json({
+        success: false,
+        error: 'Endereço inválido ou muito curto'
       }, { status: 400 });
     }
 
-    const result = await geocodeAndCache(address, userLocation);
-    
+    // Se forceLocalSearch for false, não envie city/state para provedores rígidos
+    const relaxedUserLocation = !forceLocalSearch && userLocation
+      ? { lat: userLocation.lat, lng: userLocation.lng }
+      : userLocation;
+
+    const result = await geocodeAndCache(address, relaxedUserLocation);
+
     if (!result) {
       // Log específico para debug de filtro de localização
       if (userLocation?.city) {
@@ -565,7 +647,7 @@ export async function POST(request: NextRequest) {
     // Log para debug
     console.log(`Geocodificação bem-sucedida: ${result.provider} (confiança: ${result.confidence})`);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       lat: result.lat,
       lng: result.lng,
@@ -578,10 +660,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro no endpoint /api/geocode:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Erro interno do servidor', 
-        details: error instanceof Error ? error.message : 'Erro desconhecido' 
+      {
+        success: false,
+        error: 'Erro interno do servidor',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
       },
       { status: 500 }
     );
