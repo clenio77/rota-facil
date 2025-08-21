@@ -18,13 +18,14 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
     if (!customCity.trim()) return;
 
     try {
-      // Geocodificar a cidade customizada
+      // Geocodificar a cidade customizada SEM forçar filtro local
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           address: `${customCity}, ${customState || 'Brasil'}`,
-          userLocation: currentLocation
+          // Não enviar userLocation com city/state para não restringir a busca
+          forceLocalSearch: false
         }),
       });
 
