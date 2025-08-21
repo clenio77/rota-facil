@@ -770,75 +770,63 @@ export default function HomePage() {
   };
 
   const handleConfirmVoiceAddress = async () => {
-    let address = voiceText.trim();
+    const address = voiceText.trim();
     if (!address) { alert('Digite ou dite um endereço.'); return; }
 
     try {
-      // 🎯 POLÍTICA ULTRA-SIMPLES: SEMPRE buscar na cidade ativa, SEM EXCEÇÕES
+      console.log('🎤 Buscando endereço por voz:', address);
+
+      // 🚀 USAR A NOVA API DE BUSCA PHOTON (mesma do campo de busca)
       const currentLocation = deviceOrigin || deviceLocation;
 
-      // SEMPRE complementar com a cidade ativa quando temos localização
-      if (currentLocation?.city) {
-        // Só adicionar cidade se não estiver já no texto
-        const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (!normalize(address).includes(normalize(currentLocation.city))) {
-          address = `${address}, ${currentLocation.city}`;
-          if (currentLocation.state) address += `, ${currentLocation.state}`;
-        }
-        console.log('🎯 Endereço SEMPRE na cidade ativa:', address);
-      }
-
-      // Geocodificar no servidor SEMPRE com filtro local ativo
-      const res = await fetch('/api/geocode', {
+      // 🚀 USAR A NOVA API DE BUSCA PHOTON (mesma do campo de busca)
+      const res = await fetch('/api/address-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          address,
-          userLocation: currentLocation, // SEMPRE enviar cidade/estado para forçar filtro
-          forceLocalSearch: true // SEMPRE forçar busca local
+          query: voiceText.trim(), // Usar texto original sem modificações
+          userLocation: currentLocation,
+          limit: 5 // Pegar apenas os 5 melhores resultados
         }),
       });
 
       const data = await res.json();
-      if (!data.success || !data.lat || !data.lng) {
-        alert(`Não foi possível encontrar o endereço "${voiceText}" na sua cidade. Tente ser mais específico.`);
+
+      if (!data.success || !data.results || data.results.length === 0) {
+        alert(`Não foi possível encontrar "${voiceText}". Tente ser mais específico ou verificar a ortografia.`);
         return;
       }
 
-      // DEBUG: log info do provedor usado (apenas no console)
-      if (data.debug_info) {
-        console.log('🔍 DEBUG Geocodificação:', {
-          provider: data.debug_info.provider_used,
-          confidence: data.debug_info.confidence,
-          userCity: data.debug_info.user_city,
-          userState: data.debug_info.user_state,
-          viaCepAttempted: data.debug_info.viacep_attempted,
-          forceLocal: data.debug_info.force_local_search,
-          finalAddress: data.debug_info.final_address,
-          originalInput: voiceText,
-          resultAddress: data.address
-        });
-      }
+      // Pegar o melhor resultado (primeiro da lista já ordenada por confiança e proximidade)
+      const bestResult = data.results[0];
+
+      console.log('✅ Melhor resultado encontrado via voz:', bestResult);
 
       const newStop: Stop = {
         id: Date.now(),
         photoUrl: '',
         status: 'confirmed',
-        address: data.address || address,
-        lat: data.lat,
-        lng: data.lng,
+        address: bestResult.display_name,
+        lat: bestResult.lat,
+        lng: bestResult.lng,
       };
 
       setStops(prev => [...prev, newStop]);
       setIsVoiceDialogOpen(false);
       setVoiceText('');
 
-      // Feedback de sucesso
-      console.log('✅ Endereço adicionado:', data.address);
+      // Feedback de sucesso com informações do resultado
+      const distanceInfo = bestResult.distance ? ` (${bestResult.distance.toFixed(1)}km de distância)` : '';
+      console.log(`✅ Endereço adicionado via voz: ${bestResult.display_name}${distanceInfo}`);
+
+      // Aviso se confiança baixa
+      if (bestResult.confidence < 0.7) {
+        console.warn('⚠️ Resultado com baixa confiança, verifique se está correto');
+      }
 
     } catch (err) {
-      console.error('Erro ao geocodificar:', err);
-      alert('Erro ao confirmar o endereço. Verifique sua conexão.');
+      console.error('Erro ao buscar endereço via voz:', err);
+      alert('Erro ao buscar o endereço. Verifique sua conexão.');
     }
   };
 
