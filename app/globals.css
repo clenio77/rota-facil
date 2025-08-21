@@ -120,23 +120,91 @@ body {
   @apply transition-all duration-200 hover:shadow-lg hover:scale-[1.02];
 }
 
-/* Button styles */
+/* 📱 MOBILE-FIRST BUTTON SYSTEM */
 .btn-primary {
-  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg;
+  @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold
+         py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl
+         min-h-[48px] text-base touch-manipulation select-none
+         focus:outline-none focus:ring-4 focus:ring-blue-300;
 }
 
 .btn-secondary {
-  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  @apply bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-800 font-semibold
+         py-4 px-6 rounded-xl transition-all duration-200 border-2 border-gray-300
+         min-h-[48px] text-base touch-manipulation select-none
+         focus:outline-none focus:ring-4 focus:ring-gray-300;
 }
 
-/* Input styles */
+.btn-large {
+  @apply py-5 px-8 text-lg min-h-[56px] rounded-2xl;
+}
+
+.btn-icon {
+  @apply p-4 min-w-[48px] min-h-[48px] rounded-xl flex items-center justify-center;
+}
+
+/* 📱 MOBILE-FIRST TOUCH ZONES */
+.touch-zone {
+  @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+}
+
+.thumb-zone {
+  /* Área acessível com polegar em telas 5-7" */
+  @apply max-w-sm mx-auto;
+}
+
+/* 📱 MOBILE-FIRST INPUT SYSTEM */
 .input-primary {
-  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
+  @apply w-full px-4 py-4 border-2 border-gray-300 rounded-xl text-base
+         focus:outline-none focus:ring-4 focus:ring-blue-300 focus:border-blue-500
+         min-h-[48px] touch-manipulation bg-white shadow-sm transition-all duration-200;
+}
+
+/* 📱 MOBILE-FIRST LAYOUT SYSTEM */
+.mobile-container {
+  @apply px-4 py-6 max-w-sm mx-auto sm:max-w-md md:max-w-lg lg:max-w-xl;
+}
+
+.mobile-section {
+  @apply mb-8 bg-white rounded-2xl shadow-lg p-6;
+}
+
+.mobile-header {
+  @apply text-2xl font-bold text-gray-900 mb-4 text-center;
+}
+
+.mobile-grid {
+  @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+}
+
+/* 📱 MOBILE-FIRST NAVIGATION */
+.mobile-nav {
+  @apply fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200
+         px-2 py-2 flex justify-around items-center z-50 shadow-2xl
+         backdrop-blur-sm bg-white/95;
+}
+
+.mobile-nav-item {
+  @apply flex flex-col items-center gap-1 p-3 rounded-2xl touch-manipulation
+         min-w-[64px] min-h-[64px] justify-center transition-all duration-200
+         hover:bg-gray-100 active:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.mobile-nav-item.active {
+  @apply bg-blue-100 text-blue-600 font-semibold;
+}
+
+.mobile-nav-icon {
+  @apply w-6 h-6 mb-1;
+}
+
+.mobile-nav-label {
+  @apply text-xs font-medium;
 }
 
 /* Status badges */
 .badge {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply inline-flex items-center px-3 py-2 rounded-full text-sm font-semibold min-h-[32px];
 }
 
 .badge-success {

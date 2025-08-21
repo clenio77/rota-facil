@@ -5,7 +5,15 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import StopCard from '../components/StopCard';
 import CityIndicator from '../components/CityIndicator';
+import Dashboard from '../components/Dashboard';
+import VoiceControl, { useVoiceCommands } from '../components/VoiceControl';
+import OfflineStatusIndicator, { useOfflineActions } from '../components/OfflineStatus';
+// import ProofOfDeliveryModal, { useProofOfDelivery } from '../components/ProofOfDelivery';
 import { getSupabase } from '../lib/supabaseClient';
+import { analytics } from '../lib/analytics';
+import { voiceCommands } from '../lib/voiceCommands';
+import { offlineManager } from '../lib/offlineManager';
+import { proofOfDelivery } from '../lib/proofOfDelivery';
 import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
 // SpeechRecognition types for browsers (ambient declarations)
 // Minimal subset to type usage without depending on lib.dom updates
@@ -95,6 +103,17 @@ export default function HomePage() {
   const [roundtrip, setRoundtrip] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentDeliveryIndex, setCurrentDeliveryIndex] = useState(0);
+
+  // 🔄 OFFLINE ACTIONS
+  const { queueAction, cacheData, getCachedData } = useOfflineActions();
+
+  // 📸 PROOF OF DELIVERY
+  // const { proofs, loadProofs } = useProofOfDelivery();
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
+  const [currentProofStop, setCurrentProofStop] = useState<{ id: number; address: string } | null>(null);
 
   // Sync settings modal with URL hash (#settings)
   React.useEffect(() => {
@@ -248,17 +267,35 @@ export default function HomePage() {
       }
 
       if (result.success) {
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? {
-                ...stop,
-                status: 'confirmed',
-                address: result.address,
-                lat: result.lat,
-                lng: result.lng
+        setStops(prev => {
+          const updatedStops = prev.map(stop =>
+            stop.id === newStop.id
+              ? {
+                  ...stop,
+                  status: 'confirmed',
+                  address: result.address,
+                  lat: result.lat,
+                  lng: result.lng
+                }
+              : stop
+          );
+
+          // 📊 INICIAR SESSÃO DE ANALYTICS se for a primeira parada confirmada
+          const confirmedCount = updatedStops.filter(s => s.status === 'confirmed').length;
+          if (confirmedCount === 1 && !currentSessionId) {
+            const sessionId = analytics.startDeliverySession(
+              1, // Começar com 1, será atualizado conforme mais paradas são adicionadas
+              {
+                city: 'Uberlândia', // TODO: Detectar cidade automaticamente
+                state: 'MG'
               }
-            : stop
-        ));
+            );
+            setCurrentSessionId(sessionId);
+            console.log('📊 Sessão de analytics iniciada:', sessionId);
+          }
+
+          return updatedStops;
+        });
       } else {
         throw new Error(result.error || 'Erro ao processar imagem');
       }
@@ -401,6 +438,188 @@ export default function HomePage() {
     .filter(s => typeof s.sequence === 'number')
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
+  // 🎤 VOICE COMMANDS HANDLERS
+  const voiceCommandHandlers = {
+    next_delivery: () => {
+      const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+      if (currentDeliveryIndex < route.length - 1) {
+        setCurrentDeliveryIndex(prev => prev + 1);
+        const nextStop = route[currentDeliveryIndex + 1];
+        voiceCommands.speak({
+          text: `Próxima entrega: ${nextStop.address}`,
+          priority: 'high'
+        });
+      } else {
+        voiceCommands.speak({
+          text: 'Esta é a última entrega da rota.',
+          priority: 'medium'
+        });
+      }
+    },
+
+    previous_delivery: () => {
+      if (currentDeliveryIndex > 0) {
+        setCurrentDeliveryIndex(prev => prev - 1);
+        const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+        const prevStop = route[currentDeliveryIndex - 1];
+        voiceCommands.speak({
+          text: `Entrega anterior: ${prevStop.address}`,
+          priority: 'high'
+        });
+      } else {
+        voiceCommands.speak({
+          text: 'Esta é a primeira entrega da rota.',
+          priority: 'medium'
+        });
+      }
+    },
+
+    show_map: () => {
+      setShowMap(true);
+      voiceCommands.speak({
+        text: 'Mapa exibido.',
+        priority: 'medium'
+      });
+    },
+
+    start_route: async () => {
+      // 🔄 CACHE ROUTE DATA
+      const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+      await cacheData('current_route', {
+        stops: route,
+        startTime: Date.now(),
+        totalDistance: routeDistanceKm,
+        totalTime: routeDurationMin
+      }, 'high', 24); // Cache por 24 horas
+
+      // 🔄 QUEUE OFFLINE ACTION
+      await queueAction('route_start', {
+        routeId: `route_${Date.now()}`,
+        stops: route.length,
+        startTime: Date.now()
+      });
+
+      handleStartRoute();
+      voiceCommands.speak({
+        text: 'Iniciando navegação no Google Maps.',
+        priority: 'high'
+      });
+    },
+
+    mark_delivered: async () => {
+      const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+      const currentStop = route[currentDeliveryIndex];
+      if (currentStop) {
+        // 📸 ABRIR MODAL DE COMPROVAÇÃO
+        setCurrentProofStop({
+          id: currentStop.id,
+          address: currentStop.address
+        });
+        setIsProofModalOpen(true);
+
+        voiceCommands.speak({
+          text: 'Abrindo tela de comprovação de entrega.',
+          priority: 'high'
+        });
+      }
+    },
+
+    report_problem: () => {
+      voiceCommands.speak({
+        text: 'Problema reportado. Entrega marcada para revisão.',
+        priority: 'high'
+      });
+    },
+
+    skip_delivery: () => {
+      const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+      if (currentDeliveryIndex < route.length - 1) {
+        setCurrentDeliveryIndex(prev => prev + 1);
+        voiceCommands.speak({
+          text: 'Entrega pulada. Próxima entrega carregada.',
+          priority: 'medium'
+        });
+      }
+    },
+
+    pause_route: () => {
+      voiceCommands.speak({
+        text: 'Rota pausada. Bom intervalo!',
+        priority: 'medium'
+      });
+    },
+
+    show_help: () => {
+      voiceCommands.speak({
+        text: 'Comandos disponíveis: próxima entrega, entregue, problema, iniciar rota, mostrar mapa, pausar, ajuda.',
+        priority: 'high'
+      });
+    },
+
+    show_dashboard: () => {
+      setIsDashboardOpen(true);
+      voiceCommands.speak({
+        text: 'Dashboard de estatísticas aberto.',
+        priority: 'medium'
+      });
+    },
+
+    stop_speaking: () => {
+      voiceCommands.stopSpeaking();
+    },
+
+    repeat_last: () => {
+      voiceCommands.repeatLast();
+    }
+  };
+
+  // Configurar handlers de voz
+  useVoiceCommands(voiceCommandHandlers);
+
+  // 📸 HANDLER DE COMPROVAÇÃO CAPTURADA
+  const handleProofCaptured = async (proof: any) => {
+    if (!currentProofStop) return;
+
+    // Marcar parada como entregue
+    setStops(prev => prev.map(stop =>
+      stop.id === currentProofStop.id
+        ? { ...stop, status: 'delivered' as any }
+        : stop
+    ));
+
+    // 🔄 QUEUE OFFLINE ACTION
+    await queueAction('delivery_update', {
+      stopId: currentProofStop.id,
+      status: 'delivered',
+      timestamp: Date.now(),
+      address: currentProofStop.address,
+      proofId: proof.id
+    });
+
+    console.log('📸 Comprovação capturada:', proof);
+
+    // Avançar para próxima entrega
+    const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+    if (currentDeliveryIndex < route.length - 1) {
+      setTimeout(() => {
+        setCurrentDeliveryIndex(prev => prev + 1);
+        const nextStop = route[currentDeliveryIndex + 1];
+        voiceCommands.speak({
+          text: `Comprovação salva. Próxima entrega: ${nextStop.address}`,
+          priority: 'medium'
+        });
+      }, 1000);
+    } else {
+      voiceCommands.speak({
+        text: 'Comprovação salva. Todas as entregas concluídas!',
+        priority: 'high'
+      });
+    }
+
+    // Recarregar lista de comprovações
+    // loadProofs();
+  };
+
   // Verificar se está em modo de teste
   const isTestMode = typeof window !== 'undefined' && (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -441,6 +660,30 @@ export default function HomePage() {
     if (route.length < 2) {
       alert('Otimize a rota ou confirme pelo menos 2 paradas.');
       return;
+    }
+
+    // 📊 FINALIZAR SESSÃO DE ANALYTICS (simulando entrega completa)
+    if (currentSessionId) {
+      const totalDistance = routeDistanceKm || 0;
+      const completedStops = route.length;
+      const routeOptimized = optimizedStops.length > 0;
+
+      analytics.endDeliverySession(
+        currentSessionId,
+        completedStops,
+        totalDistance,
+        routeOptimized
+      );
+
+      console.log('📊 Sessão de analytics finalizada:', {
+        sessionId: currentSessionId,
+        completedStops,
+        totalDistance,
+        routeOptimized
+      });
+
+      // Reset session
+      setCurrentSessionId(null);
     }
     const useOrigin = useDeviceOrigin && deviceOrigin;
     const originStr = useOrigin && deviceOrigin ? `${deviceOrigin.lat},${deviceOrigin.lng}` : `${route[0].lat},${route[0].lng}`;
@@ -583,7 +826,15 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-20">
+      <div className="mobile-container">
+        {/* 📱 MOBILE HEADER */}
+        <div className="text-center mb-6 pt-4">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">📦 Rota Fácil</h1>
+          <p className="text-lg sm:text-xl text-gray-600">Otimize suas entregas com IA</p>
+        </div>
+
+        <div className="space-y-6">
       {/* Banner de Modo de Teste */}
       {isTestMode && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -964,12 +1215,77 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Clear list floating action */}
-      {stops.length > 0 && (
-        <button onClick={handleClearStops} className="fixed bottom-24 right-4 z-40 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-custom">
-          Limpar lista
-        </button>
-      )}
+        {/* 📱 MOBILE FLOATING ACTION BUTTON */}
+        {stops.length > 0 && (
+          <button
+            onClick={handleClearStops}
+            className="fixed bottom-24 right-4 z-40 bg-red-600 hover:bg-red-700 active:bg-red-800
+                       text-white p-4 rounded-full shadow-2xl min-h-[56px] min-w-[56px]
+                       flex items-center justify-center touch-manipulation
+                       focus:outline-none focus:ring-4 focus:ring-red-300"
+            title="Limpar lista"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
+
+        {/* 📱 MOBILE BOTTOM NAVIGATION */}
+        <nav className="mobile-nav">
+          <button className="mobile-nav-item active" onClick={() => setIsDashboardOpen(true)}>
+            <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span className="mobile-nav-label">Dashboard</span>
+          </button>
+
+          <button className="mobile-nav-item" onClick={() => fileInputRef.current?.click()}>
+            <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="mobile-nav-label">Foto</span>
+          </button>
+
+          <VoiceControl onCommand={(command) => {
+            const handler = voiceCommandHandlers[command as keyof typeof voiceCommandHandlers];
+            if (handler) handler();
+          }} />
+
+          {stops.length > 0 && (
+            <button className="mobile-nav-item" onClick={handleOptimizeRoute} disabled={isOptimizing}>
+              <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="mobile-nav-label">Otimizar</span>
+            </button>
+          )}
+        </nav>
+
+        {/* 📊 DASHBOARD MODAL */}
+        <Dashboard
+          isOpen={isDashboardOpen}
+          onClose={() => setIsDashboardOpen(false)}
+        />
+
+        {/* 🔄 OFFLINE STATUS INDICATOR */}
+        <OfflineStatusIndicator />
+
+        {/* 📸 PROOF OF DELIVERY MODAL */}
+        {/* {currentProofStop && (
+          <ProofOfDeliveryModal
+            stopId={currentProofStop.id}
+            address={currentProofStop.address}
+            isOpen={isProofModalOpen}
+            onClose={() => {
+              setIsProofModalOpen(false);
+              setCurrentProofStop(null);
+            }}
+            onProofCaptured={handleProofCaptured}
+          />
+        )} */}
+      </div>
     </div>
   );
 }
