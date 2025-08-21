@@ -1,0 +1,74 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradientes para o pin de localização -->
+    <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7CB342;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4CAF50;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="orangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9800;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F57C00;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196F3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1976D2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Pin de localização principal -->
+  <g transform="translate(200, 200)">
+    <!-- Sombra do pin -->
+    <ellipse cx="0" cy="80" rx="25" ry="8" fill="rgba(0,0,0,0.2)" opacity="0.3"/>
+    
+    <!-- Corpo do pin - parte verde -->
+    <path d="M -60 -40 
+             A 60 60 0 0 1 0 -100
+             A 60 60 0 0 1 60 -40
+             L 60 20
+             A 60 60 0 0 1 30 50
+             L 0 80
+             L -30 50
+             A 60 60 0 0 1 -60 20
+             Z" 
+          fill="url(#greenGradient)" 
+          stroke="rgba(255,255,255,0.3)" 
+          stroke-width="2"/>
+    
+    <!-- Corpo do pin - parte laranja -->
+    <path d="M 0 -100
+             A 60 60 0 0 1 60 -40
+             L 60 20
+             A 60 60 0 0 1 30 50
+             L 0 80
+             L 0 -100
+             Z" 
+          fill="url(#orangeGradient)" 
+          opacity="0.9"/>
+    
+    <!-- Corpo do pin - detalhe azul -->
+    <path d="M -30 50
+             L 0 80
+             L 30 50
+             A 60 60 0 0 1 -30 50
+             Z" 
+          fill="url(#blueGradient)"/>
+    
+    <!-- Círculo interno branco -->
+    <circle cx="0" cy="-40" r="35" fill="white" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
+    
+    <!-- Check mark (✓) -->
+    <g transform="translate(0, -40)">
+      <path d="M -12 -2 L -4 6 L 12 -10" 
+            stroke="url(#orangeGradient)" 
+            stroke-width="6" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            fill="none"/>
+    </g>
+    
+    <!-- Brilho no pin -->
+    <ellipse cx="-15" cy="-60" rx="8" ry="12" fill="rgba(255,255,255,0.4)" opacity="0.6"/>
+  </g>
+</svg>
