@@ -439,12 +439,13 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
           .map((r: any) => ({ ...r, lat: parseFloat(r.lat), lon: parseFloat(r.lon) }))
           .filter((r: any) => isValidBrazilianCoordinate(r.lat, r.lon));
 
-        // FILTRO INTELIGENTE DE CIDADE: Rigoroso mas flexível para variações
+        // FILTRO PROGRESSIVO DE CIDADE: Começa rigoroso, fica mais flexível
         let cityFilteredResults = results;
         if (userLocation?.city) {
           const userCityNorm = normalizeStr(userLocation.city);
 
-          const cityResults = results.filter((r: any) => {
+          // NÍVEL 1: Busca rigorosa na cidade
+          const exactCityResults = results.filter((r: any) => {
             const displayName = normalizeStr(r.display_name || '');
 
             // Verificar múltiplas formas do nome da cidade
@@ -455,28 +456,37 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
                    (r.address && normalizeStr(r.address.municipality || '').includes(userCityNorm));
           });
 
-          if (cityResults.length > 0) {
-            console.log(`Nominatim: ${cityResults.length} resultados na cidade ${userLocation.city}`);
-            cityFilteredResults = cityResults;
-          } else {
-            // VALIDAÇÃO POR DISTÂNCIA: Se não encontrar na cidade, verificar se há resultados próximos
-            if (userLocation.lat && userLocation.lng) {
-              const nearbyResults = results.filter((r: any) => {
+          if (exactCityResults.length > 0) {
+            console.log(`Nominatim: ${exactCityResults.length} resultados EXATOS na cidade ${userLocation.city}`);
+            cityFilteredResults = exactCityResults;
+          } else if (userLocation.lat && userLocation.lng) {
+            // NÍVEL 2: Busca por proximidade (mais flexível)
+            const nearbyResults = results.filter((r: any) => {
+              const distance = haversineKm(userLocation.lat!, userLocation.lng!, r.lat, r.lon);
+              return distance <= 20; // Aumentado para 20km
+            });
+
+            if (nearbyResults.length > 0) {
+              console.log(`Nominatim: ${nearbyResults.length} resultados PRÓXIMOS (≤20km) aceitos`);
+              cityFilteredResults = nearbyResults;
+            } else {
+              // NÍVEL 3: Busca ainda mais flexível (região metropolitana)
+              const regionResults = results.filter((r: any) => {
                 const distance = haversineKm(userLocation.lat!, userLocation.lng!, r.lat, r.lon);
-                return distance <= 15; // Máximo 15km para considerar "próximo"
+                return distance <= 50; // Região metropolitana
               });
 
-              if (nearbyResults.length > 0) {
-                console.log(`Nominatim: ${nearbyResults.length} resultados próximos (≤15km) aceitos`);
-                cityFilteredResults = nearbyResults;
+              if (regionResults.length > 0) {
+                console.log(`Nominatim: ${regionResults.length} resultados na REGIÃO (≤50km) aceitos`);
+                cityFilteredResults = regionResults;
               } else {
-                console.log(`Nominatim: NENHUM resultado na cidade ${userLocation.city} ou próximo - REJEITANDO TODOS`);
-                cityFilteredResults = []; // Rejeitar todos se não estiver na cidade ou próximo
+                console.log(`Nominatim: NENHUM resultado próximo encontrado - mantendo ${results.length} resultados para análise`);
+                cityFilteredResults = results; // Manter todos para análise posterior
               }
-            } else {
-              console.log(`Nominatim: NENHUM resultado na cidade ${userLocation.city} - REJEITANDO TODOS`);
-              cityFilteredResults = []; // Rejeitar todos se não estiver na cidade
             }
+          } else {
+            console.log(`Nominatim: Sem coordenadas do usuário - mantendo ${results.length} resultados`);
+            cityFilteredResults = results; // Sem coordenadas, manter todos
           }
         }
 
@@ -742,11 +752,11 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     return photonResult;
   }
 
-  // 5. Tentar Nominatim com filtro de cidade
-  console.log('Tentando Nominatim com filtro de cidade...');
+  // 5. Tentar Nominatim com filtro progressivo
+  console.log('Tentando Nominatim com filtro progressivo...');
   const nominatimResult = await geocodeWithNominatim(address, userLocation);
-  if (nominatimResult && nominatimResult.confidence >= 0.4) {
-    console.log('Geocodificação via Nominatim (com filtro) bem-sucedida');
+  if (nominatimResult && nominatimResult.confidence >= 0.3) { // Reduzido de 0.4 para 0.3
+    console.log('Geocodificação via Nominatim (filtro progressivo) bem-sucedida');
     return nominatimResult;
   }
 
@@ -780,26 +790,56 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     return googleResult;
   }
 
-  // 8. ÚLTIMO RECURSO LOCAL: Busca simplificada MAS apenas na região
-  if (address.includes(',') && userLocation?.lat && userLocation?.lng) {
-    console.log('🔧 ÚLTIMO RECURSO LOCAL: Tentando endereço simplificado na região...');
+  // 8. ÚLTIMO RECURSO: Busca simplificada progressiva
+  console.log('🔧 ÚLTIMO RECURSO: Tentando estratégias simplificadas...');
+
+  // Estratégia 1: Primeira parte do endereço
+  if (address.includes(',')) {
     const simplifiedAddress = address.split(',')[0].trim();
+    console.log(`Tentando endereço simplificado: "${simplifiedAddress}"`);
     const simplifiedResult = await geocodeWithNominatim(simplifiedAddress, userLocation);
 
     if (simplifiedResult) {
-      // VALIDAÇÃO: Verificar se está próximo (máximo 30km para busca simplificada)
-      const distance = haversineKm(userLocation.lat, userLocation.lng, simplifiedResult.lat, simplifiedResult.lng);
-
-      if (distance <= 30) {
-        console.log(`✅ ÚLTIMO RECURSO LOCAL: Resultado próximo (${distance.toFixed(1)}km) - ACEITO`);
+      if (userLocation?.lat && userLocation?.lng) {
+        const distance = haversineKm(userLocation.lat, userLocation.lng, simplifiedResult.lat, simplifiedResult.lng);
+        if (distance <= 50) { // Mais flexível para último recurso
+          console.log(`✅ ÚLTIMO RECURSO: Resultado próximo (${distance.toFixed(1)}km) - ACEITO`);
+          return {
+            ...simplifiedResult,
+            confidence: Math.max(0.25, simplifiedResult.confidence - 0.2),
+            provider: simplifiedResult.provider + '-simplified'
+          };
+        }
+      } else {
+        // Sem coordenadas do usuário, aceitar resultado
+        console.log(`✅ ÚLTIMO RECURSO: Sem coordenadas do usuário - ACEITO`);
         return {
           ...simplifiedResult,
-          confidence: Math.max(0.25, simplifiedResult.confidence - 0.3),
-          provider: simplifiedResult.provider + '-local-simplified'
+          confidence: Math.max(0.25, simplifiedResult.confidence - 0.2),
+          provider: simplifiedResult.provider + '-simplified'
         };
-      } else {
-        console.log(`❌ ÚLTIMO RECURSO LOCAL: Resultado muito distante (${distance.toFixed(1)}km) - REJEITADO`);
       }
+    }
+  }
+
+  // Estratégia 2: Busca apenas com palavras-chave principais
+  const keywords = address.split(/[\s,]+/).filter(word =>
+    word.length > 3 &&
+    !['rua', 'avenida', 'av', 'r', 'número', 'num', 'nº'].includes(word.toLowerCase())
+  );
+
+  if (keywords.length > 0) {
+    const keywordAddress = keywords.slice(0, 2).join(' '); // Pegar apenas 2 palavras principais
+    console.log(`Tentando busca por palavras-chave: "${keywordAddress}"`);
+    const keywordResult = await geocodeWithNominatim(keywordAddress, userLocation);
+
+    if (keywordResult) {
+      console.log(`✅ ÚLTIMO RECURSO: Busca por palavras-chave bem-sucedida`);
+      return {
+        ...keywordResult,
+        confidence: Math.max(0.2, keywordResult.confidence - 0.3),
+        provider: keywordResult.provider + '-keywords'
+      };
     }
   }
 
