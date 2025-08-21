@@ -94,14 +94,18 @@ function normalizeStr(str: string): string {
 // Extração simples de rua e número do texto
 function extractStreetAndNumberLoose(text: string): { street: string; number?: string } | null {
   const cleaned = text.replace(/\s+/g, ' ').trim();
+  console.log(`extractStreetAndNumberLoose: analisando "${cleaned}"`);
+
   // Padrões comuns: "Rua X, 123" | "Avenida X 123" | "X 123"
   const numMatch = cleaned.match(/(.*?)[,\s]+(\d{1,6})(?:\D|$)/);
   if (numMatch) {
     const street = numMatch[1].replace(/[.,]$/,'').trim();
     const number = numMatch[2];
+    console.log(`extractStreetAndNumberLoose: encontrado rua="${street}" número="${number}"`);
     if (street && number) return { street, number };
   }
-  // Sem número explícito
+
+  console.log(`extractStreetAndNumberLoose: NENHUM número encontrado em "${cleaned}"`);
   return null;
 }
 
@@ -577,26 +581,18 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     console.log(`Contexto do usuário: ${userLocation.city || 'cidade desconhecida'} - ${userLocation.state || 'estado desconhecido'}`);
   }
 
-  // 0. Verificar cache primeiro (melhoria gratuita!)
-  const cachedResult = await searchGeocodingCache(originalAddress);
-  if (cachedResult) {
-    console.log('Resultado encontrado no cache');
+  // 0. CACHE DESABILITADO - FORÇAR NOVA BUSCA SEMPRE
+  console.log('🚨 CACHE DESABILITADO - NOVA BUSCA FORÇADA 🚨');
 
-    // Aplicar boost de confiança se o resultado for da mesma cidade
-    let confidence = cachedResult.confidence;
-    if (userLocation?.city && cachedResult.city &&
-        cachedResult.city.toLowerCase() === userLocation.city.toLowerCase()) {
-      confidence = Math.min(1.0, confidence + 0.2); // Boost de 20% para mesma cidade
-      console.log(`Boost aplicado: resultado da mesma cidade (${cachedResult.city})`);
-    }
-
+  // TESTE: retornar resultado fake para confirmar que o deploy funcionou
+  if (address.includes('teste123')) {
     return {
-      lat: cachedResult.lat,
-      lng: cachedResult.lng,
-      address: cachedResult.formatted_address,
-      confidence,
-      provider: cachedResult.provider,
-      formatted_address: cachedResult.formatted_address
+      lat: -18.9186,
+      lng: -48.2772,
+      address: 'TESTE DEPLOY FUNCIONOU',
+      confidence: 0.99,
+      provider: 'teste-deploy',
+      formatted_address: 'Deploy funcionou - cache desabilitado'
     };
   }
 
@@ -758,7 +754,11 @@ export async function POST(request: NextRequest) {
         provider_used: result.provider,
         confidence: result.confidence,
         user_city: userLocation?.city || 'N/A',
-        final_address: address
+        user_state: userLocation?.state || 'N/A',
+        final_address: address,
+        force_local_search: forceLocalSearch,
+        // Mostrar se ViaCEP foi tentado
+        viacep_attempted: !!userLocation?.city && !!userLocation?.state
       }
     });
 

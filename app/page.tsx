@@ -806,7 +806,11 @@ export default function HomePage() {
 
       // DEBUG: mostrar info do provedor usado
       if (data.debug_info) {
-        alert(`DEBUG: ${data.debug_info.provider_used} (conf: ${data.debug_info.confidence.toFixed(2)}) - ${data.debug_info.final_address}`);
+        alert(`DEBUG: ${data.debug_info.provider_used} (conf: ${data.debug_info.confidence.toFixed(2)})
+City: ${data.debug_info.user_city}/${data.debug_info.user_state}
+ViaCEP tentado: ${data.debug_info.viacep_attempted}
+Force local: ${data.debug_info.force_local_search}
+Endereço: ${data.debug_info.final_address}`);
       }
 
       const newStop: Stop = {
