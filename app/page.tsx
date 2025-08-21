@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import Image from 'next/image';
 import StopCard from '../components/StopCard';
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
@@ -840,6 +841,35 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
+      {/* 🏆 HEADER PRINCIPAL COM LOGO */}
+      <div className="bg-white rounded-xl shadow-custom p-6">
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="w-16 h-16 relative">
+            <Image
+              src="/rota-facil-icon.svg"
+              alt="Rota Fácil Logo"
+              width={64}
+              height={64}
+              className="w-full h-full object-contain drop-shadow-lg"
+            />
+          </div>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-slate-800 leading-tight">ROTA FÁCIL</h1>
+            <p className="text-lg text-slate-600 leading-tight">MOURA <span className="bg-green-500 text-white px-2 py-1 rounded text-sm font-bold ml-2">PRO</span></p>
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-slate-500 font-medium">
+            Sistema Inteligente para Carteiros
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 mt-2 text-xs">
+            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">📱 Mobile-First</span>
+            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">🎤 Voice Control</span>
+            <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">🔄 Offline Ready</span>
+          </div>
+        </div>
+      </div>
+
       {/* Banner de Modo de Teste */}
       {isTestMode && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">

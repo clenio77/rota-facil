@@ -1,13 +1,28 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Image from 'next/image'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'RotaFácil - Otimização de Rotas de Entrega',
-  description: 'Aplicativo PWA para otimização inteligente de rotas de entrega com reconhecimento de endereços',
+  title: 'Rota Fácil Moura - Sistema Inteligente para Carteiros',
+  description: 'Sistema PWA para otimização inteligente de rotas de entrega com reconhecimento de endereços por OCR e comando de voz',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/rota-facil-icon.svg', type: 'image/svg+xml' }
+    ],
+    apple: [
+      { url: '/rota-facil-icon.svg', type: 'image/svg+xml' }
+    ],
+    shortcut: '/favicon.svg'
+  },
+  keywords: ['rota', 'entrega', 'carteiro', 'otimização', 'OCR', 'voz', 'GPS', 'mobile'],
+  authors: [{ name: 'Clenio Consultory AI' }],
+  creator: 'Clenio Consultory AI',
+  publisher: 'Rota Fácil Moura',
 }
 
 export const viewport: Viewport = {
@@ -25,25 +40,38 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/rota-facil-icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/rota-facil-icon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Rota Fácil Moura" />
+        <meta name="theme-color" content="#4CAF50" />
       </head>
       <body className={`${inter.className} bg-gray-50 text-gray-900`}>
         <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-            <div className="container mx-auto px-4 py-4">
+          <header className="bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">
+            <div className="container mx-auto px-4 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                  <h1 className="text-2xl font-bold">RotaFácil</h1>
+                  <div className="w-10 h-10 relative">
+                    <Image
+                      src="/rota-facil-icon.svg"
+                      alt="Rota Fácil Logo"
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-contain filter brightness-0 invert"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold leading-tight">ROTA FÁCIL</h1>
+                    <p className="text-xs opacity-90 leading-tight">MOURA PRO</p>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm opacity-90">Entregas otimizadas</span>
+                  <span className="text-xs opacity-90 hidden sm:inline">Sistema Inteligente</span>
+                  <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
                 </div>
               </div>
             </div>

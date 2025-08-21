@@ -1,13 +1,25 @@
 {
-  "name": "RotaFácil - Otimização de Rotas",
-  "short_name": "RotaFácil",
-  "description": "Aplicativo PWA para otimização inteligente de rotas de entrega com reconhecimento automático de endereços",
+  "name": "Rota Fácil Moura - Sistema Inteligente para Carteiros",
+  "short_name": "Rota Fácil",
+  "description": "Sistema PWA para otimização inteligente de rotas de entrega com reconhecimento de endereços por OCR e comando de voz",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F3F4F6",
-  "theme_color": "#3B82F6",
+  "background_color": "#F8FAFC",
+  "theme_color": "#4CAF50",
   "orientation": "portrait",
   "icons": [
+    {
+      "src": "/rota-facil-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/rota-facil-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/icon-72x72.png",
       "sizes": "72x72",
@@ -64,18 +76,18 @@
   "prefer_related_applications": false,
   "shortcuts": [
     {
-      "name": "Nova Rota",
-      "short_name": "Nova",
-      "description": "Criar uma nova rota de entrega",
-      "url": "/?action=new-route",
-      "icons": [{ "src": "/icon-96x96.png", "sizes": "96x96" }]
+      "name": "Adicionar Parada",
+      "short_name": "Parada",
+      "description": "Adicionar nova parada por foto ou voz",
+      "url": "/?action=add-stop",
+      "icons": [{ "src": "/rota-facil-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
-      "name": "Minhas Rotas",
-      "short_name": "Rotas",
-      "description": "Ver rotas salvas",
-      "url": "/?action=my-routes",
-      "icons": [{ "src": "/icon-96x96.png", "sizes": "96x96" }]
+      "name": "Otimizar Rota",
+      "short_name": "Otimizar",
+      "description": "Otimizar rota atual",
+      "url": "/?action=optimize",
+      "icons": [{ "src": "/rota-facil-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]
 }
