@@ -32,15 +32,17 @@ class OfflineManager {
   private dbName = 'rota-facil-offline';
   private dbVersion = 1;
   private db: IDBDatabase | null = null;
-  private isOnline = navigator.onLine;
+  private isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
   private syncQueue: OfflineAction[] = [];
   private syncInProgress = false;
   private listeners: ((status: OfflineStatus) => void)[] = [];
 
   constructor() {
-    this.initializeDB();
-    this.setupNetworkListeners();
-    this.loadSyncQueue();
+    if (typeof window !== 'undefined') {
+      this.initializeDB();
+      this.setupNetworkListeners();
+      this.loadSyncQueue();
+    }
   }
 
   /**
@@ -92,6 +94,8 @@ class OfflineManager {
    * 🌐 Configurar listeners de rede
    */
   private setupNetworkListeners(): void {
+    if (typeof window === 'undefined') return;
+
     window.addEventListener('online', () => {
       this.isOnline = true;
       console.log('🌐 Conexão restaurada - iniciando sincronização');

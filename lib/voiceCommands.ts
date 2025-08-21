@@ -115,15 +115,17 @@ export class VoiceCommandSystem {
   private lastResponse: VoiceResponse | null = null;
 
   constructor() {
-    this.synthesis = window.speechSynthesis;
-    this.initializeRecognition();
+    if (typeof window !== 'undefined') {
+      this.synthesis = window.speechSynthesis;
+      this.initializeRecognition();
+    }
   }
 
   /**
    * 🎤 Inicializar reconhecimento de voz
    */
   private initializeRecognition(): void {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (typeof window === 'undefined' || (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window))) {
       console.warn('🎤 Speech Recognition não suportado neste navegador');
       return;
     }

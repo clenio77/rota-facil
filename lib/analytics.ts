@@ -293,9 +293,11 @@ class AnalyticsSystem {
 export const analytics = new AnalyticsSystem();
 
 // Limpar dados antigos na inicialização (executar apenas uma vez por dia)
-const lastCleanup = localStorage.getItem('rota-facil-last-cleanup');
-const today = new Date().toISOString().split('T')[0];
-if (lastCleanup !== today) {
-  analytics.cleanOldData();
-  localStorage.setItem('rota-facil-last-cleanup', today);
+if (typeof window !== 'undefined') {
+  const lastCleanup = localStorage.getItem('rota-facil-last-cleanup');
+  const today = new Date().toISOString().split('T')[0];
+  if (lastCleanup !== today) {
+    analytics.cleanOldData();
+    localStorage.setItem('rota-facil-last-cleanup', today);
+  }
 }
