@@ -91,21 +91,42 @@ function normalizeStr(str: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-// Extração simples de rua e número do texto
+// Extração MELHORADA de rua e número do texto
 function extractStreetAndNumberLoose(text: string): { street: string; number?: string } | null {
   const cleaned = text.replace(/\s+/g, ' ').trim();
   console.log(`extractStreetAndNumberLoose: analisando "${cleaned}"`);
 
-  // Padrões comuns: "Rua X, 123" | "Avenida X 123" | "X 123"
-  const numMatch = cleaned.match(/(.*?)[,\s]+(\d{1,6})(?:\D|$)/);
-  if (numMatch) {
-    const street = numMatch[1].replace(/[.,]$/,'').trim();
-    const number = numMatch[2];
-    console.log(`extractStreetAndNumberLoose: encontrado rua="${street}" número="${number}"`);
-    if (street && number) return { street, number };
+  // PADRÕES MELHORADOS para capturar números corretamente:
+  // 1. "Afonso Pena, 262" ou "Afonso Pena 262"
+  // 2. "Rua Afonso Pena, 262"
+  // 3. "Av. Afonso Pena 262"
+
+  // Primeiro, tentar padrões mais específicos
+  const patterns = [
+    // Padrão 1: Nome da rua + vírgula + número
+    /^(.+?),\s*(\d{1,6})(?:\D.*)?$/,
+    // Padrão 2: Nome da rua + espaço + número (no final)
+    /^(.+?)\s+(\d{1,6})(?:\s*[^\d].*)?$/,
+    // Padrão 3: Capturar número no meio (mais conservador)
+    /^(.+?)\s+(\d{1,6})\s*(?:,|$)/
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      const street = match[1].replace(/[.,]$/,'').trim();
+      const number = match[2];
+
+      // Validar se o número não é muito grande (evitar CEPs)
+      const numValue = parseInt(number);
+      if (numValue > 0 && numValue <= 99999) {
+        console.log(`extractStreetAndNumberLoose: ENCONTRADO rua="${street}" número="${number}"`);
+        return { street, number };
+      }
+    }
   }
 
-  console.log(`extractStreetAndNumberLoose: NENHUM número encontrado em "${cleaned}"`);
+  console.log(`extractStreetAndNumberLoose: NENHUM número válido encontrado em "${cleaned}"`);
   return null;
 }
 
@@ -373,17 +394,37 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
   try {
     // 1) Tente busca estruturada se soubermos a cidade/estado do usuário
     if (userLocation?.city) {
-      const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.searchParams.set('format', 'json');
-      url.searchParams.set('countrycodes', 'br');
-      url.searchParams.set('limit', '5');
-      url.searchParams.set('addressdetails', '1');
-      url.searchParams.set('extratags', '1');
-      url.searchParams.set('namedetails', '1');
-      url.searchParams.set('street', address); // rua + número que o usuário falou
-      url.searchParams.set('city', userLocation.city);
-      if (userLocation.state) url.searchParams.set('state', userLocation.state);
-      url.searchParams.set('country', 'Brasil');
+      // PRIMEIRA TENTATIVA: Busca estruturada com rua e número separados
+      const streetParts = extractStreetAndNumberLoose(address);
+
+      if (streetParts && streetParts.number) {
+        console.log(`Nominatim: tentando busca estruturada para "${streetParts.street}" número "${streetParts.number}"`);
+
+        const url = new URL('https://nominatim.openstreetmap.org/search');
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('countrycodes', 'br');
+        url.searchParams.set('limit', '10');
+        url.searchParams.set('addressdetails', '1');
+        url.searchParams.set('extratags', '1');
+        url.searchParams.set('namedetails', '1');
+        url.searchParams.set('street', `${streetParts.street} ${streetParts.number}`); // rua + número específico
+        url.searchParams.set('city', userLocation.city);
+        if (userLocation.state) url.searchParams.set('state', userLocation.state);
+        url.searchParams.set('country', 'Brasil');
+      } else {
+        // FALLBACK: Busca estruturada normal
+        const url = new URL('https://nominatim.openstreetmap.org/search');
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('countrycodes', 'br');
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('addressdetails', '1');
+        url.searchParams.set('extratags', '1');
+        url.searchParams.set('namedetails', '1');
+        url.searchParams.set('street', address); // endereço completo
+        url.searchParams.set('city', userLocation.city);
+        if (userLocation.state) url.searchParams.set('state', userLocation.state);
+        url.searchParams.set('country', 'Brasil');
+      }
 
       const response = await fetch(url.toString(), {
         headers: {
@@ -399,20 +440,48 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
           .filter((r: any) => isValidBrazilianCoordinate(r.lat, r.lon))
           .filter((r: any) => normalizeStr(r.display_name || '').includes(normalizeStr(userLocation.city!)));
 
-        if (results.length > 0) {
+        // FILTRO ADICIONAL: Se o usuário especificou um número, priorizar resultados que contenham esse número
+        let filteredResults = results;
+        const streetParts = extractStreetAndNumberLoose(address);
+        if (streetParts && streetParts.number) {
+          const numberResults = results.filter((r: any) => {
+            const displayName = r.display_name || '';
+            const addressObj = r.address || {};
+
+            // Verificar se o número aparece no display_name ou no house_number
+            return displayName.includes(streetParts.number!) ||
+                   addressObj.house_number === streetParts.number;
+          });
+
+          if (numberResults.length > 0) {
+            console.log(`Nominatim: encontrados ${numberResults.length} resultados com número ${streetParts.number}`);
+            filteredResults = numberResults;
+          } else {
+            console.log(`Nominatim: AVISO - nenhum resultado contém o número ${streetParts.number}, usando todos os ${results.length} resultados`);
+          }
+        }
+
+        if (filteredResults.length > 0) {
           // Preferir casa (house) ou building; senão, pegar o mais detalhado
-          results.sort((a: any, b: any) => {
+          filteredResults.sort((a: any, b: any) => {
             const rank = (x: any) => (
               x.type === 'house' ? 3 : x.class === 'building' ? 2 : x.osm_type === 'way' ? 1 : 0
             );
             return rank(b) - rank(a);
           });
 
-          const r = results[0];
+          const r = filteredResults[0];
           let confidence = 0.85;
           if (r.osm_type === 'way') confidence = 0.9;
           if (r.class === 'building') confidence = 0.92;
           if (r.type === 'house') confidence = 0.96;
+
+          // BONUS: Se encontramos o número exato, aumentar confiança
+          if (streetParts && streetParts.number &&
+              (r.display_name.includes(streetParts.number) || r.address?.house_number === streetParts.number)) {
+            confidence = Math.min(0.98, confidence + 0.05);
+            console.log(`Nominatim: BONUS de confiança por número exato encontrado: ${confidence}`);
+          }
 
           return {
             lat: r.lat,

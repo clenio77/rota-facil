@@ -804,13 +804,19 @@ export default function HomePage() {
         return;
       }
 
-      // DEBUG: mostrar info do provedor usado
+      // DEBUG: log info do provedor usado (apenas no console)
       if (data.debug_info) {
-        alert(`DEBUG: ${data.debug_info.provider_used} (conf: ${data.debug_info.confidence.toFixed(2)})
-City: ${data.debug_info.user_city}/${data.debug_info.user_state}
-ViaCEP tentado: ${data.debug_info.viacep_attempted}
-Force local: ${data.debug_info.force_local_search}
-Endereço: ${data.debug_info.final_address}`);
+        console.log('🔍 DEBUG Geocodificação:', {
+          provider: data.debug_info.provider_used,
+          confidence: data.debug_info.confidence,
+          userCity: data.debug_info.user_city,
+          userState: data.debug_info.user_state,
+          viaCepAttempted: data.debug_info.viacep_attempted,
+          forceLocal: data.debug_info.force_local_search,
+          finalAddress: data.debug_info.final_address,
+          originalInput: voiceText,
+          resultAddress: data.address
+        });
       }
 
       const newStop: Stop = {
