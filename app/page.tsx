@@ -804,6 +804,11 @@ export default function HomePage() {
         return;
       }
 
+      // DEBUG: mostrar info do provedor usado
+      if (data.debug_info) {
+        alert(`DEBUG: ${data.debug_info.provider_used} (conf: ${data.debug_info.confidence.toFixed(2)}) - ${data.debug_info.final_address}`);
+      }
+
       const newStop: Stop = {
         id: Date.now(),
         photoUrl: '',

@@ -736,7 +736,14 @@ export async function POST(request: NextRequest) {
       address: result.formatted_address || result.address,
       confidence: result.confidence,
       provider: result.provider,
-      original_address: address
+      original_address: address,
+      // DEBUG: incluir info de debug na resposta para ver no celular
+      debug_info: {
+        provider_used: result.provider,
+        confidence: result.confidence,
+        user_city: userLocation?.city || 'N/A',
+        final_address: address
+      }
     });
 
   } catch (error) {
