@@ -773,41 +773,28 @@ export default function HomePage() {
     if (!address) { alert('Digite ou dite um endereço.'); return; }
 
     try {
-      // 🎯 Política SIMPLES: sempre buscar na cidade ativa do app, a não ser que o usuário fale explicitamente outra cidade
+      // 🎯 POLÍTICA ULTRA-SIMPLES: SEMPRE buscar na cidade ativa, SEM EXCEÇÕES
       const currentLocation = deviceOrigin || deviceLocation;
 
-      // Comparação sem acentos
-      const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-      // Detectar se o usuário já informou cidade/UF explícita no texto (ex.: ", belo horizonte" ou "mg", "sp")
-      const hasExplicitCityOrUF = (() => {
-        const n = normalize(address);
-        const hasUF = /(\bac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|se|sp|to\b)/.test(n);
-        const manyCommas = address.split(',').length >= 3; // rua, numero, cidade
-        const hasBrasil = n.includes('brasil');
-        // Detectar nomes de cidades conhecidas (além da atual)
-        const hasCityName = currentLocation?.city && n.includes('belo horizonte') || n.includes('sao paulo') || n.includes('rio de janeiro') || n.includes('brasilia') || n.includes('salvador') || n.includes('fortaleza') || n.includes('recife') || n.includes('porto alegre') || n.includes('curitiba') || n.includes('goiania') || n.includes('manaus') || n.includes('belem') || n.includes('vitoria') || n.includes('natal') || n.includes('joao pessoa') || n.includes('maceio') || n.includes('aracaju') || n.includes('teresina') || n.includes('sao luis') || n.includes('macapa') || n.includes('boa vista') || n.includes('rio branco') || n.includes('porto velho') || n.includes('cuiaba') || n.includes('campo grande') || n.includes('florianopolis');
-        return hasUF || manyCommas || hasBrasil || hasCityName;
-      })();
-
-      // Se NÃO tem cidade/UF no texto e temos localização, complementar com cidade/UF do dispositivo
-      if (currentLocation?.city && !hasExplicitCityOrUF && !normalize(address).includes(normalize(currentLocation.city))) {
-        address = `${address}, ${currentLocation.city}`;
-        if (currentLocation.state) address += `, ${currentLocation.state}`;
-        console.log('🎯 Endereço expandido para busca local:', address);
+      // SEMPRE complementar com a cidade ativa quando temos localização
+      if (currentLocation?.city) {
+        // Só adicionar cidade se não estiver já no texto
+        const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (!normalize(address).includes(normalize(currentLocation.city))) {
+          address = `${address}, ${currentLocation.city}`;
+          if (currentLocation.state) address += `, ${currentLocation.state}`;
+        }
+        console.log('🎯 Endereço SEMPRE na cidade ativa:', address);
       }
 
-      // Geocodificar no servidor com contexto de localização do usuário
+      // Geocodificar no servidor SEMPRE com filtro local ativo
       const res = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address,
-          // Se o usuário informou outra cidade/UF, mandar só coordenadas (sem cidade/estado) para não forçar filtro rígido
-          userLocation: hasExplicitCityOrUF && currentLocation
-            ? { lat: currentLocation.lat, lng: currentLocation.lng }
-            : currentLocation,
-          forceLocalSearch: !hasExplicitCityOrUF
+          userLocation: currentLocation, // SEMPRE enviar cidade/estado para forçar filtro
+          forceLocalSearch: true // SEMPRE forçar busca local
         }),
       });
 

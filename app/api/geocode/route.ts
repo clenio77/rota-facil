@@ -125,30 +125,9 @@ async function geocodeWithViaCepAddressLookup(address: string, userLocation?: { 
     console.log(`ViaCEP logradouro: encontrados ${data.length} resultados para "${parts.street}" em ${userLocation.city}/${uf}`);
     data.forEach((d: any, i: number) => console.log(`  [${i}] ${d.logradouro} - ${d.bairro} - CEP: ${d.cep}`));
 
-    // Escolher o melhor logradouro: buscar match exato primeiro, senão pegar o primeiro
-    const exactMatch = data.find((d: any) => normalizeStr(d.logradouro || '') === normalizeStr(parts.street));
-    const partialMatch = data.find((d: any) => normalizeStr(d.logradouro || '').includes(normalizeStr(parts.street)));
-    const target = exactMatch || partialMatch || data[0];
-
-    const street = target.logradouro || parts.street;
-    const bairro = target.bairro || '';
-    const localidade = target.localidade || userLocation.city;
-    const ufRet = target.uf || uf;
-    const cep = (target.cep || '').replace(/\D/g, '');
-
-    console.log(`ViaCEP: selecionado "${street}" - ${bairro} - CEP: ${cep}`);
-
-    // Geocodificar usando Nominatim estruturado com número + cidade/UF
-    const structuredStreet = [street, parts.number].filter(Boolean).join(' ');
-    const result = await geocodeWithNominatim(structuredStreet, { ...userLocation, city: localidade, state: ufRet });
-    if (!result) return null;
-
-    return {
-      ...result,
-      confidence: Math.max(0.93, result.confidence || 0),
-      provider: 'viacep-addr+nominatim',
-      formatted_address: `${street}, ${parts.number || ''}${parts.number ? ', ' : ''}${bairro ? bairro + ', ' : ''}${localidade} - ${ufRet}, ${cep}`.trim()
-    };
+    // DESABILITAR ViaCEP por logradouro temporariamente para debug - sempre retornar null
+    console.log(`ViaCEP logradouro: DESABILITADO para debug - usando outros provedores`);
+    return null;
   } catch (e) {
     console.error('Erro ViaCEP (logradouro):', e);
     return null;
