@@ -1022,12 +1022,10 @@ export default function HomePage() {
           {/* City Indicator */}
           <div className="sm:col-span-2">
             <CityIndicator
-              currentLocation={deviceLocation}
+              currentLocation={deviceOrigin || deviceLocation}
               onLocationChange={(location) => {
+                // Define a nova cidade ativa (independe do toggle de origem)
                 setDeviceOrigin(location);
-                if (useDeviceOrigin) {
-                  setDeviceOrigin(location);
-                }
               }}
               className="mb-3"
             />
