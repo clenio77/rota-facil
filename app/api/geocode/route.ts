@@ -125,9 +125,30 @@ async function geocodeWithViaCepAddressLookup(address: string, userLocation?: { 
     console.log(`ViaCEP logradouro: encontrados ${data.length} resultados para "${parts.street}" em ${userLocation.city}/${uf}`);
     data.forEach((d: any, i: number) => console.log(`  [${i}] ${d.logradouro} - ${d.bairro} - CEP: ${d.cep}`));
 
-    // DESABILITAR ViaCEP por logradouro temporariamente para debug - sempre retornar null
-    console.log(`ViaCEP logradouro: DESABILITADO para debug - usando outros provedores`);
-    return null;
+    // Escolher o melhor logradouro: buscar match exato primeiro, senão pegar o primeiro
+    const exactMatch = data.find((d: any) => normalizeStr(d.logradouro || '') === normalizeStr(parts.street));
+    const partialMatch = data.find((d: any) => normalizeStr(d.logradouro || '').includes(normalizeStr(parts.street)));
+    const target = exactMatch || partialMatch || data[0];
+
+    const street = target.logradouro || parts.street;
+    const bairro = target.bairro || '';
+    const localidade = target.localidade || userLocation.city;
+    const ufRet = target.uf || uf;
+    const cep = (target.cep || '').replace(/\D/g, '');
+
+    console.log(`ViaCEP: selecionado "${street}" - ${bairro} - CEP: ${cep}`);
+
+    // Geocodificar usando Nominatim estruturado com número + cidade/UF
+    const structuredStreet = [street, parts.number].filter(Boolean).join(' ');
+    const result = await geocodeWithNominatim(structuredStreet, { ...userLocation, city: localidade, state: ufRet });
+    if (!result) return null;
+
+    return {
+      ...result,
+      confidence: Math.max(0.95, result.confidence || 0), // Confiança muito alta para forçar prioridade
+      provider: 'viacep-addr+nominatim',
+      formatted_address: `${street}, ${parts.number || ''}${parts.number ? ', ' : ''}${bairro ? bairro + ', ' : ''}${localidade} - ${ufRet}, ${cep}`.trim()
+    };
   } catch (e) {
     console.error('Erro ViaCEP (logradouro):', e);
     return null;
@@ -574,42 +595,44 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     }
   }
 
-  // 2. Tentar Mapbox (se configurado)
+  // 2. Se temos cidade/UF e número, tentar ViaCEP por logradouro PRIMEIRO (mais preciso)
+  const viaCepAddrResult = await geocodeWithViaCepAddressLookup(address, userLocation);
+  if (viaCepAddrResult && viaCepAddrResult.confidence >= 0.95) {
+    console.log('Geocodificação via ViaCEP (logradouro)+Nominatim bem-sucedida');
+    return viaCepAddrResult;
+  }
+
+  // 3. Tentar Mapbox (se configurado)
   const mapboxResult = await geocodeWithMapbox(address, userLocation);
   if (mapboxResult && mapboxResult.confidence >= 0.6) {
     console.log('Geocodificação via Mapbox bem-sucedida');
     return mapboxResult;
   }
 
-  // 2b. Se temos cidade/UF e número, tentar ViaCEP por logradouro para obter CEP correto e geocodificar com número preciso
-  const viaCepAddrResult = await geocodeWithViaCepAddressLookup(address, userLocation);
-  if (viaCepAddrResult && viaCepAddrResult.confidence >= 0.9) {
-    console.log('Geocodificação via ViaCEP (logradouro)+Nominatim bem-sucedida');
-    return viaCepAddrResult;
-  }
 
-  // 3. Tentar Photon (open-source, sem chave)
+
+  // 4. Tentar Photon (open-source, sem chave)
   const photonResult = await geocodeWithPhoton(address, userLocation);
   if (photonResult && photonResult.confidence >= 0.6) {
     console.log('Geocodificação via Photon bem-sucedida');
     return photonResult;
   }
 
-  // 4. Tentar Nominatim
+  // 5. Tentar Nominatim
   const nominatimResult = await geocodeWithNominatim(address, userLocation);
   if (nominatimResult && nominatimResult.confidence >= 0.4) {
     console.log('Geocodificação via Nominatim bem-sucedida');
     return nominatimResult;
   }
 
-  // 5. Último recurso: Google (se configurado)
+  // 6. Último recurso: Google (se configurado)
   const googleResult = await geocodeWithGoogle(address, userLocation);
   if (googleResult) {
     console.log('Geocodificação via Google bem-sucedida');
     return googleResult;
   }
 
-  // 6. Se nada funcionou, tentar versões simplificadas do endereço
+  // 7. Se nada funcionou, tentar versões simplificadas do endereço
   if (address.includes(',')) {
     const simplifiedAddress = address.split(',')[0].trim() + ', Brasil';
     const fallbackResult = await geocodeWithNominatim(simplifiedAddress, userLocation);
