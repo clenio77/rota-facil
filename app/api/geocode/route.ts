@@ -53,8 +53,8 @@ async function geocodeWithViaCEP(cep: string, userLocation?: { lat: number; lng:
 
     // FILTRO RIGOROSO: Se temos localização do usuário, verificar se o CEP é da mesma cidade
     if (userLocation?.city) {
-      const cepCity = data.localidade.toLowerCase();
-      const userCity = userLocation.city.toLowerCase();
+      const cepCity = normalizeStr(data.localidade);
+      const userCity = normalizeStr(userLocation.city);
 
       if (cepCity !== userCity) {
         console.log(`ViaCEP: REJEITADO - CEP de ${data.localidade} mas usuário está em ${userLocation.city}`);
@@ -83,13 +83,34 @@ async function geocodeWithViaCEP(cep: string, userLocation?: { lat: number; lng:
   }
 }
 
+// Utilitário: remover acentos para comparação robusta
+function normalizeStr(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+// Utilitário: distância Haversine (km)
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+const MAX_LOCAL_DISTANCE_KM = 50; // limite para considerar "na região" quando só temos coordenadas
+
 // Provider 2: Mapbox Geocoding API
-async function geocodeWithMapbox(address: string, userLocation?: { city?: string; state?: string }): Promise<GeocodeResult | null> {
+async function geocodeWithMapbox(address: string, userLocation?: { lat?: number; lng?: number; city?: string; state?: string }): Promise<GeocodeResult | null> {
   const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
   if (!mapboxToken) return null;
 
   try {
-    // Construir query com contexto de localização se disponível
+    // Construir query com contexto de localização se disponível (cidade/estado)
     let query = address;
     if (userLocation?.city) {
       query = `${address}, ${userLocation.city}`;
@@ -97,12 +118,21 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
         query += `, ${userLocation.state}`;
       }
     }
-    
-    const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
-      `country=BR&types=address,poi&limit=5&language=pt&access_token=${mapboxToken}`
-    );
 
+    // Montar URL com proximidade se tivermos coordenadas do dispositivo
+    const baseUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`;
+    const params: string[] = [
+      'country=BR',
+      'types=address,poi',
+      'limit=5',
+      'language=pt',
+      `access_token=${mapboxToken}`
+    ];
+    if (typeof userLocation?.lng === 'number' && typeof userLocation?.lat === 'number') {
+      params.push(`proximity=${userLocation.lng},${userLocation.lat}`);
+    }
+
+    const response = await fetch(`${baseUrl}?${params.join('&')}`);
     const data = await response.json();
 
     if (data.features && data.features.length > 0) {
@@ -114,15 +144,23 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
             return false;
           }
 
-          // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
+          // Quando temos cidade do usuário, aceitar somente a mesma cidade (sem acentos)
           if (userLocation?.city) {
             const featureContext = feature.context || [];
             const featureCity = featureContext.find((ctx) =>
               ctx.id.startsWith('place') || ctx.id.startsWith('locality')
             );
 
-            if (!featureCity || featureCity.text.toLowerCase() !== userLocation.city.toLowerCase()) {
-              console.log(`Mapbox: REJEITADO - endereço fora da cidade ${userLocation.city} (encontrado: ${featureCity?.text || 'desconhecida'})`);
+            const cityOk = featureCity && normalizeStr(featureCity.text) === normalizeStr(userLocation.city);
+            if (!cityOk) {
+              console.log(`Mapbox: REJEITADO - fora da cidade ${userLocation.city} (encontrado: ${featureCity?.text || 'desconhecida'})`);
+              return false;
+            }
+          } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+            // Sem cidade, mas com coordenadas: filtrar por raio
+            const dist = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+            if (dist > MAX_LOCAL_DISTANCE_KM) {
+              console.log(`Mapbox: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
               return false;
             }
           }
@@ -133,9 +171,9 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
           const [lng, lat] = feature.center;
           let confidence = feature.relevance || 0.8;
 
-          // Como já filtramos por cidade, todos os resultados são da cidade correta
-          if (userLocation?.city) {
-            confidence = Math.min(1.0, confidence + 0.2); // Boost para cidade confirmada
+          // Boost de confiança quando garantimos localidade
+          if (userLocation?.city || (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number')) {
+            confidence = Math.min(1.0, confidence + 0.2);
           }
 
           return {
@@ -150,16 +188,14 @@ async function geocodeWithMapbox(address: string, userLocation?: { city?: string
         .sort((a: MapboxFeatureResult, b: MapboxFeatureResult) => b.confidence - a.confidence);
 
       if (features.length > 0) {
-        // Como já filtramos por cidade, podemos usar um limiar de confiança mais baixo
         const validFeatures = features.filter((f: MapboxFeatureResult) => f.confidence >= 0.3);
-
         if (validFeatures.length === 0) {
           console.log('Mapbox: todos os resultados foram filtrados por baixa confiança');
           return null;
         }
 
         const best = validFeatures[0];
-        console.log(`Mapbox: resultado da cidade ${userLocation?.city || 'atual'} selecionado (confiança: ${best.confidence})`);
+        console.log(`Mapbox: resultado local selecionado (confiança: ${best.confidence})`);
 
         return {
           lat: best.lat,
@@ -207,11 +243,18 @@ async function geocodeWithNominatim(address: string, userLocation?: { city?: str
 
         // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
         if (userLocation?.city) {
-          const resultAddress = result.display_name.toLowerCase();
-          const userCity = userLocation.city.toLowerCase();
+          const resultAddress = normalizeStr(result.display_name);
+          const userCity = normalizeStr(userLocation.city);
 
           if (!resultAddress.includes(userCity)) {
             console.log(`Nominatim: REJEITADO - endereço fora da cidade ${userLocation.city}`);
+            return null;
+          }
+        } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+          // Sem cidade: filtrar por raio usando coordenadas
+          const dist = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+          if (dist > MAX_LOCAL_DISTANCE_KM) {
+            console.log(`Nominatim: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
             return null;
           }
         }
@@ -272,8 +315,19 @@ async function geocodeWithGoogle(address: string, userLocation?: { lat: number; 
           component.types.includes('locality') || component.types.includes('administrative_area_level_2')
         );
 
-        if (!cityComponent || cityComponent.long_name.toLowerCase() !== userLocation.city.toLowerCase()) {
+        const comp = cityComponent?.long_name ? normalizeStr(cityComponent.long_name) : '';
+        const want = normalizeStr(userLocation.city);
+        if (!cityComponent || comp !== want) {
           console.log(`Google: REJEITADO - endereço fora da cidade ${userLocation.city} (encontrado: ${cityComponent?.long_name || 'desconhecida'})`);
+          return null;
+        }
+      } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
+        // Sem cidade: filtrar por proximidade comparando bounds do resultado
+        // Quando o resultado não tem bounds, usar distância do ponto central
+        const resultLocation = result.geometry.location;
+        const dist = haversineKm(userLocation.lat, userLocation.lng, resultLocation.lat, resultLocation.lng);
+        if (dist > MAX_LOCAL_DISTANCE_KM) {
+          console.log(`Google: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
           return null;
         }
       }

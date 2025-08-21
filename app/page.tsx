@@ -776,13 +776,16 @@ export default function HomePage() {
       // 🎯 FORÇAR BUSCA NA CIDADE ATUAL
       const currentLocation = deviceOrigin || deviceLocation;
 
+      // Comparação sem acentos para evitar duplicidade/erros (Uberlandia vs Uberlândia)
+      const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
       // Se temos localização e o endereço não contém cidade, adicionar automaticamente
-      if (currentLocation?.city && !address.toLowerCase().includes(currentLocation.city.toLowerCase())) {
+      if (currentLocation?.city && !normalize(address).includes(normalize(currentLocation.city))) {
         // Verificar se o endereço já tem formato completo (contém vírgula ou hífen)
         const hasCompleteFormat = address.includes(',') || address.includes('-') ||
-                                 address.toLowerCase().includes('rua') ||
-                                 address.toLowerCase().includes('av') ||
-                                 address.toLowerCase().includes('avenida');
+                                 normalize(address).includes('rua') ||
+                                 normalize(address).includes('av') ||
+                                 normalize(address).includes('avenida');
 
         if (hasCompleteFormat) {
           // Endereço parece completo, adicionar apenas a cidade
