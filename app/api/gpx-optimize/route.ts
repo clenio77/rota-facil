@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       if (userLocationStr) {
         userLocation = JSON.parse(userLocationStr);
       }
-    } catch (error) {
+    } catch {
       console.log('Localização do usuário não fornecida ou inválida');
     }
 
@@ -91,10 +91,10 @@ export async function POST(request: NextRequest) {
         filterByLocation: true,
         maxDistanceFromUser: 50
       };
-    } catch (error) {
+    } catch {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Opções de otimização inválidas',
           details: 'JSON malformado nas opções'
         },

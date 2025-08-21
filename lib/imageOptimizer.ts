@@ -168,7 +168,7 @@ export class ImageOptimizer {
         },
         optimizations
       };
-    } catch (error) {
+    } catch {
       // Se não conseguir carregar a imagem, retornar dados básicos
       return {
         optimizedFile: file,

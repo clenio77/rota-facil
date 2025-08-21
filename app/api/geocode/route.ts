@@ -268,7 +268,7 @@ async function geocodeWithGoogle(address: string, userLocation?: { lat: number; 
 
       // FILTRO RIGOROSO: Se temos localização do usuário, APENAS aceitar endereços da mesma cidade
       if (userLocation?.city) {
-        const cityComponent = result.address_components.find((component: any) =>
+        const cityComponent = result.address_components.find((component: { types: string[]; long_name: string }) =>
           component.types.includes('locality') || component.types.includes('administrative_area_level_2')
         );
 

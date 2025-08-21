@@ -7,6 +7,8 @@ interface ECTDeliveryItem {
   cep: string;
   arRequired: boolean;
   arOrder: string;
+  correctedAddress?: string;
+  validatedCEP?: string | boolean;
 }
 
 interface ECTListData {
@@ -195,7 +197,7 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
     // Procurar endereço para este item
     if (itemFound) {
       // Endereços específicos conhecidos
-      const knownAddresses = {
+      const knownAddresses: Record<string, string> = {
         '001': 'Rua Santa Catarina - de 0181/182 a 1837/1838, 301',
         '002': 'Rua Padre Mário Forestan, 52',
         '003': 'Rua Abdalla Haddad, 222',
@@ -268,7 +270,8 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
           objectCode: objectCode || `ITEM${sequenceStr}`,
           address: address,
           cep: cep || '',
-          arRequired: false
+          arRequired: false,
+          arOrder: ''
         });
         console.log(`✅ Item ${sequenceStr} extraído com sucesso!`);
       }
@@ -280,7 +283,7 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
 }
 
 // Normaliza nomes de estados para a sigla (UF)
-function normalizeUF(state?: string): string | undefined {
+function _normalizeUF(state?: string): string | undefined {
   if (!state) return undefined;
   const raw = state.trim().toLowerCase();
   if (/^[a-z]{2}$/i.test(state) && state.length === 2) return state.toUpperCase();
@@ -304,7 +307,7 @@ function normalizeUF(state?: string): string | undefined {
   return map[key] || undefined;
 }
 
-function toTitleCaseCity(city?: string): string | undefined {
+function _toTitleCaseCity(city?: string): string | undefined {
   if (!city) return undefined;
   return city
     .toLowerCase()
@@ -408,7 +411,7 @@ async function geocodeAddresses(items: ECTDeliveryItem[], userLocation?: { city?
             }
           }
         } catch (photonError) {
-          console.log(`⚠️ Photon falhou para ${item.address}:`, photonError.message);
+          console.log(`⚠️ Photon falhou para ${item.address}:`, photonError instanceof Error ? photonError.message : 'Erro desconhecido');
         }
       }
 
@@ -455,7 +458,7 @@ async function geocodeAddresses(items: ECTDeliveryItem[], userLocation?: { city?
             }
           }
         } catch (nominatimError) {
-          console.log(`⚠️ Nominatim falhou para ${item.address}:`, nominatimError.message);
+          console.log(`⚠️ Nominatim falhou para ${item.address}:`, nominatimError instanceof Error ? nominatimError.message : 'Erro desconhecido');
         }
       }
 
@@ -504,7 +507,7 @@ function isValidUberlandiaCoordinate(lat: number, lng: number): boolean {
 
 // Função para geocodificar endereços conhecidos de Uberlândia com coordenadas REAIS
 function getKnownAddressCoordinates(address: string): { lat: number; lng: number } | null {
-  const addressLower = address.toLowerCase();
+  const _addressLower = address.toLowerCase();
 
   // Base de dados com coordenadas FIXAS para garantir pontos corretos
   const knownAddresses = [
@@ -865,15 +868,106 @@ SEQUENCIA | OBJETO | ENDERECO | CEP | AR
     // Verificar paradas criadas
     console.log(`📍 Rota criada: ${stops.length} paradas (${validItems.length} entregas + início/fim)`);
 
+    // ⚡ OTIMIZAÇÃO DE ROTA: Calcular ordem mais eficiente
+    console.log('⚡ Iniciando otimização de rota...');
+    const optimizedItems = optimizeRoute(validItems, userLocation);
+    console.log('✅ Rota otimizada calculada');
+
+    // 📊 CÁLCULO DE DISTÂNCIA E TEMPO
+    const routeMetrics = calculateRouteMetrics(optimizedItems, userLocation);
+    console.log(`📏 Distância total: ${routeMetrics.totalDistance.toFixed(2)} km`);
+    console.log(`⏱️ Tempo estimado: ${routeMetrics.totalTime} min`);
+
     const routeData = {
       stops,
-      totalDistance: 0, // Será calculado pela otimização
-      totalTime: 0, // Será calculado pela otimização
-      googleMapsUrl: generateGoogleMapsUrl(validItems, userLocation)
+      totalDistance: routeMetrics.totalDistance,
+      totalTime: routeMetrics.totalTime,
+      googleMapsUrl: generateGoogleMapsUrl(optimizedItems, userLocation)
     };
 
+    // ⚡ FUNÇÃO DE OTIMIZAÇÃO DE ROTA (Algoritmo Nearest Neighbor)
+    function optimizeRoute(items: Array<{lat?: number; lng?: number; geocodedAddress?: string; address: string}>, userLocation?: {lat: number; lng: number; city?: string; state?: string}) {
+      if (!userLocation || items.length <= 1) return items;
+
+      // Filtrar apenas itens com coordenadas válidas
+      const validCoordItems = items.filter(item => item.lat !== undefined && item.lng !== undefined) as Array<{lat: number; lng: number; geocodedAddress?: string; address: string}>;
+
+      if (validCoordItems.length <= 1) return validCoordItems;
+
+      console.log('🧮 Calculando rota otimizada usando algoritmo Nearest Neighbor...');
+
+      const startPoint = { lat: userLocation.lat, lng: userLocation.lng };
+      const unvisited = [...validCoordItems];
+      const optimized = [];
+      let currentPoint = startPoint;
+
+      while (unvisited.length > 0) {
+        let nearestIndex = 0;
+        let nearestDistance = calculateDistance(currentPoint, unvisited[0]);
+
+        // Encontrar o ponto mais próximo
+        for (let i = 1; i < unvisited.length; i++) {
+          const distance = calculateDistance(currentPoint, unvisited[i]);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = i;
+          }
+        }
+
+        // Adicionar o ponto mais próximo à rota otimizada
+        const nearestPoint = unvisited.splice(nearestIndex, 1)[0];
+        optimized.push(nearestPoint);
+        currentPoint = nearestPoint;
+
+        console.log(`📍 Próxima parada: ${nearestPoint.address} (${nearestDistance.toFixed(2)} km)`);
+      }
+
+      return optimized;
+    }
+
+    // 📏 FUNÇÃO PARA CALCULAR DISTÂNCIA ENTRE DOIS PONTOS (Haversine)
+    function calculateDistance(point1: {lat: number; lng: number}, point2: {lat: number; lng: number}): number {
+      const R = 6371; // Raio da Terra em km
+      const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+      const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // 📊 FUNÇÃO PARA CALCULAR MÉTRICAS DA ROTA
+    function calculateRouteMetrics(items: Array<{lat?: number; lng?: number}>, userLocation?: {lat: number; lng: number}) {
+      if (!userLocation || items.length === 0) {
+        return { totalDistance: 0, totalTime: 0 };
+      }
+
+      let totalDistance = 0;
+      let currentPoint = { lat: userLocation.lat, lng: userLocation.lng };
+
+      // Calcular distância de cada segmento
+      for (const item of items) {
+        if (item.lat !== undefined && item.lng !== undefined) {
+          const segmentDistance = calculateDistance(currentPoint, { lat: item.lat, lng: item.lng });
+          totalDistance += segmentDistance;
+          currentPoint = { lat: item.lat, lng: item.lng };
+        }
+      }
+
+      // Distância de volta ao ponto inicial
+      totalDistance += calculateDistance(currentPoint, { lat: userLocation.lat, lng: userLocation.lng });
+
+      // Estimar tempo (velocidade média urbana: 25 km/h + tempo de parada: 3 min por entrega)
+      const drivingTime = (totalDistance / 25) * 60; // minutos
+      const stopTime = items.length * 3; // 3 minutos por parada
+      const totalTime = Math.round(drivingTime + stopTime);
+
+      return { totalDistance, totalTime };
+    }
+
     // Função para gerar URL do Google Maps com múltiplas paradas
-    function generateGoogleMapsUrl(items: Array<{lat: number; lng: number; geocodedAddress?: string; address: string}>, userLocation?: any) {
+    function generateGoogleMapsUrl(items: Array<{lat?: number; lng?: number; geocodedAddress?: string; address: string}>, userLocation?: {lat: number; lng: number; city?: string; state?: string}) {
       console.log('🗺️ Gerando URL do Google Maps...');
       console.log('📍 Itens para rota:', items.map(item => ({
         address: item.address,
@@ -973,18 +1067,29 @@ SEQUENCIA | OBJETO | ENDERECO | CEP | AR
 
     return NextResponse.json({
       success: true,
-      message: `Lista ECT processada com sucesso! ${validItems.length}/${ectData.items.length} endereços geocodificados.`,
-      routeData: routeData,
+      message: `🚀 Rota otimizada com sucesso! ${validItems.length}/${ectData.items.length} endereços processados.`,
+      routeData: {
+        ...routeData,
+        optimized: true,
+        metrics: {
+          totalDistance: routeMetrics.totalDistance,
+          totalTime: routeMetrics.totalTime,
+          averageDistancePerStop: (routeMetrics.totalDistance / validItems.length).toFixed(2),
+          estimatedFuelCost: (routeMetrics.totalDistance * 0.15).toFixed(2), // R$ 0,15 por km
+          efficiency: 'Rota otimizada usando algoritmo Nearest Neighbor'
+        }
+      },
       ectData: ectData,
       geocodedItems: geocodedItems,
       extractedText: extractedText.substring(0, 1000),
       ocrConfidence: 0.7,
       extractionConfidence: 0.8,
-      extractionMethod: 'ect-list-processor',
+      extractionMethod: 'ect-list-processor-optimized',
       suggestions: [
-        'Verifique se todos os endereços estão corretos',
-        'A rota foi otimizada para Uberlândia, MG',
-        'Use o Google Maps para navegação'
+        `✅ Rota otimizada: ${routeMetrics.totalDistance.toFixed(1)} km em ${routeMetrics.totalTime} min`,
+        `💰 Custo estimado de combustível: R$ ${(routeMetrics.totalDistance * 0.15).toFixed(2)}`,
+        '🗺️ Use o botão "Abrir no Google Maps" para navegação',
+        '📍 Ordem das paradas foi otimizada para menor distância'
       ]
     });
 

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
             break;
           case 'xls':
           case 'xlsx':
-            fileData = await processExcelFile(file);
+            fileData = await processExcelFile();
             break;
           case 'kml':
             fileData = await processKMLFile(file);
@@ -203,7 +203,7 @@ async function processGPXFile(file: File): Promise<{type: string; waypoints: Arr
 }
 
 // Processar arquivo Excel
-async function processExcelFile(_file: File): Promise<{type: string; message: string; addresses: string[]}> {
+async function processExcelFile(): Promise<{type: string; message: string; addresses: string[]}> {
   try {
     // Para arquivos Excel, vamos simular extração de dados
     // Em produção, você pode usar bibliotecas como 'xlsx'

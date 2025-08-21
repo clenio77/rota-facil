@@ -104,7 +104,7 @@ class ExternalOCRStrategy implements OCRStrategy {
         try {
           const result = await api(imageUrl);
           if (result) return result;
-        } catch (error) {
+        } catch {
           console.log(`API ${api.name} falhou, tentando próxima...`);
         }
       }
@@ -202,7 +202,7 @@ class ExternalOCRStrategy implements OCRStrategy {
 class SimpleTextExtractionStrategy implements OCRStrategy {
   name = 'Extração Simples de Texto';
   
-  async execute(imageUrl: string): Promise<OCRResult | null> {
+  async execute(_imageUrl: string): Promise<OCRResult | null> {
     // Fallback final: tentar extrair qualquer texto possível
     try {
       // Esta é uma estratégia de último recurso
@@ -212,7 +212,7 @@ class SimpleTextExtractionStrategy implements OCRStrategy {
         confidence: 0.1,
         provider: 'fallback'
       };
-    } catch (error) {
+    } catch {
       return null;
     }
   }

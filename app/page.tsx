@@ -494,7 +494,7 @@ export default function HomePage() {
   };
 
   // MODO TESTE: Função para testar diferentes cenários
-  const handleTestScenario = (scenarioType: 'rejected' | 'accepted') => {
+  const _handleTestScenario = (scenarioType: 'rejected' | 'accepted') => {
     const testScenarios = {
       rejected: {
         name: 'Endereço de São Paulo (rejeitado)',
