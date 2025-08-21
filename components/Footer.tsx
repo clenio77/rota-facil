@@ -11,7 +11,7 @@ export default function Footer({ className = '' }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className={`bg-gradient-to-r from-slate-50 to-slate-100 border-t border-slate-200 py-8 px-4 ${className}`}>
+    <footer className={`bg-gradient-to-r from-slate-50 to-slate-100 border-t border-slate-200 py-8 px-4 pb-20 md:pb-8 ${className}`}>
       <div className="max-w-6xl mx-auto">
         {/* Main Footer Content */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
@@ -65,11 +65,11 @@ export default function Footer({ className = '' }: FooterProps) {
             <div className="text-sm text-slate-600 mb-2">
               Sistema Inteligente para Carteiros
             </div>
-            <div className="flex flex-wrap justify-center lg:justify-end gap-2 text-xs">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">📱 Mobile-First</span>
-              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">🎤 Voice Control</span>
-              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full">🔄 Offline Ready</span>
-              <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full">📊 Analytics</span>
+            <div className="flex flex-wrap justify-center lg:justify-end gap-1.5 text-xs">
+              <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">📱 Mobile</span>
+              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">🎤 Voice</span>
+              <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">🔄 Offline</span>
+              <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">📊 Analytics</span>
             </div>
           </div>
         </div>
@@ -78,37 +78,38 @@ export default function Footer({ className = '' }: FooterProps) {
         <div className="border-t border-slate-300 my-6"></div>
 
         {/* Bottom Section */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-600">
-          <div className="flex items-center gap-4">
-            <span>© {currentYear} Clenio Consultory AI</span>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-slate-600">
+          <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-center md:text-left">
+            <span className="font-medium">© {currentYear} Clenio Consultory AI</span>
             <span className="hidden md:inline">•</span>
-            <span className="text-xs">Todos os direitos reservados</span>
+            <span className="text-xs text-slate-500">Todos os direitos reservados</span>
           </div>
-          
-          <div className="flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1">
+
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 text-xs">
+            <span className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded-full">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              Sistema Ativo
+              <span className="font-medium text-green-700">Ativo</span>
             </span>
-            <span>•</span>
-            <span>Versão 2.0</span>
-            <span>•</span>
-            <span className="text-blue-600 hover:text-blue-800 cursor-pointer">
-              Suporte Técnico
+            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full font-medium">v2.0</span>
+            <span className="text-blue-600 hover:text-blue-800 cursor-pointer font-medium underline">
+              Suporte
             </span>
           </div>
         </div>
 
         {/* Powered by AI Badge */}
         <div className="mt-4 text-center">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-full px-4 py-2 text-xs">
-            <div className="w-4 h-4 relative">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-full px-3 py-2 text-xs shadow-sm">
+            <div className="w-5 h-5 relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
               <div className="absolute inset-0.5 bg-white rounded-full flex items-center justify-center">
-                <span className="text-[8px] font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">AI</span>
+                <span className="text-[10px] font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">AI</span>
               </div>
             </div>
-            <span className="text-slate-700 font-medium">Powered by Artificial Intelligence</span>
+            <span className="text-slate-700 font-medium">
+              <span className="hidden sm:inline">Powered by Artificial Intelligence</span>
+              <span className="sm:hidden">Powered by AI</span>
+            </span>
           </div>
         </div>
       </div>
