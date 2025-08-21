@@ -437,14 +437,29 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
       if (Array.isArray(data) && data.length > 0) {
         const results = data
           .map((r: any) => ({ ...r, lat: parseFloat(r.lat), lon: parseFloat(r.lon) }))
-          .filter((r: any) => isValidBrazilianCoordinate(r.lat, r.lon))
-          .filter((r: any) => normalizeStr(r.display_name || '').includes(normalizeStr(userLocation.city!)));
+          .filter((r: any) => isValidBrazilianCoordinate(r.lat, r.lon));
 
-        // FILTRO ADICIONAL: Se o usuário especificou um número, priorizar resultados que contenham esse número
-        let filteredResults = results;
+        // FILTRO FLEXÍVEL: Se temos cidade, preferir resultados da cidade, mas não excluir outros
+        let cityFilteredResults = results;
+        if (userLocation?.city) {
+          const cityResults = results.filter((r: any) =>
+            normalizeStr(r.display_name || '').includes(normalizeStr(userLocation.city!))
+          );
+
+          if (cityResults.length > 0) {
+            console.log(`Nominatim: ${cityResults.length} resultados na cidade ${userLocation.city}`);
+            cityFilteredResults = cityResults;
+          } else {
+            console.log(`Nominatim: AVISO - nenhum resultado na cidade ${userLocation.city}, usando todos os ${results.length} resultados`);
+            cityFilteredResults = results; // Usar todos se não encontrar na cidade
+          }
+        }
+
+        // FILTRO FLEXÍVEL DE NÚMEROS: Priorizar, mas não excluir
+        let filteredResults = cityFilteredResults;
         const streetParts = extractStreetAndNumberLoose(address);
         if (streetParts && streetParts.number) {
-          const numberResults = results.filter((r: any) => {
+          const numberResults = cityFilteredResults.filter((r: any) => {
             const displayName = r.display_name || '';
             const addressObj = r.address || {};
 
@@ -457,7 +472,8 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
             console.log(`Nominatim: encontrados ${numberResults.length} resultados com número ${streetParts.number}`);
             filteredResults = numberResults;
           } else {
-            console.log(`Nominatim: AVISO - nenhum resultado contém o número ${streetParts.number}, usando todos os ${results.length} resultados`);
+            console.log(`Nominatim: FLEXÍVEL - nenhum resultado com número ${streetParts.number}, usando ${cityFilteredResults.length} resultados da cidade`);
+            filteredResults = cityFilteredResults; // Usar resultados da cidade mesmo sem número exato
           }
         }
 
@@ -650,8 +666,8 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     console.log(`Contexto do usuário: ${userLocation.city || 'cidade desconhecida'} - ${userLocation.state || 'estado desconhecido'}`);
   }
 
-  // 0. CACHE DESABILITADO - FORÇAR NOVA BUSCA SEMPRE
-  console.log('🚨 CACHE DESABILITADO - NOVA BUSCA FORÇADA 🚨');
+  // 0. ESTRATÉGIA FLEXÍVEL - TENTAR MÚLTIPLAS ABORDAGENS
+  console.log('🔍 INICIANDO BUSCA FLEXÍVEL COM MÚLTIPLAS ESTRATÉGIAS');
 
   // TESTE: retornar resultado fake para confirmar que o deploy funcionou
   if (address.includes('teste123')) {
@@ -661,7 +677,7 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
       address: 'TESTE DEPLOY FUNCIONOU',
       confidence: 0.99,
       provider: 'teste-deploy',
-      formatted_address: 'Deploy funcionou - cache desabilitado'
+      formatted_address: 'Deploy funcionou - busca flexível ativa'
     };
   }
 
@@ -699,34 +715,65 @@ async function geocodeAddressImproved(originalAddress: string, userLocation?: { 
     return photonResult;
   }
 
-  // 5. Tentar Nominatim
+  // 5. Tentar Nominatim com filtro de cidade
+  console.log('Tentando Nominatim com filtro de cidade...');
   const nominatimResult = await geocodeWithNominatim(address, userLocation);
   if (nominatimResult && nominatimResult.confidence >= 0.4) {
-    console.log('Geocodificação via Nominatim bem-sucedida');
+    console.log('Geocodificação via Nominatim (com filtro) bem-sucedida');
     return nominatimResult;
   }
 
-  // 6. Último recurso: Google (se configurado)
+  // 6. FALLBACK FLEXÍVEL: Tentar sem filtro rigoroso de cidade
+  if (userLocation?.city) {
+    console.log('🔄 FALLBACK: Tentando busca SEM filtro rigoroso de cidade...');
+    const relaxedLocation = { lat: userLocation.lat, lng: userLocation.lng }; // Apenas coordenadas
+    const fallbackResult = await geocodeWithNominatim(address, relaxedLocation);
+    if (fallbackResult && fallbackResult.confidence >= 0.3) {
+      console.log('✅ FALLBACK: Geocodificação sem filtro rigoroso bem-sucedida');
+      return {
+        ...fallbackResult,
+        confidence: Math.max(0.4, fallbackResult.confidence - 0.1), // Reduzir confiança levemente
+        provider: fallbackResult.provider + '-relaxed'
+      };
+    }
+  }
+
+  // 7. Último recurso: Google (se configurado)
   const googleResult = await geocodeWithGoogle(address, userLocation);
   if (googleResult) {
     console.log('Geocodificação via Google bem-sucedida');
     return googleResult;
   }
 
-  // 7. Se nada funcionou, tentar versões simplificadas do endereço
+  // 8. FALLBACK EXTREMO: Busca global com endereço + Brasil
+  console.log('🌍 FALLBACK EXTREMO: Tentando busca global...');
+  const globalAddress = `${address}, Brasil`;
+  const globalResult = await geocodeWithNominatim(globalAddress, undefined);
+  if (globalResult && globalResult.confidence >= 0.2) {
+    console.log('✅ FALLBACK EXTREMO: Geocodificação global bem-sucedida');
+    return {
+      ...globalResult,
+      confidence: Math.max(0.3, globalResult.confidence - 0.2),
+      provider: globalResult.provider + '-global'
+    };
+  }
+
+  // 9. ÚLTIMO RECURSO: Endereço simplificado
   if (address.includes(',')) {
+    console.log('🔧 ÚLTIMO RECURSO: Tentando endereço simplificado...');
     const simplifiedAddress = address.split(',')[0].trim() + ', Brasil';
-    const fallbackResult = await geocodeWithNominatim(simplifiedAddress, userLocation);
-    if (fallbackResult) {
-      console.log('Geocodificação com endereço simplificado bem-sucedida');
+    const simplifiedResult = await geocodeWithNominatim(simplifiedAddress, undefined);
+    if (simplifiedResult) {
+      console.log('✅ ÚLTIMO RECURSO: Geocodificação simplificada bem-sucedida');
       return {
-        ...fallbackResult,
-        confidence: Math.max(0.3, fallbackResult.confidence - 0.2)
+        ...simplifiedResult,
+        confidence: Math.max(0.25, simplifiedResult.confidence - 0.3),
+        provider: simplifiedResult.provider + '-simplified'
       };
     }
   }
 
-  console.log('Falha na geocodificação com todos os provedores');
+  console.log('❌ TODAS as tentativas de geocodificação falharam');
   return null;
 }
 
