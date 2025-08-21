@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
+import AddressSearch from '../components/AddressSearch';
 import StopCard from '../components/StopCard';
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
@@ -918,6 +919,33 @@ export default function HomePage() {
                 <span>Detectando sua localização...</span>
               </div>
             )}
+            {/* 🔍 BUSCA INTELIGENTE DE ENDEREÇOS */}
+            <div className="mt-4 mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🔍 Busca Inteligente de Endereços
+              </label>
+              <AddressSearch
+                onAddressSelect={(result) => {
+                  const newStop: Stop = {
+                    id: Date.now(),
+                    photoUrl: '',
+                    status: 'confirmed',
+                    address: result.display_name,
+                    lat: result.lat,
+                    lng: result.lng,
+                  };
+                  setStops(prev => [...prev, newStop]);
+                  console.log('✅ Endereço adicionado via busca:', result);
+                }}
+                userLocation={deviceOrigin || deviceLocation || undefined}
+                placeholder="Digite o endereço (ex: Rua Principal, 123)..."
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Digite pelo menos 3 caracteres para buscar endereços automaticamente
+              </p>
+            </div>
+
             <div className="mt-4 space-y-3">
               <div>
                 <Link
