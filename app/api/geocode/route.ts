@@ -136,42 +136,36 @@ async function geocodeWithMapbox(address: string, userLocation?: { lat?: number;
     const data = await response.json();
 
     if (data.features && data.features.length > 0) {
-      // Filtrar e ordenar resultados por relevância e proximidade
+      // Filtrar e ordenar resultados por qualidade (casa > rua/POI) e proximidade
       const features = data.features
         .filter((feature: MapboxFeature) => {
           const [lng, lat] = feature.center;
-          if (!isValidBrazilianCoordinate(lat, lng)) {
-            return false;
-          }
+          if (!isValidBrazilianCoordinate(lat, lng)) return false;
 
-          // Quando temos cidade do usuário, aceitar somente a mesma cidade (sem acentos)
+          // Respeitar cidade quando informada
           if (userLocation?.city) {
             const featureContext = feature.context || [];
             const featureCity = featureContext.find((ctx) =>
               ctx.id.startsWith('place') || ctx.id.startsWith('locality')
             );
-
             const cityOk = featureCity && normalizeStr(featureCity.text) === normalizeStr(userLocation.city);
-            if (!cityOk) {
-              console.log(`Mapbox: REJEITADO - fora da cidade ${userLocation.city} (encontrado: ${featureCity?.text || 'desconhecida'})`);
-              return false;
-            }
+            if (!cityOk) return false;
           } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
-            // Sem cidade, mas com coordenadas: filtrar por raio
             const dist = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
-            if (dist > MAX_LOCAL_DISTANCE_KM) {
-              console.log(`Mapbox: REJEITADO por distância ${dist.toFixed(1)}km (> ${MAX_LOCAL_DISTANCE_KM}km)`);
-              return false;
-            }
+            if (dist > MAX_LOCAL_DISTANCE_KM) return false;
           }
 
           return true;
         })
-        .map((feature: MapboxFeature): MapboxFeatureResult => {
+        .map((feature: MapboxFeature): MapboxFeatureResult & { hasNumber: boolean; dist: number } => {
           const [lng, lat] = feature.center;
-          let confidence = feature.relevance || 0.8;
+          // Tenta detectar número (endereço tipo address geralmente contém número no place_name)
+          const hasNumber = /,\s*\d+/.test(feature.place_name);
+          const dist = (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number')
+            ? haversineKm(userLocation.lat, userLocation.lng, lat, lng)
+            : Infinity;
 
-          // Boost de confiança quando garantimos localidade
+          let confidence = feature.relevance || 0.8;
           if (userLocation?.city || (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number')) {
             confidence = Math.min(1.0, confidence + 0.2);
           }
@@ -182,26 +176,26 @@ async function geocodeWithMapbox(address: string, userLocation?: { lat?: number;
             lng,
             confidence,
             address: feature.place_name,
-            formatted_address: feature.place_name
+            formatted_address: feature.place_name,
+            hasNumber,
+            dist
           };
         })
-        .sort((a: MapboxFeatureResult, b: MapboxFeatureResult) => b.confidence - a.confidence);
+        // Ordenar: com número primeiro, depois por distância, depois por confiança
+        .sort((a, b) => {
+          if (a.hasNumber !== b.hasNumber) return a.hasNumber ? -1 : 1;
+          if (a.dist !== b.dist) return a.dist - b.dist;
+          return (b.confidence - a.confidence);
+        });
 
       if (features.length > 0) {
-        const validFeatures = features.filter((f: MapboxFeatureResult) => f.confidence >= 0.3);
-        if (validFeatures.length === 0) {
-          console.log('Mapbox: todos os resultados foram filtrados por baixa confiança');
-          return null;
-        }
-
-        const best = validFeatures[0];
-        console.log(`Mapbox: resultado local selecionado (confiança: ${best.confidence})`);
+        const best = features[0];
 
         return {
           lat: best.lat,
           lng: best.lng,
           address: best.address,
-          confidence: best.confidence,
+          confidence: best.hasNumber ? Math.max(0.86, best.confidence) : best.confidence,
           provider: 'mapbox',
           formatted_address: best.formatted_address
         };
@@ -239,6 +233,7 @@ async function geocodeWithPhoton(address: string, userLocation?: { lat?: number;
     const results = (data.features as PhotonFeature[])
       .map((f) => {
         const [lng, lat] = f.geometry.coordinates;
+        const hasNumber = !!f.properties.housenumber;
         const nameParts = [
           f.properties.street || f.properties.name,
           f.properties.housenumber,
@@ -246,7 +241,10 @@ async function geocodeWithPhoton(address: string, userLocation?: { lat?: number;
           f.properties.state
         ].filter(Boolean);
         const place = nameParts.join(', ');
-        return { lat, lng, place, props: f.properties };
+        const dist = (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number')
+          ? haversineKm(userLocation.lat, userLocation.lng, lat, lng)
+          : Infinity;
+        return { lat, lng, place, props: f.properties, hasNumber, dist };
       })
       .filter((r) => isValidBrazilianCoordinate(r.lat, r.lng) && (!r.props.countrycode || r.props.countrycode.toLowerCase() === 'br'))
       .filter((r) => {
@@ -255,17 +253,19 @@ async function geocodeWithPhoton(address: string, userLocation?: { lat?: number;
           const rc = normalizeStr(r.props.city || '');
           const uc = normalizeStr(userLocation.city);
           if (!rc || rc !== uc) {
-            console.log(`Photon: REJEITADO - fora da cidade ${userLocation.city} (encontrado: ${r.props.city || 'desconhecida'})`);
             return false;
           }
         } else if (typeof userLocation?.lat === 'number' && typeof userLocation?.lng === 'number') {
-          const dist = haversineKm(userLocation.lat, userLocation.lng, r.lat, r.lng);
-          if (dist > MAX_LOCAL_DISTANCE_KM) {
-            console.log(`Photon: REJEITADO por distância`);
+          if (r.dist > MAX_LOCAL_DISTANCE_KM) {
             return false;
           }
         }
         return true;
+      })
+      // Ordenar: com número primeiro, depois mais próximo
+      .sort((a, b) => {
+        if (a.hasNumber !== b.hasNumber) return a.hasNumber ? -1 : 1;
+        return (a.dist || Infinity) - (b.dist || Infinity);
       });
 
     if (results.length === 0) return null;
@@ -274,7 +274,7 @@ async function geocodeWithPhoton(address: string, userLocation?: { lat?: number;
       lat: best.lat,
       lng: best.lng,
       address: best.place || `${address}${userLocation?.city ? ', ' + userLocation.city : ''}`,
-      confidence: 0.7,
+      confidence: best.hasNumber ? 0.85 : 0.7,
       provider: 'photon',
       formatted_address: best.place || `${address}`
     };
@@ -317,11 +317,19 @@ async function geocodeWithNominatim(address: string, userLocation?: { lat?: numb
           .filter((r: any) => normalizeStr(r.display_name || '').includes(normalizeStr(userLocation.city!)));
 
         if (results.length > 0) {
+          // Preferir casa (house) ou building; senão, pegar o mais detalhado
+          results.sort((a: any, b: any) => {
+            const rank = (x: any) => (
+              x.type === 'house' ? 3 : x.class === 'building' ? 2 : x.osm_type === 'way' ? 1 : 0
+            );
+            return rank(b) - rank(a);
+          });
+
           const r = results[0];
           let confidence = 0.85;
           if (r.osm_type === 'way') confidence = 0.9;
           if (r.class === 'building') confidence = 0.92;
-          if (r.type === 'house') confidence = 0.95;
+          if (r.type === 'house') confidence = 0.96;
 
           return {
             lat: r.lat,
