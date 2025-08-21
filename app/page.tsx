@@ -15,6 +15,7 @@ import { analytics } from '../lib/analytics';
 import { voiceCommands } from '../lib/voiceCommands';
 import { offlineManager } from '../lib/offlineManager';
 import { proofOfDelivery } from '../lib/proofOfDelivery';
+import Footer from '../components/Footer';
 // SpeechRecognition types for browsers (ambient declarations)
 // Minimal subset to type usage without depending on lib.dom updates
 interface MinimalSpeechRecognitionEventResult {
@@ -1246,6 +1247,9 @@ export default function HomePage() {
           </svg>
         </button>
       )}
+
+      {/* 🏢 FOOTER PROFISSIONAL */}
+      <Footer className="mt-16" />
     </div>
   );
 }
