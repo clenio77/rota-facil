@@ -773,19 +773,21 @@ export default function HomePage() {
     if (!address) { alert('Digite ou dite um endereço.'); return; }
 
     try {
-      // 🎯 Política: padrão buscar na cidade do dispositivo; se o usuário falar outra cidade/UF no texto, respeitar o texto e NÃO forçar local
+      // 🎯 Política SIMPLES: sempre buscar na cidade ativa do app, a não ser que o usuário fale explicitamente outra cidade
       const currentLocation = deviceOrigin || deviceLocation;
 
       // Comparação sem acentos
       const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-      // Detectar se o usuário já informou cidade/UF explícita no texto (ex.: ", araguari" ou "mg", "sp")
+      // Detectar se o usuário já informou cidade/UF explícita no texto (ex.: ", belo horizonte" ou "mg", "sp")
       const hasExplicitCityOrUF = (() => {
         const n = normalize(address);
         const hasUF = /(\bac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|se|sp|to\b)/.test(n);
         const manyCommas = address.split(',').length >= 3; // rua, numero, cidade
         const hasBrasil = n.includes('brasil');
-        return hasUF || manyCommas || hasBrasil;
+        // Detectar nomes de cidades conhecidas (além da atual)
+        const hasCityName = currentLocation?.city && n.includes('belo horizonte') || n.includes('sao paulo') || n.includes('rio de janeiro') || n.includes('brasilia') || n.includes('salvador') || n.includes('fortaleza') || n.includes('recife') || n.includes('porto alegre') || n.includes('curitiba') || n.includes('goiania') || n.includes('manaus') || n.includes('belem') || n.includes('vitoria') || n.includes('natal') || n.includes('joao pessoa') || n.includes('maceio') || n.includes('aracaju') || n.includes('teresina') || n.includes('sao luis') || n.includes('macapa') || n.includes('boa vista') || n.includes('rio branco') || n.includes('porto velho') || n.includes('cuiaba') || n.includes('campo grande') || n.includes('florianopolis');
+        return hasUF || manyCommas || hasBrasil || hasCityName;
       })();
 
       // Se NÃO tem cidade/UF no texto e temos localização, complementar com cidade/UF do dispositivo

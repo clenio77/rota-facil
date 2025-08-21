@@ -121,13 +121,22 @@ async function geocodeWithViaCepAddressLookup(address: string, userLocation?: { 
     const data = await resp.json();
     if (!Array.isArray(data) || data.length === 0) return null;
 
-    // Escolher o melhor logradouro (normalização simples)
-    const target = data.find((d: any) => normalizeStr(d.logradouro || '').includes(normalizeStr(parts.street))) || data[0];
+    // Log para debug
+    console.log(`ViaCEP logradouro: encontrados ${data.length} resultados para "${parts.street}" em ${userLocation.city}/${uf}`);
+    data.forEach((d: any, i: number) => console.log(`  [${i}] ${d.logradouro} - ${d.bairro} - CEP: ${d.cep}`));
+
+    // Escolher o melhor logradouro: buscar match exato primeiro, senão pegar o primeiro
+    const exactMatch = data.find((d: any) => normalizeStr(d.logradouro || '') === normalizeStr(parts.street));
+    const partialMatch = data.find((d: any) => normalizeStr(d.logradouro || '').includes(normalizeStr(parts.street)));
+    const target = exactMatch || partialMatch || data[0];
+
     const street = target.logradouro || parts.street;
     const bairro = target.bairro || '';
     const localidade = target.localidade || userLocation.city;
     const ufRet = target.uf || uf;
     const cep = (target.cep || '').replace(/\D/g, '');
+
+    console.log(`ViaCEP: selecionado "${street}" - ${bairro} - CEP: ${cep}`);
 
     // Geocodificar usando Nominatim estruturado com número + cidade/UF
     const structuredStreet = [street, parts.number].filter(Boolean).join(' ');
