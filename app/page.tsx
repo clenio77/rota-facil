@@ -768,23 +768,54 @@ export default function HomePage() {
   };
 
   const handleConfirmVoiceAddress = async () => {
-    const address = voiceText.trim();
+    let address = voiceText.trim();
     if (!address) { alert('Digite ou dite um endereço.'); return; }
+
     try {
+      // 🎯 FORÇAR BUSCA NA CIDADE ATUAL
+      const currentLocation = deviceOrigin || deviceLocation;
+
+      // Se temos localização e o endereço não contém cidade, adicionar automaticamente
+      if (currentLocation?.city && !address.toLowerCase().includes(currentLocation.city.toLowerCase())) {
+        // Verificar se o endereço já tem formato completo (contém vírgula ou hífen)
+        const hasCompleteFormat = address.includes(',') || address.includes('-') ||
+                                 address.toLowerCase().includes('rua') ||
+                                 address.toLowerCase().includes('av') ||
+                                 address.toLowerCase().includes('avenida');
+
+        if (hasCompleteFormat) {
+          // Endereço parece completo, adicionar apenas a cidade
+          address = `${address}, ${currentLocation.city}`;
+        } else {
+          // Endereço simples (ex: "centro", "praça da matriz"), adicionar cidade
+          address = `${address}, ${currentLocation.city}`;
+        }
+
+        // Adicionar estado se disponível
+        if (currentLocation.state) {
+          address += `, ${currentLocation.state}`;
+        }
+
+        console.log('🎯 Endereço expandido para busca local:', address);
+      }
+
       // Geocodificar no servidor com contexto de localização do usuário
       const res = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address,
-          userLocation: deviceOrigin || deviceLocation || undefined
+          userLocation: currentLocation,
+          forceLocalSearch: true // Flag para priorizar resultados locais
         }),
       });
+
       const data = await res.json();
       if (!data.success || !data.lat || !data.lng) {
-        alert('Não foi possível geocodificar este endereço.');
+        alert(`Não foi possível encontrar o endereço "${voiceText}" na sua cidade. Tente ser mais específico.`);
         return;
       }
+
       const newStop: Stop = {
         id: Date.now(),
         photoUrl: '',
@@ -793,12 +824,17 @@ export default function HomePage() {
         lat: data.lat,
         lng: data.lng,
       };
+
       setStops(prev => [...prev, newStop]);
       setIsVoiceDialogOpen(false);
       setVoiceText('');
+
+      // Feedback de sucesso
+      console.log('✅ Endereço adicionado:', data.address);
+
     } catch (err) {
-      console.error(err);
-      alert('Erro ao confirmar o endereço.');
+      console.error('Erro ao geocodificar:', err);
+      alert('Erro ao confirmar o endereço. Verifique sua conexão.');
     }
   };
 
@@ -1095,11 +1131,30 @@ export default function HomePage() {
           <div className="bg-white w-full max-w-lg rounded-xl shadow-custom p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-3">Confirmar endereço</h3>
             <p className="text-sm text-gray-600 mb-3">Revise o endereço reconhecido, ajuste se necessário e confirme.</p>
+            {(deviceOrigin?.city || deviceLocation?.city) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm text-blue-700 font-medium">
+                    🎯 Buscando em: {deviceOrigin?.city || deviceLocation?.city}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  Diga apenas o nome da rua ou local (ex: "Centro", "Rua Principal, 123")
+                </p>
+              </div>
+            )}
             <textarea
               className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[96px]"
               value={voiceText}
               onChange={(e) => setVoiceText(e.target.value)}
-              placeholder="Ex.: Rua Exemplo, 123 - Bairro, Cidade - UF"
+              placeholder={`Ex.: "Rua Principal, 123" ou "Centro" ou "Praça da Matriz"${
+                (deviceOrigin?.city || deviceLocation?.city)
+                  ? `\n(Buscará em ${deviceOrigin?.city || deviceLocation?.city})`
+                  : ''
+              }`}
             />
             <div className="mt-4 flex justify-end gap-2">
               <button

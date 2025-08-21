@@ -419,7 +419,7 @@ interface MapboxFeatureResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const { address, userLocation } = await request.json();
+    const { address, userLocation, forceLocalSearch } = await request.json();
     
     if (!address || typeof address !== 'string' || address.trim().length < 3) {
       return NextResponse.json({ 
@@ -439,12 +439,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: userLocation?.city
-          ? `❌ Endereço rejeitado: apenas endereços de ${userLocation.city}, ${userLocation.state || ''} são aceitos. Verifique se o endereço está correto e na cidade atual.`
+          ? `Endereço não encontrado em ${userLocation.city}. Tente ser mais específico (ex: "Rua Principal, 123" ou "Centro").`
           : 'Endereço não encontrado ou fora do Brasil',
         attempted_address: address,
         user_city: userLocation?.city || null,
         user_state: userLocation?.state || null,
-        filter_active: !!userLocation?.city
+        filter_active: !!userLocation?.city,
+        suggestion: userLocation?.city
+          ? `Tente: "${address}, ${userLocation.city}" ou seja mais específico com o nome da rua.`
+          : null
       }, { status: 404 });
     }
 
