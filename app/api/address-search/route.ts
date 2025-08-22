@@ -32,11 +32,13 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * c;
 }
 
-// Busca otimizada no Photon (mais confiável que Nominatim)
+// Busca otimizada no Photon com suporte a números
 async function searchPhotonOptimized(query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }, limit = 10): Promise<SearchResult[]> {
   try {
+    const { street, number } = extractAddressNumber(query);
+
     const url = new URL('https://photon.komoot.io/api/');
-    url.searchParams.set('q', query);
+    url.searchParams.set('q', query); // Usar query original primeiro
     url.searchParams.set('limit', limit.toString());
     url.searchParams.set('lang', 'pt');
 
@@ -47,7 +49,7 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
       url.searchParams.set('location_bias_scale', '0.5'); // Bias moderado para localização
     }
 
-    console.log(`🔍 Photon Search: ${url.toString()}`);
+    console.log(`🔍 Photon com número: "${query}" (número extraído: ${number || 'nenhum'})`);
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -84,13 +86,21 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
 
         // Calcular confiança baseada em completude dos dados
         let confidence = 0.5;
-        if (props.housenumber) confidence += 0.2;
+
+        // BONUS ESPECIAL: se tem o número exato que procuramos
+        if (number && props.housenumber === number) {
+          confidence += 0.3; // Grande bonus para número exato
+          console.log(`🎯 PHOTON: Número exato encontrado: ${props.housenumber}`);
+        } else if (props.housenumber) {
+          confidence += 0.1; // Bonus menor para qualquer número
+        }
+
         if (props.street) confidence += 0.2;
         if (props.city) confidence += 0.1;
         if (distance !== undefined && distance < 10) confidence += 0.1; // Bonus proximidade
         if (distance !== undefined && distance < 2) confidence += 0.1; // Bonus proximidade alta
 
-        // Criar display_name formatado
+        // Criar display_name formatado com prioridade para número
         const displayParts = [];
         if (props.street) {
           if (props.housenumber) {
@@ -127,10 +137,29 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
           distance,
           confidence
         };
+      })
+      .filter(result => {
+        // Se procuramos um número específico, priorizar resultados relevantes
+        if (number) {
+          // Manter resultados com número exato OU da mesma rua
+          return result.address.house_number === number ||
+                 result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+                 result.display_name.toLowerCase().includes(street.toLowerCase());
+        }
+        return true;
       });
 
     // Ordenar por confiança, proximidade e relevância
     results.sort((a, b) => {
+      // Priorizar resultados com número exato
+      if (number) {
+        const aHasExactNumber = a.address.house_number === number;
+        const bHasExactNumber = b.address.house_number === number;
+
+        if (aHasExactNumber && !bHasExactNumber) return -1;
+        if (bHasExactNumber && !aHasExactNumber) return 1;
+      }
+
       // Se temos localização do usuário, considerar distância
       if (userLocation?.lat && userLocation?.lng && a.distance !== undefined && b.distance !== undefined) {
         // Priorizar resultados muito próximos (< 5km)
@@ -150,7 +179,7 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
       return b.confidence - a.confidence;
     });
 
-    console.log(`✅ Photon: ${results.length} resultados encontrados`);
+    console.log(`✅ Photon: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
     return results;
 
   } catch (error) {
@@ -263,14 +292,48 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
   }
 }
 
-// Busca no Nominatim (fallback para endereços brasileiros)
+// Função para extrair número do endereço
+function extractAddressNumber(query: string): { street: string; number?: string } {
+  // Regex para capturar número no final ou no meio
+  const patterns = [
+    /^(.+?)\s+(\d+)$/,           // "Rua ABC 123"
+    /^(.+?),\s*(\d+)$/,          // "Rua ABC, 123"
+    /^(\d+)\s+(.+)$/,            // "123 Rua ABC"
+    /^(.+?)\s+n[°º]?\s*(\d+)$/i, // "Rua ABC nº 123"
+  ];
+
+  for (const pattern of patterns) {
+    const match = query.match(pattern);
+    if (match) {
+      const [, part1, part2] = match;
+      // Se o primeiro grupo é número, inverter
+      if (/^\d+$/.test(part1)) {
+        return { street: part2.trim(), number: part1 };
+      } else {
+        return { street: part1.trim(), number: part2 };
+      }
+    }
+  }
+
+  return { street: query.trim() };
+}
+
+// Busca no Nominatim com suporte a números
 async function searchNominatim(query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }, limit = 5): Promise<SearchResult[]> {
   try {
+    const { street, number } = extractAddressNumber(query);
+
+    // Primeira tentativa: busca com número exato
+    let searchQuery = query;
+    if (number) {
+      searchQuery = `${street} ${number}`;
+    }
+
     const url = new URL('https://nominatim.openstreetmap.org/search');
     url.searchParams.set('format', 'json');
-    url.searchParams.set('q', query);
+    url.searchParams.set('q', searchQuery);
     url.searchParams.set('countrycodes', 'br');
-    url.searchParams.set('limit', limit.toString());
+    url.searchParams.set('limit', (limit * 2).toString()); // Buscar mais para filtrar depois
     url.searchParams.set('addressdetails', '1');
 
     // Se temos localização do usuário, priorizar resultados próximos
@@ -281,7 +344,7 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
       url.searchParams.set('bounded', '1');
     }
 
-    console.log(`🔍 Nominatim Fallback: ${url.toString()}`);
+    console.log(`🔍 Nominatim com número: "${searchQuery}" (número extraído: ${number || 'nenhum'})`);
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -310,13 +373,29 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
 
       // Calcular confiança baseada nos dados disponíveis
       let confidence = 0.6;
-      if (item.address?.house_number) confidence += 0.2;
+
+      // BONUS ESPECIAL: se tem o número exato que procuramos
+      if (number && item.address?.house_number === number) {
+        confidence += 0.3; // Grande bonus para número exato
+        console.log(`🎯 NÚMERO EXATO encontrado: ${item.address.house_number}`);
+      } else if (item.address?.house_number) {
+        confidence += 0.1; // Bonus menor para qualquer número
+      }
+
       if (item.address?.road) confidence += 0.1;
       if (item.importance) confidence += parseFloat(item.importance) * 0.1;
 
+      // Melhorar display_name para mostrar número quando disponível
+      let display_name = item.display_name;
+      if (item.address?.house_number && item.address?.road) {
+        const parts = display_name.split(', ');
+        parts[0] = `${item.address.road}, ${item.address.house_number}`;
+        display_name = parts.join(', ');
+      }
+
       return {
         id: item.place_id?.toString() || `${lat}-${lng}`,
-        display_name: item.display_name,
+        display_name,
         lat,
         lng,
         address: {
@@ -333,9 +412,20 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
         distance,
         confidence
       };
-    });
+    })
+    .filter(result => {
+      // Se procuramos um número específico, priorizar resultados com números
+      if (number) {
+        // Manter resultados com número exato OU resultados da mesma rua
+        return result.address.house_number === number ||
+               result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+               result.display_name.toLowerCase().includes(street.toLowerCase());
+      }
+      return true;
+    })
+    .slice(0, limit); // Limitar após filtrar
 
-    console.log(`✅ Nominatim: ${results.length} resultados encontrados`);
+    console.log(`✅ Nominatim: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
     return results;
 
   } catch (error) {
