@@ -77,7 +77,7 @@ export default function OfflineStatusIndicator({ className = '' }: OfflineStatus
   if (!isMounted) {
     return (
       <button
-        className={`fixed top-4 right-4 z-40 bg-white rounded-xl shadow-lg p-3 border-2 border-gray-200 transition-all ${className}`}
+        className={`fixed top-4 right-4 z-[60] bg-white rounded-xl shadow-lg p-3 border-2 border-gray-200 transition-all ${className}`}
         title="Carregando status..."
         disabled
       >
@@ -96,7 +96,7 @@ export default function OfflineStatusIndicator({ className = '' }: OfflineStatus
       {/* 📊 STATUS INDICATOR */}
       <button
         onClick={() => setShowDetails(true)}
-        className={`fixed top-4 right-4 z-40 bg-white rounded-xl shadow-lg p-3 border-2 border-gray-200 hover:border-gray-300 transition-all ${className}`}
+        className={`fixed top-4 right-4 z-[60] bg-white rounded-xl shadow-lg p-3 border-2 border-gray-200 hover:border-gray-300 transition-all ${className}`}
         title="Status de conexão"
       >
         <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export default function OfflineStatusIndicator({ className = '' }: OfflineStatus
 
       {/* 📋 DETAILS MODAL */}
       {showDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             {/* Header */}
             <div className={`p-6 text-white ${
