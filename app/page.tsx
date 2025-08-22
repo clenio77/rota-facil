@@ -124,7 +124,7 @@ export default function HomePage() {
 
   // 📋 ESTADOS PARA FUNCIONALIDADE DO CARTEIRO
   const [carteiroAddresses, setCarteiroAddresses] = useState<any[]>([]);
-  const [showCarteiroPanel, setShowCarteiroPanel] = useState(false);
+  // showCarteiroPanel removido - funcionalidade movida para página dedicada
 
   // 📸 PROOF OF DELIVERY
   const { proofs, loadProofs } = useProofOfDelivery();
@@ -152,8 +152,7 @@ export default function HomePage() {
     // Mostrar mapa automaticamente
     setShowMap(true);
 
-    // Fechar painel do carteiro
-    setShowCarteiroPanel(false);
+    // Painel do carteiro removido - funcionalidade movida para página dedicada
 
     alert(`✅ ${carteiroStops.length} endereços adicionados à rota!`);
   };
@@ -975,19 +974,7 @@ export default function HomePage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              <div>
-                <Link
-                  href="/carteiro"
-                  className="inline-flex items-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  <span className="text-xl">📮</span>
-                  <span>Versão Profissional para Carteiros</span>
-                  <span className="text-lg">→</span>
-                </Link>
-                <div className="mt-2 text-sm text-gray-500">
-                  ✨ OCR avançado • Listas ECT • Cache inteligente
-                </div>
-              </div>
+              {/* Botão Versão Profissional removido - funcionalidade movida para aba de navegação */}
 
               <div>
                 <Link
@@ -1334,7 +1321,7 @@ export default function HomePage() {
           <span className="mobile-nav-label">Dashboard</span>
         </button>
 
-        <button className="mobile-nav-item" onClick={() => setShowCarteiroPanel(true)}>
+        <button className="mobile-nav-item" onClick={() => window.location.href = '/carteiro'}>
           <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
@@ -1370,62 +1357,7 @@ export default function HomePage() {
         onClose={() => setIsDashboardOpen(false)}
       />
 
-      {/* 📋 CARTEIRO MODAL */}
-      {showCarteiroPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-xl shadow-custom overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-xl font-bold text-gray-900">📋 Lista de Carteiro</h3>
-              <button
-                onClick={() => setShowCarteiroPanel(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto">
-              {/* Abas para escolher tipo de upload */}
-              <div className="mb-4">
-                <div className="flex border-b">
-                  <button
-                    onClick={() => setUploadType('simple')}
-                    className={`px-4 py-2 text-sm font-medium ${
-                      uploadType === 'simple'
-                        ? 'border-b-2 border-blue-500 text-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    📄 Extração Simples
-                  </button>
-                  <button
-                    onClick={() => setUploadType('carteiro')}
-                    className={`px-4 py-2 text-sm font-medium ${
-                      uploadType === 'carteiro'
-                        ? 'border-b-2 border-blue-500 text-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    📮 Carteiro Avançado
-                  </button>
-                </div>
-              </div>
-
-              {uploadType === 'simple' ? (
-                <SimpleUpload
-                  onAddressesLoaded={handleSimpleAddresses}
-                  userLocation={deviceLocation || deviceOrigin}
-                />
-              ) : (
-                <CarteiroUpload
-                  onAddressesLoaded={handleCarteiroAddresses}
-                  userLocation={deviceLocation || deviceOrigin}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de Carteiro removido - funcionalidade movida para página dedicada /carteiro */}
 
       {/* 🔄 OFFLINE STATUS INDICATOR */}
       <OfflineStatusIndicator />
