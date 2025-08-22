@@ -9,22 +9,26 @@ interface OfflineStatusProps {
 
 export default function OfflineStatusIndicator({ className = '' }: OfflineStatusProps) {
   const [status, setStatus] = useState<OfflineStatus>({
-    isOnline: navigator.onLine,
+    isOnline: true, // Valor padrão para evitar hidratação incorreta
     lastSync: 0,
     pendingActions: 0,
     cacheSize: 0,
     syncInProgress: false
   });
   const [showDetails, setShowDetails] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // Marcar como montado para evitar problemas de hidratação
+    setIsMounted(true);
+
     // Listener para mudanças de status
     const handleStatusChange = (newStatus: OfflineStatus) => {
       setStatus(newStatus);
     };
 
     offlineManager.addStatusListener(handleStatusChange);
-    
+
     // Carregar status inicial
     setStatus(offlineManager.getStatus());
 
@@ -68,6 +72,24 @@ export default function OfflineStatusIndicator({ className = '' }: OfflineStatus
     if (status.pendingActions > 0) return '⏳';
     return '🌐';
   };
+
+  // Não renderizar até estar montado para evitar problemas de hidratação
+  if (!isMounted) {
+    return (
+      <button
+        className={`fixed top-4 right-4 z-40 bg-white rounded-xl shadow-lg p-3 border-2 border-gray-200 transition-all ${className}`}
+        title="Carregando status..."
+        disabled
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+          <span className="text-sm font-medium text-gray-700">
+            ⏳ Carregando...
+          </span>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <>
@@ -219,7 +241,7 @@ export default function OfflineStatusIndicator({ className = '' }: OfflineStatus
 // Hook para usar status offline
 export function useOfflineStatus() {
   const [status, setStatus] = useState<OfflineStatus>({
-    isOnline: navigator.onLine,
+    isOnline: true, // Valor padrão para evitar problemas de hidratação
     lastSync: 0,
     pendingActions: 0,
     cacheSize: 0,

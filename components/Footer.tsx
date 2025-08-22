@@ -134,7 +134,7 @@ export function useFooter() {
   return {
     app: 'Rota Fácil Moura',
     developer: 'Clenio Consultory AI',
-    year: new Date().getFullYear(),
+    year: 2025, // Valor fixo para evitar problemas de hidratação
     version: '2.0',
     features: ['Mobile', 'Voice', 'Offline', 'Analytics']
   };
