@@ -479,7 +479,44 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const finalResults = Array.from(uniqueResults.values())
+    // 🎯 FILTRO AGRESSIVO: Se temos localização, filtrar por proximidade primeiro
+    let filteredResults = Array.from(uniqueResults.values());
+
+    if (userLocation?.lat && userLocation?.lng && userLocation?.city) {
+      console.log(`🎯 Aplicando filtro por cidade: ${userLocation.city}`);
+
+      // Separar resultados da cidade do usuário vs outras cidades
+      const localResults = filteredResults.filter(result => {
+        const cityMatch = result.address?.city?.toLowerCase().includes(userLocation.city!.toLowerCase()) ||
+                         result.display_name.toLowerCase().includes(userLocation.city!.toLowerCase());
+        const isNearby = result.distance !== undefined && result.distance < 30; // 30km de raio (mais restritivo)
+
+        console.log(`📍 ${result.display_name} - Cidade: ${result.address?.city} - Distância: ${result.distance}km - Match: ${cityMatch} - Próximo: ${isNearby}`);
+
+        return cityMatch || isNearby;
+      });
+
+      console.log(`✅ Resultados locais encontrados: ${localResults.length}`);
+
+      // Se temos resultados locais suficientes, usar APENAS eles
+      if (localResults.length >= 3) {
+        filteredResults = localResults;
+        console.log(`🎯 Usando APENAS resultados locais (${localResults.length} encontrados)`);
+      } else {
+        // Caso contrário, priorizar locais mas permitir alguns distantes
+        const otherResults = filteredResults.filter(result => {
+          const cityMatch = result.address?.city?.toLowerCase().includes(userLocation.city!.toLowerCase()) ||
+                           result.display_name.toLowerCase().includes(userLocation.city!.toLowerCase());
+          const isNearby = result.distance !== undefined && result.distance < 30;
+          return !(cityMatch || isNearby);
+        });
+
+        filteredResults = [...localResults, ...otherResults.slice(0, Math.max(1, limit - localResults.length))];
+        console.log(`🎯 Misturando: ${localResults.length} locais + ${Math.max(1, limit - localResults.length)} distantes`);
+      }
+    }
+
+    const finalResults = filteredResults
       .slice(0, limit)
       .sort((a, b) => {
         // 🎯 PRIORIDADE 1: Resultados da cidade do usuário
