@@ -50,26 +50,25 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validações
-    const supportedTypes = [
-      'application/pdf',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/csv',
-      'application/vnd.google-earth.kml+xml',
-      'application/gpx+xml',
-      'application/xml',
-      'text/xml',
-      'application/json'
-    ];
-
+    // Validações - Priorizar extensão sobre MIME type
     const supportedExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'kml', 'gpx', 'xml', 'json'];
     const fileExtension = file.name.toLowerCase().split('.').pop();
 
-    if (!supportedTypes.includes(file.type) && !supportedExtensions.includes(fileExtension || '')) {
-      setError('Formato não suportado. Use: PDF, XLS, XLSX, CSV, KML, GPX, XML ou JSON');
+    console.log('🔍 Arquivo selecionado:', {
+      name: file.name,
+      type: file.type,
+      extension: fileExtension,
+      size: file.size,
+      isSupported: supportedExtensions.includes(fileExtension || '')
+    });
+
+    if (!fileExtension || !supportedExtensions.includes(fileExtension)) {
+      console.error('❌ Extensão não suportada:', fileExtension);
+      setError(`Formato não suportado: ${fileExtension}. Use: PDF, XLS, XLSX, CSV, KML, GPX, XML ou JSON`);
       return;
     }
+
+    console.log('✅ Arquivo validado com sucesso');
 
     if (file.size > 10 * 1024 * 1024) {
       setError('Arquivo muito grande. Máximo 10MB permitido.');
@@ -93,14 +92,19 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         formData.append('userLocation', JSON.stringify(userLocation));
       }
 
-      setUploadProgress('Processando PDF...');
+      setUploadProgress('Processando arquivo...');
+
+      console.log('Enviando arquivo para API:', file.name);
 
       const response = await fetch('/api/carteiro/process-pdf', {
         method: 'POST',
         body: formData
       });
 
+      console.log('Resposta da API:', response.status, response.statusText);
+
       const data = await response.json();
+      console.log('Dados retornados:', data);
 
       if (!data.success) {
         throw new Error(data.error || 'Erro ao processar PDF');
@@ -128,6 +132,13 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     if (file) {
       const supportedExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'kml', 'gpx', 'xml', 'json'];
       const fileExtension = file.name.toLowerCase().split('.').pop();
+
+      console.log('Arquivo arrastado:', {
+        name: file.name,
+        type: file.type,
+        extension: fileExtension,
+        size: file.size
+      });
 
       if (supportedExtensions.includes(fileExtension || '')) {
         uploadAndProcess(file);
@@ -168,7 +179,6 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.xls,.xlsx,.csv,.kml,.gpx,.xml,.json"
           onChange={handleFileSelect}
           className="hidden"
           disabled={isUploading}
@@ -190,12 +200,27 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
                 Máximo 10MB • PDF, XLS, CSV, KML, XML, JSON
               </p>
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Selecionar Arquivo
-            </button>
+            <div className="space-x-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Selecionar Arquivo
+              </button>
+
+              <button
+                onClick={async () => {
+                  // Teste direto com o PDF existente
+                  const response = await fetch('/302.pdf');
+                  const blob = await response.blob();
+                  const file = new File([blob], '302.pdf', { type: 'application/pdf' });
+                  await uploadAndProcess(file);
+                }}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                Testar PDF
+              </button>
+            </div>
           </div>
         )}
       </div>
