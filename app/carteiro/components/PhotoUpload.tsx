@@ -78,13 +78,13 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
       reader.readAsDataURL(optimizedFiles[0]);
     } else {
       // Validar arquivos de dados
-      const validExtensions = ['.xls', '.xlsx', '.gpx', '.kml', '.xml', '.csv'];
+      const validExtensions = ['.pdf', '.xls', '.xlsx', '.gpx', '.kml', '.xml', '.csv', '.json'];
       const invalidFiles = fileArray.filter(file => {
         const extension = '.' + file.name.split('.').pop()?.toLowerCase();
         return !validExtensions.includes(extension);
       });
       if (invalidFiles.length > 0) {
-        onError('Por favor, selecione apenas arquivos válidos: XLS, XLSX, GPX, KML, XML, CSV');
+        onError('Por favor, selecione apenas arquivos válidos: PDF, XLS, XLSX, GPX, KML, XML, CSV, JSON');
         return;
       }
 
@@ -397,7 +397,7 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xls,.xlsx,.gpx,.kml,.xml,.csv"
+              accept=".pdf,.xls,.xlsx,.gpx,.kml,.xml,.csv,.json"
               multiple
               onChange={handleFileInputChange}
               className="hidden"
@@ -506,7 +506,7 @@ export default function PhotoUpload({ onProcessingStart, onProcessingComplete, o
               ) : (
                 <div>
                   <p className="font-medium mb-2">📁 Modo Arquivo:</p>
-                  <p>Faça upload dos arquivos exportados do sistema Correios: XLS, GPX, KML, XML ou CSV.</p>
+                  <p>Faça upload dos arquivos com endereços: PDF, XLS, GPX, KML, XML, CSV ou JSON.</p>
                   <p className="mt-2 text-xs opacity-75">💡 Você pode selecionar múltiplos arquivos de uma vez!</p>
                 </div>
               )}
