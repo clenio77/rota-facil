@@ -55,13 +55,13 @@ export default function RootLayout({
             <div className="container mx-auto px-4 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 relative">
+                  <div className="w-12 h-12 relative">
                     <Image
-                      src="/rota-facil-icon.svg"
+                      src="/logo-carro-azul.png"
                       alt="Rota Fácil Logo"
-                      width={40}
-                      height={40}
-                      className="w-full h-full object-contain filter brightness-0 invert"
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-contain"
                     />
                   </div>
                   <div>
