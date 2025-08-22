@@ -873,16 +873,16 @@ export default function HomePage() {
     <div className="space-y-6">
       {/* 🏆 HEADER PRINCIPAL COM LOGO */}
       <div className="bg-white rounded-xl shadow-custom p-6">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="w-16 h-16 relative">
-            <Image
-              src="/rota-facil-icon.svg"
-              alt="Rota Fácil Logo"
-              width={64}
-              height={64}
-              className="w-full h-full object-contain drop-shadow-lg"
-            />
-          </div>
+                        <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="w-16 h-16 relative">
+                    <Image
+                      src="/logo-carro-azul.png"
+                      alt="Rota Fácil Logo"
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-contain drop-shadow-lg"
+                    />
+                  </div>
           <div className="text-center">
             <h1 className="text-3xl font-bold text-slate-800 leading-tight">ROTA FÁCIL</h1>
             <p className="text-lg text-slate-600 leading-tight">MOURA <span className="bg-green-500 text-white px-2 py-1 rounded text-sm font-bold ml-2">PRO</span></p>

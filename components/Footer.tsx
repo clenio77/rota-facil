@@ -19,15 +19,15 @@ export default function Footer({ className = '' }: FooterProps) {
           {/* App Logo Section - Centralizada e Maior */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-4 mb-3">
-              <div className="w-20 h-20 relative">
-                <Image
-                  src="/rota-facil-icon.svg"
-                  alt="Rota Fácil Logo"
-                  width={80}
-                  height={80}
-                  className="w-full h-full object-contain drop-shadow-lg"
-                />
-              </div>
+                              <div className="w-20 h-20 relative">
+                  <Image
+                    src="/logo-carro-azul.png"
+                    alt="Rota Fácil Logo"
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-contain drop-shadow-lg"
+                  />
+                </div>
               <div className="text-left">
                 <div className="text-2xl font-bold text-slate-800 leading-tight">ROTA FÁCIL</div>
                 <div className="text-lg text-slate-600 leading-tight">MOURA <span className="bg-green-500 text-white px-2 py-1 rounded text-sm font-bold ml-2">PRO</span></div>
