@@ -7,6 +7,7 @@ import Image from 'next/image';
 import AddressSearch from '../components/AddressSearch';
 import StopCard from '../components/StopCard';
 import CarteiroUpload from '../components/CarteiroUpload';
+import SimpleUpload from '../components/SimpleUpload';
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
 import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
@@ -118,6 +119,9 @@ export default function HomePage() {
   // 🔄 OFFLINE ACTIONS
   const { queueAction, cacheData, getCachedData } = useOfflineActions();
 
+  // 📄 UPLOAD TYPE STATE
+  const [uploadType, setUploadType] = useState<'simple' | 'carteiro'>('simple');
+
   // 📋 ESTADOS PARA FUNCIONALIDADE DO CARTEIRO
   const [carteiroAddresses, setCarteiroAddresses] = useState<any[]>([]);
   const [showCarteiroPanel, setShowCarteiroPanel] = useState(false);
@@ -158,6 +162,36 @@ export default function HomePage() {
     setShowCarteiroPanel(false);
 
     alert(`✅ ${carteiroStops.length} endereços adicionados à rota!`);
+  };
+
+  // 📄 FUNÇÃO PARA PROCESSAR ENDEREÇOS SIMPLES
+  const handleSimpleAddresses = (addresses: any[]) => {
+    console.log('📄 Endereços simples recebidos:', addresses.length);
+
+    // Converter endereços simples para formato de paradas
+    const simpleStops: Stop[] = addresses
+      .filter(addr => addr.geocoded)
+      .map((addr, index) => ({
+        id: Date.now() + index,
+        address: addr.original || 'Endereço não especificado',
+        coordinates: {
+          lat: addr.geocoded.lat,
+          lng: addr.geocoded.lng
+        },
+        type: 'delivery' as const,
+        status: 'pending' as const
+      }));
+
+    // Adicionar paradas à lista existente
+    setStops(prevStops => [...prevStops, ...simpleStops]);
+
+    // Mostrar mapa automaticamente
+    setShowMap(true);
+
+    // Fechar painel de upload
+    setIsSettingsOpen(false);
+
+    alert(`✅ ${simpleStops.length} endereços adicionados à rota!`);
   };
 
   // Sync settings modal with URL hash (#settings)
@@ -1385,10 +1419,43 @@ export default function HomePage() {
               </button>
             </div>
             <div className="p-6 overflow-y-auto">
-              <CarteiroUpload
-                onAddressesLoaded={handleCarteiroAddresses}
-                userLocation={deviceLocation || deviceOrigin}
-              />
+              {/* Abas para escolher tipo de upload */}
+              <div className="mb-4">
+                <div className="flex border-b">
+                  <button
+                    onClick={() => setUploadType('simple')}
+                    className={`px-4 py-2 text-sm font-medium ${
+                      uploadType === 'simple'
+                        ? 'border-b-2 border-blue-500 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    📄 Extração Simples
+                  </button>
+                  <button
+                    onClick={() => setUploadType('carteiro')}
+                    className={`px-4 py-2 text-sm font-medium ${
+                      uploadType === 'carteiro'
+                        ? 'border-b-2 border-blue-500 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    📮 Carteiro Avançado
+                  </button>
+                </div>
+              </div>
+
+              {uploadType === 'simple' ? (
+                <SimpleUpload
+                  onAddressesLoaded={handleSimpleAddresses}
+                  userLocation={deviceLocation || deviceOrigin}
+                />
+              ) : (
+                <CarteiroUpload
+                  onAddressesLoaded={handleCarteiroAddresses}
+                  userLocation={deviceLocation || deviceOrigin}
+                />
+              )}
             </div>
           </div>
         </div>
