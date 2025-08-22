@@ -198,7 +198,7 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
     const url = new URL('https://photon.komoot.io/api/');
     url.searchParams.set('q', cityQuery);
     url.searchParams.set('limit', limit.toString());
-    url.searchParams.set('lang', 'pt');
+    // Removido 'lang=pt' pois Photon não suporta português
 
     if (userLocation.lat && userLocation.lng) {
       url.searchParams.set('lat', userLocation.lat.toString());
@@ -482,13 +482,24 @@ export async function POST(request: NextRequest) {
     const finalResults = Array.from(uniqueResults.values())
       .slice(0, limit)
       .sort((a, b) => {
-        // Ordenação otimizada por confiança e proximidade
+        // 🎯 PRIORIDADE 1: Resultados da cidade do usuário
+        if (userLocation?.city) {
+          const aCityMatch = a.address?.city?.toLowerCase().includes(userLocation.city.toLowerCase()) ||
+                            a.display_name.toLowerCase().includes(userLocation.city.toLowerCase());
+          const bCityMatch = b.address?.city?.toLowerCase().includes(userLocation.city.toLowerCase()) ||
+                            b.display_name.toLowerCase().includes(userLocation.city.toLowerCase());
+
+          if (aCityMatch && !bCityMatch) return -1;
+          if (bCityMatch && !aCityMatch) return 1;
+        }
+
+        // 🎯 PRIORIDADE 2: Proximidade geográfica
         if (userLocation?.lat && userLocation?.lng && a.distance !== undefined && b.distance !== undefined) {
-          // Priorizar resultados muito próximos
+          // Priorizar resultados muito próximos (< 5km)
           if (a.distance < 5 && b.distance >= 5) return -1;
           if (b.distance < 5 && a.distance >= 5) return 1;
 
-          // Para resultados próximos, ordenar por confiança
+          // Para resultados próximos (< 20km), ordenar por confiança
           if (a.distance < 20 && b.distance < 20) {
             return b.confidence - a.confidence;
           }
@@ -497,7 +508,7 @@ export async function POST(request: NextRequest) {
           return a.distance - b.distance;
         }
 
-        // Sem localização, ordenar por confiança
+        // 🎯 PRIORIDADE 3: Confiança (sem localização)
         return b.confidence - a.confidence;
       });
 
