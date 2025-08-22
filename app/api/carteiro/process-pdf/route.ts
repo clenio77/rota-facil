@@ -2,26 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, unlink } from 'fs/promises';
 import path from 'path';
 
-const { processCarteiroPDF, generateMapData } = require('../../../../utils/pdfExtractor');
+const { processCarteiroFile, generateMapData, detectFileType } = require('../../../../utils/pdfExtractor');
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const file = formData.get('pdf') as File;
+    const file = formData.get('file') as File;
     const userLocationStr = formData.get('userLocation') as string;
-    
+
     if (!file) {
       return NextResponse.json({
         success: false,
-        error: 'Nenhum arquivo PDF foi enviado'
+        error: 'Nenhum arquivo foi enviado'
       }, { status: 400 });
     }
-    
-    // Validar tipo de arquivo
-    if (file.type !== 'application/pdf') {
+
+    // Detectar e validar tipo de arquivo
+    const fileType = detectFileType(file.name);
+    const supportedTypes = ['pdf', 'excel', 'csv', 'kml', 'gpx', 'xml', 'json'];
+
+    if (!supportedTypes.includes(fileType)) {
       return NextResponse.json({
         success: false,
-        error: 'Apenas arquivos PDF são aceitos'
+        error: `Tipo de arquivo não suportado. Formatos aceitos: PDF, XLS, XLSX, CSV, KML, GPX, XML, JSON`
       }, { status: 400 });
     }
     
@@ -45,30 +48,31 @@ export async function POST(request: NextRequest) {
     // Salvar arquivo temporariamente
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    
+
     const tempDir = path.join(process.cwd(), 'temp');
-    const tempFilePath = path.join(tempDir, `carteiro-${Date.now()}.pdf`);
+    const fileExtension = file.name.split('.').pop();
+    const tempFilePath = path.join(tempDir, `carteiro-${Date.now()}.${fileExtension}`);
     
     try {
       // Criar diretório temp se não existir
       await writeFile(tempFilePath, buffer);
       
-      console.log(`📄 Processando PDF: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
-      
-      // Processar PDF
-      const result = await processCarteiroPDF(tempFilePath, userLocation);
+      console.log(`📄 Processando ${fileType.toUpperCase()}: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+
+      // Processar arquivo
+      const result = await processCarteiroFile(tempFilePath, file.name, userLocation);
       
       if (!result.success) {
         return NextResponse.json({
           success: false,
-          error: result.error || 'Erro ao processar PDF'
+          error: result.error || 'Erro ao processar arquivo'
         }, { status: 500 });
       }
       
       // Gerar dados para o mapa
       const mapData = generateMapData(result.addresses);
       
-      console.log(`✅ PDF processado: ${result.geocoded}/${result.total} endereços geocodificados`);
+      console.log(`✅ ${fileType.toUpperCase()} processado: ${result.geocoded}/${result.total} endereços geocodificados`);
       
       return NextResponse.json({
         success: true,
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
     
   } catch (error) {
-    console.error('Erro no processamento do PDF:', error);
+    console.error('Erro no processamento do arquivo:', error);
     return NextResponse.json({
       success: false,
       error: 'Erro interno do servidor',

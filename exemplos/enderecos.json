@@ -1,0 +1,36 @@
+{
+  "entregas": [
+    {
+      "id": 1,
+      "endereco": "Rua das Flores, 123",
+      "cep": "38400001",
+      "destinatario": "João Silva",
+      "cidade": "Uberlândia",
+      "estado": "MG"
+    },
+    {
+      "id": 2,
+      "endereco": "Avenida Brasil, 456", 
+      "cep": "38400002",
+      "destinatario": "Maria Santos",
+      "cidade": "Uberlândia",
+      "estado": "MG"
+    },
+    {
+      "id": 3,
+      "endereco": "Rua São Paulo, 789",
+      "cep": "38400003", 
+      "destinatario": "Pedro Oliveira",
+      "cidade": "Uberlândia",
+      "estado": "MG"
+    },
+    {
+      "id": 4,
+      "endereco": "Avenida Afonso Pena, 1000",
+      "cep": "38400004",
+      "destinatario": "Ana Costa", 
+      "cidade": "Uberlândia",
+      "estado": "MG"
+    }
+  ]
+}

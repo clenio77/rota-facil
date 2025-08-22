@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Pontos de Entrega</name>
+    <description>Lista de endereços para entrega</description>
+    
+    <Placemark>
+      <name>Rua das Flores, 123</name>
+      <description>Entrega para João Silva</description>
+      <Point>
+        <coordinates>-48.2772,-18.9186,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Avenida Brasil, 456</name>
+      <description>Entrega para Maria Santos</description>
+      <Point>
+        <coordinates>-48.2800,-18.9200,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Rua São Paulo, 789</name>
+      <description>Entrega para Pedro Oliveira</description>
+      <Point>
+        <coordinates>-48.2750,-18.9150,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Avenida Afonso Pena, 1000</name>
+      <description>Entrega para Ana Costa</description>
+      <Point>
+        <coordinates>-48.2780,-18.9170,0</coordinates>
+      </Point>
+    </Placemark>
+    
+  </Document>
+</kml>

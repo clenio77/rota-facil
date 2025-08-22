@@ -51,8 +51,23 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     if (!file) return;
 
     // Validações
-    if (file.type !== 'application/pdf') {
-      setError('Apenas arquivos PDF são aceitos');
+    const supportedTypes = [
+      'application/pdf',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/vnd.google-earth.kml+xml',
+      'application/gpx+xml',
+      'application/xml',
+      'text/xml',
+      'application/json'
+    ];
+
+    const supportedExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'kml', 'gpx', 'xml', 'json'];
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+
+    if (!supportedTypes.includes(file.type) && !supportedExtensions.includes(fileExtension || '')) {
+      setError('Formato não suportado. Use: PDF, XLS, XLSX, CSV, KML, GPX, XML ou JSON');
       return;
     }
 
@@ -72,7 +87,7 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
 
     try {
       const formData = new FormData();
-      formData.append('pdf', file);
+      formData.append('file', file);
       
       if (userLocation) {
         formData.append('userLocation', JSON.stringify(userLocation));
@@ -109,10 +124,16 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
-      uploadAndProcess(file);
-    } else {
-      setError('Apenas arquivos PDF são aceitos');
+
+    if (file) {
+      const supportedExtensions = ['pdf', 'xls', 'xlsx', 'csv', 'kml', 'gpx', 'xml', 'json'];
+      const fileExtension = file.name.toLowerCase().split('.').pop();
+
+      if (supportedExtensions.includes(fileExtension || '')) {
+        uploadAndProcess(file);
+      } else {
+        setError('Formato não suportado. Use: PDF, XLS, XLSX, CSV, KML, GPX, XML ou JSON');
+      }
     }
   };
 
@@ -127,8 +148,11 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
           📋 Lista de Carteiro
         </h3>
         <p className="text-sm text-gray-600">
-          Faça upload do PDF da lista de objetos dos Correios para gerar pontos no mapa
+          Faça upload de arquivos com endereços para gerar pontos no mapa
         </p>
+        <div className="mt-2 text-xs text-gray-500">
+          <strong>Formatos suportados:</strong> PDF, XLS, XLSX, CSV, KML, GPX, XML, JSON
+        </div>
       </div>
 
       {/* Área de Upload */}
@@ -144,7 +168,7 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.xls,.xlsx,.csv,.kml,.gpx,.xml,.json"
           onChange={handleFileSelect}
           className="hidden"
           disabled={isUploading}
@@ -160,10 +184,10 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
             <div className="text-4xl">📄</div>
             <div>
               <p className="text-lg font-medium text-gray-700 mb-1">
-                Arraste o PDF aqui ou clique para selecionar
+                Arraste o arquivo aqui ou clique para selecionar
               </p>
               <p className="text-sm text-gray-500">
-                Máximo 10MB • Apenas arquivos PDF
+                Máximo 10MB • PDF, XLS, CSV, KML, XML, JSON
               </p>
             </div>
             <button
