@@ -516,7 +516,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const finalResults = filteredResults
+    // 🎯 FILTRO SUPER AGRESSIVO POR CIDADE DO USUÁRIO
+    let cityFilteredResults = filteredResults;
+    if (userLocation?.city) {
+      const userCity = userLocation.city.toLowerCase();
+
+      // Primeiro, tentar filtrar apenas pela cidade exata
+      const exactCityResults = filteredResults.filter(result => {
+        const resultCity = result.address.city?.toLowerCase();
+        return resultCity === userCity;
+      });
+
+      console.log(`🎯 Filtro exato por cidade: ${exactCityResults.length}/${filteredResults.length} resultados para "${userLocation.city}"`);
+
+      // Se temos resultados da cidade exata, usar apenas eles
+      if (exactCityResults.length > 0) {
+        cityFilteredResults = exactCityResults;
+        console.log(`✅ Usando apenas resultados de "${userLocation.city}": ${exactCityResults.length} resultados`);
+      }
+    }
+
+    const finalResults = cityFilteredResults
       .slice(0, limit)
       .sort((a, b) => {
         // 🎯 PRIORIDADE 1: Resultados da cidade do usuário
