@@ -263,6 +263,87 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
   }
 }
 
+// Busca no Nominatim (fallback para endereços brasileiros)
+async function searchNominatim(query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }, limit = 5): Promise<SearchResult[]> {
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('q', query);
+    url.searchParams.set('countrycodes', 'br');
+    url.searchParams.set('limit', limit.toString());
+    url.searchParams.set('addressdetails', '1');
+
+    // Se temos localização do usuário, priorizar resultados próximos
+    if (userLocation?.lat && userLocation?.lng) {
+      url.searchParams.set('viewbox',
+        `${userLocation.lng - 0.1},${userLocation.lat + 0.1},${userLocation.lng + 0.1},${userLocation.lat - 0.1}`
+      );
+      url.searchParams.set('bounded', '1');
+    }
+
+    console.log(`🔍 Nominatim Fallback: ${url.toString()}`);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'User-Agent': 'RotaFacil/1.0 (https://rotafacil.com)'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    const results: SearchResult[] = data.map((item: any) => {
+      const lat = parseFloat(item.lat);
+      const lng = parseFloat(item.lon);
+
+      let distance: number | undefined;
+      if (userLocation?.lat && userLocation?.lng) {
+        distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+      }
+
+      // Calcular confiança baseada nos dados disponíveis
+      let confidence = 0.6;
+      if (item.address?.house_number) confidence += 0.2;
+      if (item.address?.road) confidence += 0.1;
+      if (item.importance) confidence += parseFloat(item.importance) * 0.1;
+
+      return {
+        id: item.place_id?.toString() || `${lat}-${lng}`,
+        display_name: item.display_name,
+        lat,
+        lng,
+        address: {
+          house_number: item.address?.house_number,
+          road: item.address?.road,
+          neighbourhood: item.address?.neighbourhood || item.address?.suburb,
+          city: item.address?.city || item.address?.town || item.address?.municipality,
+          state: item.address?.state,
+          postcode: item.address?.postcode,
+          country: item.address?.country
+        },
+        type: item.type || 'place',
+        importance: parseFloat(item.importance || '0'),
+        distance,
+        confidence
+      };
+    });
+
+    console.log(`✅ Nominatim: ${results.length} resultados encontrados`);
+    return results;
+
+  } catch (error) {
+    console.error('Erro no Nominatim:', error);
+    return [];
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { query, userLocation, limit = 8 } = await request.json();
@@ -274,16 +355,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🔍 Address Search (Photon Only): "${query}" (limit: ${limit})`);
+    console.log(`🔍 Address Search (Híbrida): "${query}" (limit: ${limit})`);
 
-    // Estratégia dupla: busca geral + busca filtrada por cidade
-    const [generalResults, cityResults] = await Promise.all([
-      searchPhotonOptimized(query, userLocation, Math.ceil(limit * 0.7)),
-      searchPhotonWithCityFilter(query, userLocation, Math.ceil(limit * 0.3))
+    // ESTRATÉGIA HÍBRIDA: Photon + Nominatim + Filtro por cidade
+    const [photonResults, nominatimResults, cityResults] = await Promise.all([
+      searchPhotonOptimized(query, userLocation, Math.ceil(limit * 0.4)),
+      searchNominatim(query, userLocation, Math.ceil(limit * 0.4)),
+      searchPhotonWithCityFilter(query, userLocation, Math.ceil(limit * 0.2))
     ]);
 
-    // Combinar e deduplificar resultados
-    const allResults = [...cityResults, ...generalResults]; // Priorizar resultados da cidade
+    // Combinar todos os resultados
+    const allResults = [...cityResults, ...photonResults, ...nominatimResults];
+
+    if (allResults.length === 0) {
+      console.log(`❌ Nenhum resultado encontrado para: "${query}"`);
+      return NextResponse.json({
+        success: false,
+        results: [],
+        query,
+        total: 0,
+        message: 'Nenhum endereço encontrado. Tente ser mais específico.'
+      });
+    }
+
+    // Deduplificar resultados
     const uniqueResults = new Map<string, SearchResult>();
 
     allResults.forEach(result => {
@@ -300,11 +395,11 @@ export async function POST(request: NextRequest) {
         // Ordenação otimizada por confiança e proximidade
         if (userLocation?.lat && userLocation?.lng && a.distance !== undefined && b.distance !== undefined) {
           // Priorizar resultados muito próximos
-          if (a.distance < 2 && b.distance >= 2) return -1;
-          if (b.distance < 2 && a.distance >= 2) return 1;
+          if (a.distance < 5 && b.distance >= 5) return -1;
+          if (b.distance < 5 && a.distance >= 5) return 1;
 
           // Para resultados próximos, ordenar por confiança
-          if (a.distance < 10 && b.distance < 10) {
+          if (a.distance < 20 && b.distance < 20) {
             return b.confidence - a.confidence;
           }
 
@@ -316,14 +411,14 @@ export async function POST(request: NextRequest) {
         return b.confidence - a.confidence;
       });
 
-    console.log(`✅ Address Search (Photon): ${finalResults.length} resultados finais`);
+    console.log(`✅ Address Search (Híbrida): ${finalResults.length} resultados finais`);
 
     return NextResponse.json({
       success: true,
       results: finalResults,
       query,
       total: finalResults.length,
-      provider: 'photon-optimized'
+      provider: 'hybrid-photon-nominatim'
     });
 
   } catch (error) {
