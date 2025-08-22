@@ -1312,44 +1312,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 📱 MOBILE BOTTOM NAVIGATION */}
-      <nav className="mobile-nav">
-        <button className="mobile-nav-item" onClick={() => setIsDashboardOpen(true)}>
-          <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          <span className="mobile-nav-label">Dashboard</span>
-        </button>
-
-        <button className="mobile-nav-item" onClick={() => window.location.href = '/carteiro'}>
-          <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="mobile-nav-label">Carteiro</span>
-        </button>
-
-        <button className="mobile-nav-item" onClick={() => fileInputRef.current?.click()}>
-          <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="mobile-nav-label">Foto</span>
-        </button>
-
-        <VoiceControl onCommand={(command) => {
-          const handler = voiceCommandHandlers[command as keyof typeof voiceCommandHandlers];
-          if (handler) handler();
-        }} />
-
-        {stops.length > 0 && (
-          <button className="mobile-nav-item" onClick={handleOptimizeRoute} disabled={isOptimizing}>
-            <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span className="mobile-nav-label">Otimizar</span>
-          </button>
-        )}
-      </nav>
+      {/* Navegação móvel removida - agora fixa no layout principal */}
 
       {/* 📊 DASHBOARD MODAL */}
       <Dashboard
@@ -1376,9 +1339,9 @@ export default function HomePage() {
         />
       )}
 
-      {/* Clear list floating action */}
+      {/* Clear list floating action - Ajustado para não sobrepor navegação fixa */}
       {stops.length > 0 && (
-        <button onClick={handleClearStops} className="fixed bottom-24 right-4 z-40 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-2xl min-h-[56px] min-w-[56px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-4 focus:ring-red-300" title="Limpar lista">
+        <button onClick={handleClearStops} className="fixed bottom-32 right-4 z-40 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-2xl min-h-[56px] min-w-[56px] flex items-center justify-center touch-manipulation focus:outline-none focus:ring-4 focus:ring-red-300" title="Limpar lista">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
