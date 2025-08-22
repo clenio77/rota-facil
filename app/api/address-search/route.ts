@@ -40,7 +40,7 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
     const url = new URL('https://photon.komoot.io/api/');
     url.searchParams.set('q', query); // Usar query original primeiro
     url.searchParams.set('limit', limit.toString());
-    url.searchParams.set('lang', 'pt');
+    // Removido 'lang=pt' pois Photon não suporta português
 
     // Se temos localização do usuário, priorizar resultados próximos
     if (userLocation?.lat && userLocation?.lng) {
