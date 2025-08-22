@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processFileSimple } from '@/lib/simpleExtractor';
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 API simple-extract chamada');
+
   try {
     console.log('🚀 Iniciando extração simples...');
     
@@ -41,10 +43,14 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('❌ Erro na extração simples:', error);
-    
+    console.error('Stack trace:', error.stack);
+
+    // Retornar erro detalhado para debug
     return NextResponse.json({
       success: false,
-      error: error.message || 'Erro interno do servidor'
+      error: error.message || 'Erro interno do servidor',
+      details: error.stack || 'Sem stack trace',
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }

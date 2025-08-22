@@ -54,6 +54,7 @@ export default function SimpleUpload({ onAddressesLoaded, userLocation }: Simple
     setProgress('Iniciando processamento...');
 
     try {
+      console.log('📁 Processando arquivo:', file.name, file.type, file.size);
       const formData = new FormData();
       formData.append('file', file);
       
@@ -62,13 +63,30 @@ export default function SimpleUpload({ onAddressesLoaded, userLocation }: Simple
       }
 
       setProgress('Extraindo texto...');
-      
-      const response = await fetch('/api/simple-extract', {
+
+      const response = await fetch('/api/ultra-simple-extract', {
         method: 'POST',
         body: formData,
       });
 
-      const data = await response.json();
+      // Debug: verificar se a resposta é válida
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro HTTP:', response.status, errorText);
+        throw new Error(`Erro do servidor (${response.status}): ${errorText.substring(0, 200)}`);
+      }
+
+      const responseText = await response.text();
+      console.log('Resposta da API:', responseText.substring(0, 500));
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Erro ao parsear JSON:', parseError);
+        console.error('Resposta recebida:', responseText);
+        throw new Error(`Resposta inválida do servidor. Recebido: ${responseText.substring(0, 100)}...`);
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Erro no processamento');
@@ -76,7 +94,7 @@ export default function SimpleUpload({ onAddressesLoaded, userLocation }: Simple
 
       setProgress('Processamento concluído!');
       setResult(data.data);
-      
+
       // Chamar callback com os endereços processados
       onAddressesLoaded(data.data.addresses);
 
@@ -181,11 +199,11 @@ export default function SimpleUpload({ onAddressesLoaded, userLocation }: Simple
 
       {/* Instructions */}
       <div className="text-xs text-gray-500 space-y-1">
-        <p><strong>💡 Dicas para melhor extração:</strong></p>
-        <p>• Use imagens com boa qualidade e texto legível</p>
-        <p>• PDFs com texto selecionável funcionam melhor</p>
-        <p>• Endereços com CEP têm maior precisão</p>
-        <p>• O sistema busca automaticamente na sua cidade ativa</p>
+        <p><strong>⚠️ Sistema em desenvolvimento:</strong></p>
+        <p>• A extração de imagens/PDF ainda está sendo ajustada</p>
+        <p>• Por enquanto, use o botão "Falar endereço" para adicionar paradas</p>
+        <p>• Ou digite endereços manualmente no campo de busca</p>
+        <p>• Em breve a extração automática estará funcionando</p>
       </div>
     </div>
   );

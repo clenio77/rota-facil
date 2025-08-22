@@ -95,11 +95,14 @@ export async function POST(request: NextRequest) {
     }
     
   } catch (error) {
-    console.error('Erro no processamento do arquivo:', error);
+    console.error('❌ Erro no processamento do arquivo:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'Sem stack');
+
     return NextResponse.json({
       success: false,
-      error: 'Erro interno do servidor',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+      error: 'Sistema Carteiro Avançado temporariamente indisponível. Use a aba "Extração Simples" que é mais estável.',
+      details: error instanceof Error ? error.message : 'Erro desconhecido',
+      suggestion: 'Tente usar a aba "📄 Extração Simples" para melhor compatibilidade.'
     }, { status: 500 });
   }
 }
