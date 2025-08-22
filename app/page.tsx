@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AddressSearch from '../components/AddressSearch';
 import StopCard from '../components/StopCard';
+import CarteiroUpload from '../components/CarteiroUpload';
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
 import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
@@ -117,8 +118,47 @@ export default function HomePage() {
   // 🔄 OFFLINE ACTIONS
   const { queueAction, cacheData, getCachedData } = useOfflineActions();
 
+  // 📋 ESTADOS PARA FUNCIONALIDADE DO CARTEIRO
+  const [carteiroAddresses, setCarteiroAddresses] = useState<any[]>([]);
+  const [showCarteiroPanel, setShowCarteiroPanel] = useState(false);
+
   // 📸 PROOF OF DELIVERY
   const { proofs, loadProofs } = useProofOfDelivery();
+
+  // 📋 FUNÇÃO PARA PROCESSAR ENDEREÇOS DO CARTEIRO
+  const handleCarteiroAddresses = (addresses: any[], mapData: any) => {
+    console.log('📋 Endereços do carteiro recebidos:', addresses.length);
+
+    // Converter endereços do carteiro para formato de paradas
+    const carteiroStops: Stop[] = addresses
+      .filter(addr => addr.geocoded && addr.coordinates)
+      .map((addr, index) => ({
+        id: Date.now() + index,
+        address: addr.endereco,
+        coordinates: {
+          lat: addr.coordinates.lat,
+          lng: addr.coordinates.lng
+        },
+        order: parseInt(addr.ordem),
+        trackingCode: addr.objeto,
+        cep: addr.cep,
+        destinatario: addr.destinatario,
+        type: 'delivery' as const,
+        status: 'pending' as const
+      }));
+
+    // Adicionar paradas à lista existente
+    setStops(prevStops => [...prevStops, ...carteiroStops]);
+    setCarteiroAddresses(addresses);
+
+    // Mostrar mapa automaticamente
+    setShowMap(true);
+
+    // Fechar painel do carteiro
+    setShowCarteiroPanel(false);
+
+    alert(`✅ ${carteiroStops.length} endereços adicionados à rota!`);
+  };
 
   // Sync settings modal with URL hash (#settings)
   React.useEffect(() => {
@@ -1294,6 +1334,13 @@ export default function HomePage() {
           <span className="mobile-nav-label">Dashboard</span>
         </button>
 
+        <button className="mobile-nav-item" onClick={() => setShowCarteiroPanel(true)}>
+          <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span className="mobile-nav-label">Carteiro</span>
+        </button>
+
         <button className="mobile-nav-item" onClick={() => fileInputRef.current?.click()}>
           <svg className="mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -1322,6 +1369,30 @@ export default function HomePage() {
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
       />
+
+      {/* 📋 CARTEIRO MODAL */}
+      {showCarteiroPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-xl shadow-custom overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-bold text-gray-900">📋 Lista de Carteiro</h3>
+              <button
+                onClick={() => setShowCarteiroPanel(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <CarteiroUpload
+                onAddressesLoaded={handleCarteiroAddresses}
+                userLocation={deviceLocation || deviceOrigin}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🔄 OFFLINE STATUS INDICATOR */}
       <OfflineStatusIndicator />
