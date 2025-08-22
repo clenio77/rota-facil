@@ -41,7 +41,7 @@ export default function Footer({ className = '' }: FooterProps) {
           {/* Developer Section - Destaque Maior */}
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 text-center">
             <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="w-16 h-16 relative">
+              <div className="w-20 h-20 relative">
                 <svg viewBox="0 0 800 800" className="w-full h-full">
                   <defs>
                     <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
