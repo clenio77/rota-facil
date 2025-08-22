@@ -7,7 +7,7 @@ import Image from 'next/image';
 import AddressSearch from '../components/AddressSearch';
 import StopCard from '../components/StopCard';
 import CarteiroUpload from '../components/CarteiroUpload';
-import SimpleUpload from '../components/SimpleUpload';
+// SimpleUpload removido - funcionalidade não implementada
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
 import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
@@ -138,17 +138,11 @@ export default function HomePage() {
       .filter(addr => addr.geocoded && addr.coordinates)
       .map((addr, index) => ({
         id: Date.now() + index,
+        photoUrl: '', // Placeholder para compatibilidade com tipo Stop
         address: addr.endereco,
-        coordinates: {
-          lat: addr.coordinates.lat,
-          lng: addr.coordinates.lng
-        },
-        order: parseInt(addr.ordem),
-        trackingCode: addr.objeto,
-        cep: addr.cep,
-        destinatario: addr.destinatario,
-        type: 'delivery' as const,
-        status: 'pending' as const
+        status: 'confirmed' as const,
+        lat: addr.coordinates.lat,
+        lng: addr.coordinates.lng
       }));
 
     // Adicionar paradas à lista existente
@@ -164,35 +158,7 @@ export default function HomePage() {
     alert(`✅ ${carteiroStops.length} endereços adicionados à rota!`);
   };
 
-  // 📄 FUNÇÃO PARA PROCESSAR ENDEREÇOS SIMPLES
-  const handleSimpleAddresses = (addresses: any[]) => {
-    console.log('📄 Endereços simples recebidos:', addresses.length);
-
-    // Converter endereços simples para formato de paradas
-    const simpleStops: Stop[] = addresses
-      .filter(addr => addr.geocoded)
-      .map((addr, index) => ({
-        id: Date.now() + index,
-        address: addr.original || 'Endereço não especificado',
-        coordinates: {
-          lat: addr.geocoded.lat,
-          lng: addr.geocoded.lng
-        },
-        type: 'delivery' as const,
-        status: 'pending' as const
-      }));
-
-    // Adicionar paradas à lista existente
-    setStops(prevStops => [...prevStops, ...simpleStops]);
-
-    // Mostrar mapa automaticamente
-    setShowMap(true);
-
-    // Fechar painel de upload
-    setIsSettingsOpen(false);
-
-    alert(`✅ ${simpleStops.length} endereços adicionados à rota!`);
-  };
+  // handleSimpleAddresses removido - funcionalidade não implementada
 
   // Sync settings modal with URL hash (#settings)
   React.useEffect(() => {
@@ -336,7 +302,7 @@ export default function HomePage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageUrl: publicUrl,
+            imageUrl: newStop.photoUrl,
             userLocation: deviceOrigin || deviceLocation || undefined
           }),
         });
@@ -345,17 +311,17 @@ export default function HomePage() {
         console.log('📍 Resultado OCR real:', result);
       }
 
-      if (result.success) {
+      if (result && result.success) {
         setStops(prev => {
           const updatedStops = prev.map(stop =>
             stop.id === newStop.id
-              ? {
-                  ...stop,
-                  status: 'confirmed',
-                  address: result.address,
-                  lat: result.lat,
-                  lng: result.lng
-                }
+                              ? {
+                    ...stop,
+                    status: 'confirmed' as const,
+                    address: result.address,
+                    lat: result.lat,
+                    lng: result.lng
+                  }
               : stop
           );
 

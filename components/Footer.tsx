@@ -96,6 +96,9 @@ export default function Footer({ className = '' }: FooterProps) {
               <span className="font-medium text-green-700">Sistema Ativo</span>
             </span>
             <span className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-medium border border-blue-200">Versão 2.0</span>
+            <a href="/carteiro" className="bg-orange-50 text-orange-700 hover:text-orange-800 cursor-pointer font-medium underline px-3 py-1.5 rounded-full border border-orange-200 transition-colors">
+              🚚 Versão Profissional para Carteiros
+            </a>
             <span className="text-blue-600 hover:text-blue-800 cursor-pointer font-medium underline bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200">
               Suporte Técnico
             </span>
