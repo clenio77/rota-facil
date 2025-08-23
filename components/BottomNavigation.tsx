@@ -8,20 +8,22 @@ export default function BottomNavigation() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>('stops');
   const [isMounted, setIsMounted] = useState(false);
+  const [currentHash, setCurrentHash] = useState<string>('');
 
   // ✅ CORREÇÃO CRÍTICA: Evitar hydration mismatch
   useEffect(() => {
     setIsMounted(true);
+    // ✅ DEFINIR HASH INICIAL apenas no cliente
+    setCurrentHash(window.location.hash);
   }, []);
 
-  // ✅ DETERMINAR TAB ATIVA baseado na rota atual
+  // ✅ DETERMINAR TAB ATIVA baseado na rota atual (SEM window.location.hash)
   useEffect(() => {
     if (!isMounted) return;
 
     if (pathname === '/') {
-      // Verificar se estamos em uma seção específica da página principal
-      const hash = window.location.hash;
-      if (hash === '#route-section') {
+      // ✅ USAR ESTADO LOCAL em vez de window.location.hash
+      if (currentHash === '#route-section') {
         setActiveTab('routes');
       } else {
         setActiveTab('stops');
@@ -33,14 +35,15 @@ export default function BottomNavigation() {
     } else if (pathname === '/gpx-optimizer') {
       setActiveTab('routes');
     }
-  }, [pathname, isMounted]);
+  }, [pathname, isMounted, currentHash]);
 
-  // ✅ LISTENER para mudanças de hash na página principal
+  // ✅ LISTENER para mudanças de hash na página principal (APENAS NO CLIENTE)
   useEffect(() => {
     if (!isMounted || pathname !== '/') return;
 
     const handleHashChange = () => {
       const hash = window.location.hash;
+      setCurrentHash(hash); // ✅ ATUALIZAR ESTADO LOCAL
       if (hash === '#route-section') {
         setActiveTab('routes');
       } else if (hash === '#stops-section') {
@@ -59,6 +62,7 @@ export default function BottomNavigation() {
         const stopsSection = document.getElementById('stops-section');
         if (stopsSection) {
           stopsSection.scrollIntoView({ behavior: 'smooth' });
+          setCurrentHash('#stops-section'); // ✅ ATUALIZAR ESTADO LOCAL
         }
       } else {
         // Se estiver em outra página, navegar para principal
@@ -70,6 +74,7 @@ export default function BottomNavigation() {
         const routeSection = document.getElementById('route-section');
         if (routeSection) {
           routeSection.scrollIntoView({ behavior: 'smooth' });
+          setCurrentHash('#route-section'); // ✅ ATUALIZAR ESTADO LOCAL
         }
       } else {
         // Se estiver em outra página, navegar para otimizador
