@@ -74,8 +74,15 @@ export default function CarteiroPage() {
         console.log('✅ Array?', Array.isArray(data.items));
         console.log('✅ Length:', data.items?.length);
         
+        // ✅ VALIDAÇÃO CRÍTICA: Verificar se data.items é um array válido
+        if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+          console.error('❌ data.items não é um array válido:', data.items);
+          setError('Formato de dados inválido recebido da API. Tente novamente.');
+          return;
+        }
+        
         setProcessedData(data);
-        setEditableItems([...data.items]); // Cópia editável
+        setEditableItems([...data.items]); // ✅ AGORA SEGURO
         setShowAddressEditor(true); // Mostrar editor automaticamente
         
         console.log('✅ Estado atualizado - processedData:', data);
