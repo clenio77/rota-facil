@@ -419,6 +419,38 @@ export default function CarteiroPage() {
                 <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
               </div>
               
+              {/* ✅ NOVA SEÇÃO: Informações Detalhadas da Rota */}
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-purple-800 mb-2">🚗 Detalhes da Rota</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-purple-700">📍 Paradas:</span>
+                    <span className="font-semibold text-purple-800">
+                      {processedData.totalItems || 0} endereços
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-purple-700">⏱️ Tempo estimado:</span>
+                    <span className="font-semibold text-purple-800">
+                      {processedData.totalItems ? (processedData.totalItems * 3) : 0} min
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-purple-700">📏 Distância estimada:</span>
+                    <span className="font-semibold text-purple-800">
+                      {processedData.totalItems ? (processedData.totalItems * 0.5).toFixed(1) : '0.0'} km
+                    </span>
+                  </div>
+                  {userLocation && (
+                    <div className="mt-3 p-2 bg-green-100 rounded border border-green-200">
+                      <p className="text-xs text-green-700 text-center">
+                        🏠 Rota circular: Inicia e termina na sua localização
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               {processedData.googleMapsUrl && (
                 <div className="bg-green-50 p-4 rounded-lg">
                   <h3 className="font-semibold text-green-800 mb-2">🗺️ Rota Gerada</h3>
@@ -430,6 +462,16 @@ export default function CarteiroPage() {
                   >
                     🚀 Abrir no Google Maps
                   </a>
+                  {/* ✅ NOVA INFORMAÇÃO: Explicação da rota */}
+                  <div className="mt-3 text-sm text-green-700">
+                    <p>📍 <strong>Origem:</strong> {processedData.items?.[0]?.address || 'Primeiro endereço'}</p>
+                    <p>🏁 <strong>Destino:</strong> {processedData.items?.[processedData.items.length - 1]?.address || 'Último endereço'}</p>
+                    {userLocation && (
+                      <p className="text-xs mt-2 bg-green-200 p-2 rounded">
+                        💡 <strong>Dica:</strong> Sua localização será usada como ponto de partida e chegada
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
