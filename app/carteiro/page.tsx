@@ -3,9 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ✅ CORREÇÃO CRÍTICA: Desabilitar SSR para evitar hydration errors
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+
 
 interface ECTItem {
   sequence: number;
