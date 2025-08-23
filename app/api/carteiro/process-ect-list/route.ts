@@ -166,6 +166,16 @@ function cleanAddressText(text: string): string {
   // ✅ REMOVER: "Continua na próxima página" e números
   cleanText = cleanText.replace(/Continua\s+na\s+próxima\s+página\s*\d*/gi, '');
   
+  // ✅ CORREÇÃO CRÍTICA: Remover vírgulas extras após nome da rua
+  // Converter "Rua Nome , Número" em "Rua Nome, Número"
+  cleanText = cleanText.replace(/^(Rua|Avenida|Travessa|Praça)\s+([^,]+)\s*,\s*(\d+)/gi, '$1 $2, $3');
+  
+  // ✅ CORREÇÃO CRÍTICA: Remover múltiplas vírgulas consecutivas
+  cleanText = cleanText.replace(/,\s*,+/g, ',');
+  
+  // ✅ CORREÇÃO CRÍTICA: Remover vírgula antes de número
+  cleanText = cleanText.replace(/,\s*(\d+)/g, ', $1');
+  
   // ✅ REMOVER: Caracteres especiais e lixo
   cleanText = cleanText.replace(/[^\w\s\-,\.]/g, ' ');
   
