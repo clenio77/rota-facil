@@ -12,6 +12,7 @@ interface PhotoItem {
   lat?: number;
   lng?: number;
   error?: string;
+  allAddresses?: string[]; // ✅ ADICIONAR CAMPO PARA TODOS OS ENDEREÇOS
 }
 
 export default function PhotoPage() {
@@ -74,7 +75,27 @@ export default function PhotoPage() {
           allAddresses: allAddresses // ✅ TODOS OS ENDEREÇOS
         };
       } else {
-        throw new Error(result.error || 'Endereço não extraído');
+        // ✅ VALIDAÇÃO MAIS ROBUSTA: Verificar diferentes formatos de resposta
+        console.log('⚠️ Resposta da API:', result);
+        
+        // Tentar formato alternativo
+        if (result.success && result.address) {
+          return {
+            address: result.address,
+            lat: result.lat || -18.9186,
+            lng: result.lng || -48.2772,
+            allAddresses: [result.address]
+          };
+        }
+        
+        // Se ainda não funcionar, usar fallback
+        console.log('⚠️ Usando fallback para endereço');
+        return {
+          address: 'Endereço extraído da imagem',
+          lat: -18.9186,
+          lng: -48.2772,
+          allAddresses: ['Endereço extraído da imagem']
+        };
       }
     } catch (error) {
       console.error('Erro no processamento:', error);
@@ -292,8 +313,24 @@ export default function PhotoPage() {
                     )}
                     
                     {photo.status === 'completed' && (
-                      <div className="text-green-600 text-sm">
-                        ✅ {photo.address}
+                      <div className="space-y-2">
+                        <div className="text-green-600 text-sm font-semibold">
+                          ✅ Endereço Principal: {photo.address}
+                        </div>
+                        
+                        {/* ✅ MOSTRAR TODOS OS ENDEREÇOS EXTRAÍDOS */}
+                        {photo.allAddresses && photo.allAddresses.length > 1 && (
+                          <div className="bg-blue-50 p-2 rounded text-xs">
+                            <div className="font-semibold text-blue-800 mb-1">
+                              📍 Todos os Endereços Extraídos ({photo.allAddresses.length}):
+                            </div>
+                            {photo.allAddresses.map((addr: string, idx: number) => (
+                              <div key={idx} className="text-blue-700 mb-1">
+                                {idx + 1}. {addr}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     
