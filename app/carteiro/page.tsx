@@ -63,6 +63,9 @@ export default function CarteiroPage() {
         console.log('✅ Total items:', data.totalItems);
         console.log('✅ Cidade:', data.city);
         console.log('✅ Estado:', data.state);
+        console.log('✅ Tipo de data.items:', typeof data.items);
+        console.log('✅ Array?', Array.isArray(data.items));
+        console.log('✅ Length:', data.items?.length);
         
         setProcessedData(data);
         setEditableItems([...data.items]); // Cópia editável
@@ -71,6 +74,12 @@ export default function CarteiroPage() {
         console.log('✅ Estado atualizado - processedData:', data);
         console.log('✅ Estado atualizado - editableItems:', [...data.items]);
         console.log('✅ Estado atualizado - showAddressEditor:', true);
+        
+        // ✅ VERIFICAÇÃO ADICIONAL: Aguardar atualização do estado
+        setTimeout(() => {
+          console.log('🔍 VERIFICAÇÃO POSTERIOR - processedData:', processedData);
+          console.log('🔍 VERIFICAÇÃO POSTERIOR - showAddressEditor:', showAddressEditor);
+        }, 100);
       } else {
         console.log('❌ Erro na resposta:', data.error);
         setError(data.error || 'Erro ao processar lista ECT');

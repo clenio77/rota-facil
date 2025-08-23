@@ -46,13 +46,13 @@ export default function PhotoPage() {
   };
 
   const processPhoto = async (photo: PhotoItem): Promise<{ address: string; lat: number; lng: number; allAddresses?: string[] }> => {
-    // ✅ CORREÇÃO CRÍTICA: Usar API REAL em vez de simulada
+    // ✅ CORREÇÃO: Usar API correta para fotos simples
     const formData = new FormData();
     formData.append('photo', photo.file);
     
     try {
-      // ✅ USAR API REAL: process-ect-list (mesma do carteiro)
-      const response = await fetch('/api/carteiro/process-ect-list', {
+      // ✅ USAR API CORRETA: process-photo-fallback para fotos simples
+      const response = await fetch('/api/carteiro/process-photo-fallback', {
         method: 'POST',
         body: formData,
       });
@@ -63,28 +63,28 @@ export default function PhotoPage() {
       
       const result = await response.json();
       
-      if (result.success && result.items && result.items.length > 0) {
-        // ✅ EXTRAIR TODOS OS ENDEREÇOS VÁLIDOS
-        const allAddresses = result.items.map((item: { address: string }) => item.address).filter(Boolean);
-        const firstItem = result.items[0];
-        
+      if (result.success && result.address) {
+        // ✅ FORMATO SIMPLES: result.address direto
         return {
-          address: firstItem.address,
-          lat: firstItem.lat || -18.9186,
-          lng: firstItem.lng || -48.2772,
-          allAddresses: allAddresses // ✅ TODOS OS ENDEREÇOS
+          address: result.address,
+          lat: result.lat || -18.9186,
+          lng: result.lng || -48.2772,
+          allAddresses: [result.address] // ✅ ÚNICO ENDEREÇO
         };
       } else {
         // ✅ VALIDAÇÃO MAIS ROBUSTA: Verificar diferentes formatos de resposta
         console.log('⚠️ Resposta da API:', result);
         
         // Tentar formato alternativo
-        if (result.success && result.address) {
+        if (result.success && result.items && result.items.length > 0) {
+          const firstItem = result.items[0];
+          const allAddresses = result.items.map((item: { address: string }) => item.address).filter(Boolean);
+          
           return {
-            address: result.address,
-            lat: result.lat || -18.9186,
-            lng: result.lng || -48.2772,
-            allAddresses: [result.address]
+            address: firstItem.address,
+            lat: firstItem.lat || -18.9186,
+            lng: firstItem.lng || -48.2772,
+            allAddresses: allAddresses
           };
         }
         
