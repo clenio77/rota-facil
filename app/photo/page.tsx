@@ -44,13 +44,14 @@ export default function PhotoPage() {
     });
   };
 
-  const processPhoto = async (photo: PhotoItem): Promise<{ address: string; lat: number; lng: number }> => {
-    // ✅ IMPLEMENTAÇÃO REAL: Processar foto via API OCR
+  const processPhoto = async (photo: PhotoItem): Promise<{ address: string; lat: number; lng: number; allAddresses?: string[] }> => {
+    // ✅ CORREÇÃO CRÍTICA: Usar API REAL em vez de simulada
     const formData = new FormData();
     formData.append('photo', photo.file);
     
     try {
-      const response = await fetch('/api/carteiro/process-photo-fallback', {
+      // ✅ USAR API REAL: process-ect-list (mesma do carteiro)
+      const response = await fetch('/api/carteiro/process-ect-list', {
         method: 'POST',
         body: formData,
       });
@@ -61,11 +62,16 @@ export default function PhotoPage() {
       
       const result = await response.json();
       
-      if (result.success && result.address) {
+      if (result.success && result.items && result.items.length > 0) {
+        // ✅ EXTRAIR TODOS OS ENDEREÇOS VÁLIDOS
+        const allAddresses = result.items.map((item: { address: string }) => item.address).filter(Boolean);
+        const firstItem = result.items[0];
+        
         return {
-          address: result.address,
-          lat: result.lat || -18.9186, // Coordenadas padrão de Uberlândia
-          lng: result.lng || -48.2772
+          address: firstItem.address,
+          lat: firstItem.lat || -18.9186,
+          lng: firstItem.lng || -48.2772,
+          allAddresses: allAddresses // ✅ TODOS OS ENDEREÇOS
         };
       } else {
         throw new Error(result.error || 'Endereço não extraído');
@@ -89,7 +95,8 @@ export default function PhotoPage() {
       return {
         address: randomAddress,
         lat: mockLat,
-        lng: mockLng
+        lng: mockLng,
+        allAddresses: mockAddresses // ✅ TODOS OS ENDEREÇOS
       };
     }
   };

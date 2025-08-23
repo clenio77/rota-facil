@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface ECTItem {
@@ -31,6 +31,13 @@ export default function CarteiroPage() {
   const [editableItems, setEditableItems] = useState<ECTItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ DEBUG: Monitorar mudanças nos estados
+  useEffect(() => {
+    console.log('🔍 ESTADO ATUALIZADO - processedData:', processedData);
+    console.log('🔍 ESTADO ATUALIZADO - showAddressEditor:', showAddressEditor);
+    console.log('🔍 ESTADO ATUALIZADO - editableItems:', editableItems);
+  }, [processedData, showAddressEditor, editableItems]);
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -51,10 +58,21 @@ export default function CarteiroPage() {
       const data: ProcessedECTList = await response.json();
 
       if (data.success) {
+        console.log('✅ Dados recebidos com sucesso:', data);
+        console.log('✅ Items:', data.items);
+        console.log('✅ Total items:', data.totalItems);
+        console.log('✅ Cidade:', data.city);
+        console.log('✅ Estado:', data.state);
+        
         setProcessedData(data);
         setEditableItems([...data.items]); // Cópia editável
         setShowAddressEditor(true); // Mostrar editor automaticamente
+        
+        console.log('✅ Estado atualizado - processedData:', data);
+        console.log('✅ Estado atualizado - editableItems:', [...data.items]);
+        console.log('✅ Estado atualizado - showAddressEditor:', true);
       } else {
+        console.log('❌ Erro na resposta:', data.error);
         setError(data.error || 'Erro ao processar lista ECT');
       }
     } catch (err) {
