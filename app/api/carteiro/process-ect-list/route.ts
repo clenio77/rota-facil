@@ -844,7 +844,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
       },
-      signal: AbortSignal.timeout(15000) // ✅ TIMEOUT: 15 segundos para evitar travamento
+      signal: AbortSignal.timeout(30000) // ✅ TIMEOUT: 30 segundos para evitar falhas
     });
 
     const ocrData = await ocrResponse.json();
@@ -862,7 +862,7 @@ export async function POST(request: NextRequest) {
       // ✅ FALLBACK ROBUSTO: Tentar múltiplas APIs alternativas
       console.log('⚠️ OCR.space falhou, tentando APIs alternativas...');
       
-      // ✅ FALLBACK 1: API alternativa OCR.space (diferente endpoint)
+      // ✅ FALLBACK 1: API alternativa OCR.space (diferente endpoint) - TIMEOUT MENOR
       if (!extractedText) {
         try {
           console.log('🔄 Tentando API alternativa OCR.space...');
@@ -871,7 +871,7 @@ export async function POST(request: NextRequest) {
             headers: {
               'Content-Type': 'application/json',
             },
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(15000) // ✅ TIMEOUT MENOR: 15 segundos para fallback
           });
           
           const contentType = altResponse.headers.get('content-type');
@@ -891,7 +891,7 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // ✅ FALLBACK 2: Google Cloud Vision (se API key disponível)
+      // ✅ FALLBACK 2: Google Cloud Vision (se API key disponível) - TIMEOUT MENOR
       if (!extractedText && process.env.GOOGLE_CLOUD_VISION_API_KEY) {
         try {
           console.log('🔄 Tentando Google Cloud Vision...');
@@ -906,7 +906,7 @@ export async function POST(request: NextRequest) {
                   features: [{ type: 'TEXT_DETECTION', maxResults: 1 }]
                 }]
               }),
-              signal: AbortSignal.timeout(30000)
+              signal: AbortSignal.timeout(15000) // ✅ TIMEOUT MENOR: 15 segundos para fallback
             }
           );
           
@@ -922,7 +922,7 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // ✅ FALLBACK 3: OCR simulado para demonstração (último recurso)
+      // ✅ FALLBACK 3: OCR simulado para demonstração (último recurso) - SEM TIMEOUT
       if (!extractedText) {
         console.log('⚠️ Todas as APIs de OCR falharam, usando OCR simulado para demonstração...');
         
@@ -948,13 +948,14 @@ BAIRRO CENTRO
 UBERLANDIA - MG
 CEP: 38400-123`;
         }
-
-        console.log('✅ OCR simulado gerou texto de exemplo');
+        
         extractedText = simulatedText;
+        console.log('✅ OCR simulado usado para demonstração');
       }
     } else {
+      // ✅ OCR.space funcionou
       extractedText = ocrData.ParsedResults[0].ParsedText;
-      console.log('✅ OCR.space funcionou com sucesso!');
+      console.log('✅ OCR.space funcionou perfeitamente');
     }
     console.log('Texto extraído via OCR:', extractedText.substring(0, 200) + '...');
     console.log('Texto completo para debug:', extractedText);
@@ -1072,7 +1073,7 @@ CEP: 38400-123`;
       stops,
       totalDistance: routeMetrics.totalDistance,
       totalTime: routeMetrics.totalTime,
-      googleMapsUrl: generateGoogleMapsUrl(optimizedItems, userLocation)
+      googleMapsUrl: generateGoogleMapsUrl(stops, userLocation) // ✅ USAR STOPS COMPLETOS (incluindo início/fim)
     };
 
     // ⚡ FUNÇÃO DE OTIMIZAÇÃO DE ROTA (Algoritmo Nearest Neighbor)
@@ -1157,12 +1158,14 @@ CEP: 38400-123`;
     }
 
     // Função para gerar URL do Google Maps com múltiplas paradas
-    function generateGoogleMapsUrl(items: Array<{lat?: number; lng?: number; geocodedAddress?: string; address: string}>, userLocation?: {lat: number; lng: number; city?: string; state?: string}) {
+    function generateGoogleMapsUrl(items: Array<{lat?: number; lng?: number; geocodedAddress?: string; address: string; isStartPoint?: boolean; isEndPoint?: boolean}>, userLocation?: {lat: number; lng: number; city?: string; state?: string}) {
       console.log('🗺️ Gerando URL do Google Maps...');
       console.log('📍 Itens para rota:', items.map(item => ({
         address: item.address,
         lat: item.lat,
-        lng: item.lng
+        lng: item.lng,
+        isStartPoint: item.isStartPoint,
+        isEndPoint: item.isEndPoint
       })));
       console.log('📱 Localização do usuário:', userLocation);
 
@@ -1205,17 +1208,20 @@ CEP: 38400-123`;
         const origin = `${userLocation.lat},${userLocation.lng}`;
         const destination = `${userLocation.lat},${userLocation.lng}`;
         
-        // ✅ WAYPOINTS: Todos os endereços como paradas intermediárias
-        const waypoints = items.map(item => item.address).join('|');
+        // ✅ WAYPOINTS: Apenas endereços de entrega (excluir início/fim)
+        const deliveryWaypoints = items
+          .filter(item => !item.isStartPoint && !item.isEndPoint)
+          .map(item => item.address)
+          .join('|');
 
         console.log('🚀 Rota circular (origem/destino):', origin);
-        console.log('📍 Waypoints (todas as paradas):', waypoints);
+        console.log('📍 Waypoints (entregas):', deliveryWaypoints);
 
         const params = new URLSearchParams({
           api: '1',
           origin,
           destination,
-          waypoints,
+          waypoints: deliveryWaypoints,
           travelmode: 'driving'
         });
 

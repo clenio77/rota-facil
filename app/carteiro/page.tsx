@@ -130,6 +130,14 @@ export default function CarteiroPage() {
 
     const formData = new FormData();
     formData.append('photo', file);
+    
+    // ✅ ADICIONAR LOCALIZAÇÃO DO USUÁRIO PARA ROTA CIRCULAR
+    if (userLocation) {
+      formData.append('userLocation', JSON.stringify(userLocation));
+      console.log('📍 Enviando localização do usuário para API:', userLocation);
+    } else {
+      console.log('⚠️ Localização do usuário não disponível - rota será entre endereços apenas');
+    }
 
     try {
       // ✅ TIMEOUT MAIOR: API pode demorar até 3 minutos
