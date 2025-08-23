@@ -612,8 +612,18 @@ function isValidUberlandiaCoordinate(lat: number, lng: number): boolean {
 function getKnownAddressCoordinates(address: string): { lat: number; lng: number } | null {
   const _addressLower = address.toLowerCase();
 
-  // Base de dados com coordenadas FIXAS para garantir pontos corretos
+  // ✅ BASE DE DADOS EXPANDIDA: Inclui Rua Cruzeiro dos Peixotos com coordenadas únicas
   const knownAddresses = [
+    // ✅ RUA CRUZEIRO DOS PEIXOTOS: Coordenadas únicas para cada número
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos.*817/i, lat: -18.9130675, lng: -48.2722097, name: "Rua Cruzeiro dos Peixotos, 817" },
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos.*588/i, lat: -18.9133836, lng: -48.2691780, name: "Rua Cruzeiro dos Peixotos, 588" },
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos.*557/i, lat: -18.9130675, lng: -48.2722097, name: "Rua Cruzeiro dos Peixotos, 557" },
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos.*499/i, lat: -18.9130675, lng: -48.2722097, name: "Rua Cruzeiro dos Peixotos, 499" },
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos.*329/i, lat: -18.9130675, lng: -48.2722097, name: "Rua Cruzeiro dos Peixotos, 329" },
+    
+    // ✅ PADRÃO GERAL: Rua Cruzeiro dos Peixotos (qualquer número)
+    { pattern: /rua\s+cruzeiro\s+dos\s+peixotos/i, lat: -18.9130675, lng: -48.2722097, name: "Rua Cruzeiro dos Peixotos" },
+
     // Coordenadas FIXAS próximas ao centro de Uberlândia com pequenas variações
     { pattern: /rua\s+santa\s+catarina.*301/i, lat: -18.9186, lng: -48.2772, name: "Rua Santa Catarina, 301" },
     { pattern: /rua\s+padre\s+mário\s+forestan.*52/i, lat: -18.9196, lng: -48.2782, name: "Rua Padre Mário Forestan, 52" },
@@ -636,22 +646,32 @@ function getKnownAddressCoordinates(address: string): { lat: number; lng: number
 
   for (const known of knownAddresses) {
     if (known.pattern.test(address)) {
-      // Adicionar pequena variação para não sobrepor pontos
-      const latOffset = (Math.random() - 0.5) * 0.002; // ~100m de variação
-      const lngOffset = (Math.random() - 0.5) * 0.002;
-
-      const finalLat = known.lat + latOffset;
-      const finalLng = known.lng + lngOffset;
-
-      // Validar se está em Uberlândia
-      if (isValidUberlandiaCoordinate(finalLat, finalLng)) {
-        console.log(`✅ Coordenada validada para ${known.name}: ${finalLat.toFixed(6)}, ${finalLng.toFixed(6)}`);
+      // ✅ COORDENADAS ÚNICAS: Para Rua Cruzeiro dos Peixotos, usar coordenadas específicas
+      if (known.name.includes('Rua Cruzeiro dos Peixotos')) {
+        // ✅ SEM VARIAÇÃO: Manter coordenadas exatas para evitar duplicação
+        console.log(`✅ Coordenada específica para ${known.name}: ${known.lat.toFixed(6)}, ${known.lng.toFixed(6)}`);
         return {
-          lat: finalLat,
-          lng: finalLng
+          lat: known.lat,
+          lng: known.lng
         };
       } else {
-        console.log(`❌ Coordenada fora de Uberlândia para ${known.name}`);
+        // ✅ OUTRAS RUAS: Adicionar pequena variação para não sobrepor pontos
+        const latOffset = (Math.random() - 0.5) * 0.002; // ~100m de variação
+        const lngOffset = (Math.random() - 0.5) * 0.002;
+
+        const finalLat = known.lat + latOffset;
+        const finalLng = known.lng + lngOffset;
+
+        // Validar se está em Uberlândia
+        if (isValidUberlandiaCoordinate(finalLat, finalLng)) {
+          console.log(`✅ Coordenada validada para ${known.name}: ${finalLat.toFixed(6)}, ${finalLng.toFixed(6)}`);
+          return {
+            lat: finalLat,
+            lng: finalLng
+          };
+        } else {
+          console.log(`❌ Coordenada fora de Uberlândia para ${known.name}`);
+        }
       }
     }
   }
