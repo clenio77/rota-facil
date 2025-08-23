@@ -53,43 +53,48 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Rota Fácil Moura" />
         <meta name="theme-color" content="#4CAF50" />
+        {/* ✅ CORREÇÃO CRÍTICA: Prevenir injeção de extensões */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
       <body className={`${inter.className} bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300 text-gray-900`} suppressHydrationWarning>
-        <div className="min-h-screen flex flex-col">
-          {/* Header Fixo - Sempre Visível */}
-          <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">
-            <div className="container mx-auto px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-16 h-16 relative">
-                    <img
-                      src="/logo-carro-azul-removebg-preview.png"
-                      alt="Rota Fácil Logo"
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-contain"
-                    />
+        {/* ✅ CORREÇÃO CRÍTICA: Wrapper para evitar conflitos de extensões */}
+        <div id="app-root" suppressHydrationWarning>
+          <div className="min-h-screen flex flex-col">
+            {/* Header Fixo - Sempre Visível */}
+            <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">
+              <div className="container mx-auto px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-16 h-16 relative">
+                      <img
+                        src="/logo-carro-azul-removebg-preview.png"
+                        alt="Rota Fácil Logo"
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold leading-tight">ROTA FÁCIL</h1>
+                      <p className="text-xs opacity-90 leading-tight">MOURA PRO</p>
+                    </div>
                   </div>
-                  <div>
-                    <h1 className="text-xl font-bold leading-tight">ROTA FÁCIL</h1>
-                    <p className="text-xs opacity-90 leading-tight">MOURA PRO</p>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs opacity-90 hidden sm:inline">Sistema Inteligente</span>
+                    <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs opacity-90 hidden sm:inline">Sistema Inteligente</span>
-                  <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
                 </div>
               </div>
-            </div>
-          </header>
+            </header>
 
-          {/* Main Content com Padding para Header e Navegação Fixos */}
-          <main className="flex-1 container mx-auto px-4 py-6 pt-20 pb-24">
-            {children}
-          </main>
+            {/* Main Content com Padding para Header e Navegação Fixos */}
+            <main className="flex-1 container mx-auto px-4 py-6 pt-20 pb-24">
+              {children}
+            </main>
 
-          {/* Bottom Navigation Inteligente - Detecta rota atual e marca aba correspondente */}
-          <BottomNavigation />
+            {/* Bottom Navigation Inteligente - Detecta rota atual e marca aba correspondente */}
+            <BottomNavigation />
+          </div>
         </div>
       </body>
     </html>
