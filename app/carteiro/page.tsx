@@ -60,14 +60,35 @@ export default function CarteiroPage() {
   // ✅ NOVA FUNCIONALIDADE: Localização do dispositivo
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  // ✅ CORREÇÃO CRÍTICA: Estado de montagem do cliente
+  const [isClientMounted, setIsClientMounted] = useState(false);
+
+  // ✅ CORREÇÃO CRÍTICA: Garantir que só renderiza no cliente
+  useEffect(() => {
+    setIsClientMounted(true);
+  }, []);
 
   // ✅ DEBUG: Monitorar mudanças nos estados
   useEffect(() => {
+    if (!isClientMounted) return;
+    
     console.log('🔍 ESTADO ATUALIZADO - processedData:', processedData);
     console.log('🔍 ESTADO ATUALIZADO - showAddressEditor:', showAddressEditor);
     console.log('🔍 ESTADO ATUALIZADO - editableItems:', editableItems);
     console.log('🔍 ESTADO ATUALIZADO - userLocation:', userLocation);
-  }, [processedData, showAddressEditor, editableItems, userLocation]);
+  }, [processedData, showAddressEditor, editableItems, userLocation, isClientMounted]);
+
+  // ✅ CORREÇÃO CRÍTICA: Não renderizar nada até o cliente estar montado
+  if (!isClientMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ✅ NOVA FUNCIONALIDADE: Obter localização do dispositivo
   const getUserLocation = () => {
