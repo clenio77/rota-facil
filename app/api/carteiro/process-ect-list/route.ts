@@ -149,6 +149,14 @@ function cleanAddressText(text: string): string {
   cleanText = cleanText.replace(/(\d+)\/(\d+)/gi, '$1'); // Remove barras
   cleanText = cleanText.replace(/(\d+)\s+(\d+)/gi, '$1'); // Remove espaços entre números
   
+  // ✅ CORREÇÃO CRÍTICA: Remover hífens desnecessários após nome da rua
+  cleanText = cleanText.replace(/^(Rua|Avenida|Travessa|Praça)\s+([^-]+)\s*-\s*(\d+)/gi, '$1 $2, $3');
+  
+  // ✅ CORREÇÃO CRÍTICA: Remover texto "Doc.Identidade" e similares
+  cleanText = cleanText.replace(/Doc\.Identidade[^,]*/gi, '');
+  cleanText = cleanText.replace(/Nome\s+legível[^,]*/gi, '');
+  cleanText = cleanText.replace(/motivo\s+de\s+não\s+entrega[^,]*/gi, '');
+  
   // ✅ REMOVER: CEP e informações extras
   cleanText = cleanText.replace(/CEP:\s*\d{5}-?\d{3}/gi, '');
   
@@ -163,6 +171,10 @@ function cleanAddressText(text: string): string {
   
   // ✅ LIMPAR: Múltiplos espaços
   cleanText = cleanText.replace(/\s+/g, ' ').trim();
+  
+  // ✅ CORREÇÃO FINAL: Garantir formato correto "Rua, Número, Cidade, Estado"
+  // Converter "Rua Nome - 836, 557" em "Rua Nome, 557"
+  cleanText = cleanText.replace(/^(Rua|Avenida|Travessa|Praça)\s+([^,]+),\s*(\d+),\s*(\d+)/gi, '$1 $2, $4');
   
   // ✅ VALIDAR: Endereço deve ter pelo menos 10 caracteres e começar com tipo de via
   if (cleanText.length < 10 || !cleanText.match(/^(Rua|Avenida|Travessa|Praça)/i)) {
