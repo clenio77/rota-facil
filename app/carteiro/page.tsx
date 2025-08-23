@@ -326,11 +326,7 @@ export default function CarteiroPage() {
                       )}
                     </div>
                     <p className="text-gray-600">{item.address || 'Endereço não disponível'}</p>
-                    {item.lat && item.lng && (
-                      <p className="text-xs text-gray-500">
-                        Coordenadas: {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
-                      </p>
-                    )}
+                    {/* ✅ COORDENADAS REMOVIDAS: Não são mais necessárias para Google Maps */}
                   </div>
                 ))
               ) : (
