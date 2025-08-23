@@ -6,13 +6,116 @@ interface OCRResult {
   provider: string;
 }
 
+// ✅ FUNÇÃO PARA EXTRAIR ENDEREÇOS DO TEXTO OCR
+function extractAddressesFromText(text: string): string[] {
+  if (!text) return [];
+  
+  const addresses: string[] = [];
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  
+  for (const line of lines) {
+    // ✅ PADRÃO 1: Endereço com rua, número, cidade, estado
+    const addressPattern1 = /(Rua|Avenida|Av|Travessa|Praça)\s+([^,]+),\s*(\d+)[^,]*,\s*([^,]+),\s*([A-Z]{2})/i;
+    const match1 = line.match(addressPattern1);
+    if (match1) {
+      const address = `${match1[1]} ${match1[2]}, ${match1[3]}, ${match1[4]}, ${match1[5]}`;
+      if (!addresses.includes(address)) {
+        addresses.push(address);
+      }
+      continue;
+    }
+    
+    // ✅ PADRÃO 2: Endereço com rua, número, CEP
+    const addressPattern2 = /(Rua|Avenida|Av|Travessa|Praça)\s+([^,]+),\s*(\d+)[^,]*\s*CEP:\s*(\d{5}-?\d{3})/i;
+    const match2 = line.match(addressPattern2);
+    if (match2) {
+      const address = `${match2[1]} ${match2[2]}, ${match2[3]}, Uberlândia, MG`;
+      if (!addresses.includes(address)) {
+        addresses.push(address);
+      }
+      continue;
+    }
+    
+    // ✅ PADRÃO 3: Endereço simples com rua e número
+    const addressPattern3 = /(Rua|Avenida|Av|Travessa|Praça)\s+([^,]+),\s*(\d+)/i;
+    const match3 = line.match(addressPattern3);
+    if (match3) {
+      const address = `${match3[1]} ${match3[2]}, ${match3[3]}, Uberlândia, MG`;
+      if (!addresses.includes(address)) {
+        addresses.push(address);
+      }
+      continue;
+    }
+    
+    // ✅ PADRÃO 4: Linha que contém "Endereço:" seguida de endereço
+    if (line.includes('Endereço:') && line.length > 10) {
+      const addressPart = line.replace('Endereço:', '').trim();
+      if (addressPart.length > 10) {
+        // Tentar extrair endereço da parte após "Endereço:"
+        const cleanAddress = cleanAddressText(addressPart);
+        if (cleanAddress && !addresses.includes(cleanAddress)) {
+          addresses.push(cleanAddress);
+        }
+      }
+    }
+  }
+  
+  return addresses;
+}
+
+// ✅ FUNÇÃO PARA LIMPAR TEXTO DE ENDEREÇO
+function cleanAddressText(text: string): string {
+  if (!text) return '';
+  
+  let cleanText = text;
+  
+  // ✅ CORREÇÃO CRÍTICA: Interpretar faixas de numeração
+  cleanText = cleanText.replace(/até\s+(\d+)\/(\d+)/gi, '$1');
+  cleanText = cleanText.replace(/at\s+(\d+)\s+(\d+)/gi, '$1');
+  cleanText = cleanText.replace(/(\d+)\/(\d+)/gi, '$1');
+  cleanText = cleanText.replace(/(\d+)\s+(\d+)/gi, '$1');
+  
+  // ✅ CORREÇÃO CRÍTICA: Remover hífens desnecessários
+  cleanText = cleanText.replace(/^(Rua|Avenida|Travessa|Praça)\s+([^-]+)\s*-\s*(\d+)/gi, '$1 $2, $3');
+  
+  // ✅ CORREÇÃO CRÍTICA: Remover texto "Doc.Identidade" e similares
+  cleanText = cleanText.replace(/Doc\.Identidade[^,]*/gi, '');
+  cleanText = cleanText.replace(/Nome\s+legível[^,]*/gi, '');
+  cleanText = cleanText.replace(/motivo\s+de\s+não\s+entrega[^,]*/gi, '');
+  
+  // ✅ REMOVER: CEP e informações extras
+  cleanText = cleanText.replace(/CEP:\s*\d{5}-?\d{3}/gi, '');
+  
+  // ✅ REMOVER: Caracteres especiais e lixo
+  cleanText = cleanText.replace(/[^\w\s\-,\.]/g, ' ');
+  
+  // ✅ LIMPAR: Múltiplos espaços
+  cleanText = cleanText.replace(/\s+/g, ' ').trim();
+  
+  // ✅ VALIDAR: Endereço deve ter pelo menos 10 caracteres
+  if (cleanText.length < 10) {
+    return '';
+  }
+  
+  // ✅ CORREÇÃO FINAL: Garantir que o endereço termine com cidade e estado
+  if (!cleanText.includes('Uberlândia') && !cleanText.includes('MG')) {
+    cleanText += ', Uberlândia, MG';
+  }
+  
+  return cleanText;
+}
+
 // API Externa de OCR (sem Tesseract.js)
 async function tryOCRSpace(imageUrl: string): Promise<OCRResult | null> {
   try {
+    // ✅ CORREÇÃO CRÍTICA: Usar mesma lógica da aba Carteiro
     const formData = new FormData();
     formData.append('url', imageUrl);
     formData.append('language', 'por');
     formData.append('isOverlayRequired', 'false');
+    formData.append('OCREngine', '2'); // ✅ MESMO ENGINE
+    formData.append('filetype', 'png'); // ✅ MESMO FILETYPE
+    formData.append('isTable', 'true'); // ✅ MESMO IS_TABLE
     
     const response = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
@@ -23,15 +126,35 @@ async function tryOCRSpace(imageUrl: string): Promise<OCRResult | null> {
     });
     
     const data = await response.json();
-    if (data.IsErroredOnProcessing) return null;
+    
+    // ✅ CORREÇÃO CRÍTICA: Mesma validação da aba Carteiro
+    if (data.IsErroredOnProcessing) {
+      console.log('❌ OCR.space retornou erro:', data.ErrorMessage);
+      return null;
+    }
+    
+    if (!data.ParsedResults || data.ParsedResults.length === 0) {
+      console.log('❌ OCR.space não retornou resultados');
+      return null;
+    }
+    
+    const text = data.ParsedResults[0]?.ParsedText || '';
+    
+    if (!text.trim()) {
+      console.log('❌ OCR.space retornou texto vazio');
+      return null;
+    }
+    
+    console.log('✅ OCR.space funcionou com sucesso!');
+    console.log('Texto extraído via OCR:', text.substring(0, 100) + '...');
     
     return {
-      text: data.ParsedResults?.[0]?.ParsedText || '',
-      confidence: 0.7, // OCR.space não retorna confiança
+      text: text,
+      confidence: 0.8, // OCR.space não retorna confiança
       provider: 'ocr.space'
     };
   } catch (error) {
-    console.error('OCR.space falhou:', error);
+    console.error('❌ OCR.space falhou:', error);
     return null;
   }
 }
@@ -125,73 +248,58 @@ export async function POST(request: NextRequest) {
     // Tentar APIs externas de OCR
     console.log('Tentando APIs externas de OCR...');
     
-    const apis = [
-      () => tryOCRSpace(imageUrl),
-      () => tryOCRAPI(imageUrl),
-      () => tryCloudVision(imageUrl)
-    ];
-    
+    // ✅ CORREÇÃO CRÍTICA: Usar mesma lógica da aba Carteiro
     let ocrResult: OCRResult | null = null;
     
-    for (let i = 0; i < apis.length; i++) {
-      try {
-        console.log(`Tentando API ${i + 1}/${apis.length}...`);
-        ocrResult = await apis[i]();
-        if (ocrResult && ocrResult.text.trim()) {
-          console.log(`API ${i + 1} bem-sucedida: ${ocrResult.provider}`);
-          break;
-        }
-      } catch (ocrError) {
-        console.log(`API ${i + 1} falhou, tentando próxima...`, ocrError);
+    // ✅ TENTAR OCR.SPACE PRIMEIRO (que funciona na aba Carteiro)
+    try {
+      console.log('Tentando OCR.space...');
+      ocrResult = await tryOCRSpace(imageUrl);
+      if (ocrResult && ocrResult.text.trim()) {
+        console.log('✅ OCR.space funcionou!');
       }
+    } catch (error) {
+      console.log('❌ OCR.space falhou:', error);
     }
-
-    // Se APIs externas falharam, usar OCR simulado para demonstração
+    
+    // ✅ SE OCR.SPACE FALHOU, TENTAR ALTERNATIVAS
     if (!ocrResult || !ocrResult.text.trim()) {
-      console.log('⚠️ APIs externas falharam, usando OCR simulado para demonstração...');
-
-      // OCR simulado com texto de exemplo baseado no nome do arquivo
-      const fileName = photo.name.toLowerCase();
-      let simulatedText = '';
-
-      if (fileName.includes('lista') || fileName.includes('ect') || fileName.includes('correios')) {
-        simulatedText = `LISTA DE ENTREGA ECT
-UNIDADE: AC UBERLANDIA
-DISTRITO: CENTRO
-CARTEIRO: JOÃO SILVA
-
-1. 12345678901 - RUA DAS FLORES, 123 - CENTRO - UBERLANDIA/MG - 38400-000 - AR: X
-2. 12345678902 - AV BRASIL, 456 - CENTRO - UBERLANDIA/MG - 38400-001 - AR:
-3. 12345678903 - RUA SANTOS DUMONT, 789 - CENTRO - UBERLANDIA/MG - 38400-002 - AR: X`;
-      } else {
-        simulatedText = `Endereço de exemplo:
-RUA DAS PALMEIRAS, 456
-BAIRRO CENTRO
-UBERLANDIA - MG
-CEP: 38400-123`;
+      try {
+        console.log('Tentando OCR API alternativa...');
+        ocrResult = await tryOCRAPI(imageUrl);
+        if (ocrResult && ocrResult.text.trim()) {
+          console.log('✅ OCR API alternativa funcionou!');
+        }
+      } catch (error) {
+        console.log('❌ OCR API alternativa falhou:', error);
       }
-
-      console.log('✅ OCR simulado gerou texto de exemplo');
-      ocrResult = {
-        text: simulatedText,
-        confidence: 0.85,
-        provider: 'simulado-demo'
-      };
+    }
+    
+    // ✅ SE AINDA FALHOU, TENTAR GOOGLE CLOUD VISION
+    if (!ocrResult || !ocrResult.text.trim()) {
+      try {
+        console.log('Tentando Google Cloud Vision...');
+        ocrResult = await tryCloudVision(imageUrl);
+        if (ocrResult && ocrResult.text.trim()) {
+          console.log('✅ Google Cloud Vision funcionou!');
+        }
+      } catch (error) {
+        console.log('❌ Google Cloud Vision falhou:', error);
+      }
     }
 
+    // ❌ REMOVER: OCR simulado que quebra a funcionalidade
+    // ❌ REMOVER: Dados fake que não resolvem o problema real
     if (!ocrResult || !ocrResult.text.trim()) {
       return NextResponse.json({
         success: false,
-        error: 'Não foi possível extrair texto da imagem. Tente uma imagem mais clara ou digite o endereço manualmente.',
+        error: 'Não foi possível extrair texto da imagem. Tente uma imagem mais clara ou use a aba Carteiro para listas ECT.',
         extractedText: '',
-        ocrConfidence: 0,
-        extractionConfidence: 0,
-        extractionMethod: 'all-failed',
         suggestions: [
           'Verifique se a imagem está nítida e bem iluminada',
           'Certifique-se de que o texto está legível',
-          'Tente uma resolução mais alta',
-          'Use o modo manual se o OCR continuar falhando'
+          'Use a aba Carteiro para listas ECT completas',
+          'Use o modo manual se necessário'
         ]
       });
     }
@@ -202,29 +310,43 @@ CEP: 38400-123`;
       textLength: ocrResult.text.length
     });
 
-    // Em vez de coordenadas fixas, apenas retorna o texto para que a UI trate
-    // ou usemos uma geocodificação posterior se necessário.
-    const mockRouteData = {
-      stops: [],
-      totalDistance: 0,
-      totalTime: 0,
-      googleMapsUrl: 'https://www.google.com/maps'
-    };
+    // ✅ CORREÇÃO CRÍTICA: Extrair endereços do texto OCR
+    const extractedAddresses = extractAddressesFromText(ocrResult.text);
+    
+    if (extractedAddresses.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Não foi possível extrair endereços válidos do texto da imagem.',
+        extractedText: ocrResult.text,
+        suggestions: [
+          'Verifique se a imagem contém endereços legíveis',
+          'Tente uma imagem mais clara',
+          'Use o modo manual se necessário'
+        ]
+      });
+    }
+
+    // ✅ RETORNAR PRIMEIRO ENDEREÇO EXTRAÍDO
+    const primaryAddress = extractedAddresses[0];
+    
+    console.log('✅ Endereços extraídos:', extractedAddresses);
+    console.log('✅ Endereço principal:', primaryAddress);
 
     console.log('Processamento concluído com sucesso para carteiro (FALLBACK)');
 
     return NextResponse.json({
       success: true,
-      message: 'Lista processada com sucesso via API externa!',
-      routeData: mockRouteData,
+      message: 'Endereço extraído com sucesso!',
+      address: primaryAddress, // ✅ ENDEREÇO EXTRAÍDO
+      allAddresses: extractedAddresses, // ✅ TODOS OS ENDEREÇOS
       extractedText: ocrResult.text,
       ocrConfidence: ocrResult.confidence,
-      extractionConfidence: ocrResult.confidence,
-      extractionMethod: `fallback-${ocrResult.provider}`,
+      extractionConfidence: 0.8,
+      extractionMethod: `ocr-${ocrResult.provider}`,
       suggestions: [
-        'Texto extraído via API externa de OCR',
-        'Cole o endereço acima no campo de voz da home para geocodificar com a sua localização',
-        'Use o modo manual se necessário'
+        'Endereço extraído via OCR',
+        'Use o botão "Adicionar às Paradas" para incluir na rota',
+        'Verifique se o endereço está correto'
       ]
     });
 
