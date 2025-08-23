@@ -43,7 +43,7 @@ export default function CarteiroPage() {
     if (!file) return;
 
     setIsProcessing(true);
-    setError(null);
+    setError(null); // ✅ LIMPAR ERRO ANTERIOR
     setProcessedData(null);
 
     const formData = new FormData();
@@ -176,7 +176,7 @@ export default function CarteiroPage() {
               className="hidden"
             />
             
-            {!isProcessing && !processedData && (
+            {!isProcessing && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
