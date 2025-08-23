@@ -10,16 +10,41 @@ interface ECTItem {
   cep?: string;
   lat?: number;
   lng?: number;
+  // ✅ NOVA PROPRIEDADE DA API
+  correctedAddress?: string;
 }
 
 interface ProcessedECTList {
   success: boolean;
-  items: ECTItem[];
-  totalItems: number;
-  city: string;
-  state: string;
+  items?: ECTItem[];
+  totalItems?: number;
+  city?: string;
+  state?: string;
   googleMapsUrl?: string;
   error?: string;
+  // ✅ NOVAS PROPRIEDADES DA API REAL
+  routeData?: {
+    stops: ECTItem[];
+    totalDistance: number;
+    totalTime: number;
+    googleMapsUrl: string;
+    optimized: boolean;
+    metrics: Record<string, unknown>;
+  };
+  ectData?: {
+    listNumber: string;
+    unit: string;
+    district: string;
+    state: string;
+    city: string;
+    items: ECTItem[];
+  };
+  geocodedItems?: ECTItem[];
+  extractedText?: string;
+  ocrConfidence?: number;
+  extractionConfidence?: number;
+  extractionMethod?: string;
+  suggestions?: string[];
 }
 
 export default function CarteiroPage() {
@@ -66,42 +91,51 @@ export default function CarteiroPage() {
 
       if (data.success) {
         console.log('✅ Dados recebidos com sucesso:', data);
-        console.log('✅ Items:', data.items);
-        console.log('✅ Total items:', data.totalItems);
-        console.log('✅ Cidade:', data.city);
-        console.log('✅ Estado:', data.state);
-        console.log('✅ Tipo de data.items:', typeof data.items);
-        console.log('✅ Array?', Array.isArray(data.items));
-        console.log('✅ Length:', data.items?.length);
+        console.log('✅ RouteData:', data.routeData);
+        console.log('✅ Stops:', data.routeData?.stops);
+        console.log('✅ ECTData:', data.ectData);
+        console.log('✅ GeocodedItems:', data.geocodedItems);
+        console.log('✅ Total items:', data.routeData?.stops?.length || data.ectData?.items?.length || 0);
+        console.log('✅ Cidade:', data.ectData?.city || 'Não especificada');
+        console.log('✅ Estado:', data.ectData?.state || 'Não especificado');
         console.log('✅ Estrutura completa de data:', JSON.stringify(data, null, 2));
         
-        // ✅ VALIDAÇÃO MAIS ROBUSTA: Verificar se data.items existe e é válido
-        if (!data.items) {
-          console.error('❌ data.items é null/undefined');
-          setError('Dados de itens não encontrados na resposta da API. Tente novamente.');
+        // ✅ VALIDAÇÃO CORRIGIDA: Verificar se há dados de endereços em qualquer formato
+        const stops = data.routeData?.stops || data.ectData?.items || data.geocodedItems || [];
+        
+        if (!stops || stops.length === 0) {
+          console.error('❌ Nenhum endereço encontrado nos dados');
+          setError('Nenhum endereço foi extraído da imagem. Tente com uma imagem diferente.');
           return;
         }
         
-        if (!Array.isArray(data.items)) {
-          console.error('❌ data.items não é um array:', typeof data.items, data.items);
-          setError('Formato de itens inválido na resposta da API. Tente novamente.');
-          return;
-        }
+        console.log('✅ VALIDAÇÃO PASSOU - Encontrados', stops.length, 'endereços');
         
-        if (data.items.length === 0) {
-          console.error('❌ data.items é um array vazio');
-          setError('Nenhum item foi extraído da imagem. Tente com uma imagem diferente.');
-          return;
-        }
+        // ✅ NORMALIZAR DADOS: Converter para formato esperado pelo frontend
+        const normalizedData: ProcessedECTList = {
+          success: true,
+          totalItems: stops.length,
+          city: data.ectData?.city || 'Uberlândia',
+          state: data.ectData?.state || 'MG',
+          items: stops.map(stop => ({
+            sequence: stop.sequence || 0,
+            objectCode: stop.objectCode || 'N/A',
+            address: stop.address || stop.correctedAddress || 'Endereço não disponível',
+            cep: stop.cep || '',
+            lat: stop.lat || 0,
+            lng: stop.lng || 0
+          })),
+          googleMapsUrl: data.routeData?.googleMapsUrl || undefined
+        };
         
-        console.log('✅ VALIDAÇÃO PASSOU - Array válido com', data.items.length, 'itens');
+        console.log('✅ Dados normalizados:', normalizedData);
         
-        setProcessedData(data);
-        setEditableItems([...data.items]); // ✅ AGORA SEGURO
+        setProcessedData(normalizedData);
+        setEditableItems(normalizedData.items ? [...normalizedData.items] : []); // ✅ AGORA SEGURO
         setShowAddressEditor(true); // Mostrar editor automaticamente
         
-        console.log('✅ Estado atualizado - processedData:', data);
-        console.log('✅ Estado atualizado - editableItems:', [...data.items]);
+        console.log('✅ Estado atualizado - processedData:', normalizedData);
+        console.log('✅ Estado atualizado - editableItems:', normalizedData.items ? [...normalizedData.items] : []);
         console.log('✅ Estado atualizado - showAddressEditor:', true);
         
         // ✅ VERIFICAÇÃO ADICIONAL: Aguardar atualização do estado
@@ -174,7 +208,7 @@ export default function CarteiroPage() {
   };
 
   const handleDiscardChanges = () => {
-    setEditableItems([...processedData!.items]); // Restaurar original
+    setEditableItems(processedData?.items ? [...processedData.items] : []); // Restaurar original
     setShowAddressEditor(false);
   };
 
