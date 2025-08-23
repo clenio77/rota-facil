@@ -1168,88 +1168,47 @@ CEP: 38400-123`;
 
       if (items.length === 0) return 'https://www.google.com/maps';
 
-      // Usar localização do usuário como origem e destino se disponível
-      const hasUserLocation = userLocation && userLocation.lat && userLocation.lng;
+      // ✅ SOLUÇÃO CRÍTICA: Usar APENAS endereços limpos para Google Maps
+      // O Google Maps fará a geocodificação automaticamente com coordenadas únicas
+      console.log('🚀 SOLUÇÃO: Usando APENAS endereços limpos para Google Maps');
 
       if (items.length === 1) {
-        // Uma única parada
-        if (hasUserLocation) {
-          // Rota: Localização atual → Entrega → Localização atual
-          const params = new URLSearchParams({
-            api: '1',
-            origin: `${userLocation.lat},${userLocation.lng}`,
-            destination: `${userLocation.lat},${userLocation.lng}`,
-            waypoints: `${items[0].lat},${items[0].lng}`,
-            travelmode: 'driving'
-          });
-          return `https://www.google.com/maps/dir/?${params.toString()}`;
-        } else {
-          // Sem localização do usuário, apenas o destino
-          // ✅ CORREÇÃO CRÍTICA: NÃO usar encodeURIComponent para evitar dupla codificação
-          return `https://www.google.com/maps/dir/?api=1&destination=${items[0].geocodedAddress || items[0].address}`;
-        }
-      }
-
-      // Múltiplas paradas
-      if (hasUserLocation) {
-        // Rota: Localização atual → Entregas → Localização atual
-        const origin = `${userLocation.lat},${userLocation.lng}`;
-        const destination = `${userLocation.lat},${userLocation.lng}`;
-
-        // 🚀 PRODUÇÃO: Usar TODOS os endereços para rota completa
-        console.log('🚀 PRODUÇÃO: Usando TODOS os endereços para rota otimizada');
-        console.log(`📍 Total de endereços: ${items.length}`);
-
-        // Criar waypoints com todos os endereços REAIS extraídos da imagem
-        const waypoints = items.map(item => {
-          // ✅ IMPORTANTE: Usar endereço REAL extraído da imagem OCR
-          const address = item.address; // Endereço REAL da imagem
-          console.log(`📍 Adicionando waypoint REAL: ${address}`);
-          
-          // ✅ CORREÇÃO CRÍTICA: NÃO usar encodeURIComponent para evitar dupla codificação
-          // O Google Maps já faz a codificação necessária
-          return address;
-        }).join('|');
-
-        console.log('🚀 Origem:', origin);
-        console.log('🏁 Destino:', destination);
-        console.log('📍 Waypoints completos:', waypoints);
-
-        // ✅ CORREÇÃO CRÍTICA: Usar URLSearchParams que faz codificação correta
-        const params = new URLSearchParams({
-          api: '1',
-          origin,
-          destination,
-          waypoints,
-          travelmode: 'driving'
-        });
-
-        const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
-        console.log('🗺️ URL final do Google Maps:', finalUrl);
-        console.log('🌐 URL decodificada:', decodeURIComponent(finalUrl));
-
-        return finalUrl;
-      } else {
-        // Sem localização do usuário, usar primeira e última entrega
-        const origin = `${items[0].lat},${items[0].lng}`;
-        const destination = `${items[items.length - 1].lat},${items[items.length - 1].lng}`;
+        // Uma única parada - usar apenas o endereço
+        const cleanAddress = items[0].address;
+        console.log(`📍 Endereço único: ${cleanAddress}`);
         
-        // ✅ CORREÇÃO CRÍTICA: Usar coordenadas em vez de endereços para evitar problemas de encoding
-        const waypoints = items.slice(1, -1).map(item => `${item.lat},${item.lng}`).join('|');
-
         const params = new URLSearchParams({
           api: '1',
-          origin,
-          destination,
+          destination: cleanAddress,
           travelmode: 'driving'
         });
-
-        if (waypoints) {
-          params.set('waypoints', waypoints);
-        }
-
         return `https://www.google.com/maps/dir/?${params.toString()}`;
       }
+
+      // ✅ MÚLTIPLAS PARADAS: Usar APENAS endereços limpos
+      const origin = items[0].address;
+      const destination = items[items.length - 1].address;
+      
+      // ✅ WAYPOINTS: Apenas endereços limpos (sem coordenadas)
+      const waypoints = items.slice(1, -1).map(item => item.address).join('|');
+
+      console.log('🚀 Origem (endereço):', origin);
+      console.log('🏁 Destino (endereço):', destination);
+      console.log('📍 Waypoints (endereços):', waypoints);
+
+      const params = new URLSearchParams({
+        api: '1',
+        origin,
+        destination,
+        waypoints,
+        travelmode: 'driving'
+      });
+
+      const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
+      console.log('🗺️ URL final do Google Maps (endereços):', finalUrl);
+      console.log('🌐 URL decodificada:', decodeURIComponent(finalUrl));
+
+      return finalUrl;
     }
 
     console.log('Lista ECT processada com sucesso:', {
