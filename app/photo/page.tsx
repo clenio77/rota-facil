@@ -100,25 +100,11 @@ export default function PhotoPage() {
     } catch (error) {
       console.error('Erro no processamento:', error);
       
-      // ✅ FALLBACK: Usar dados de exemplo se API falhar
-      const mockAddresses = [
-        'Rua das Flores, 123, Uberlândia, MG',
-        'Avenida Central, 456, Uberlândia, MG',
-        'Travessa do Comércio, 789, Uberlândia, MG',
-        'Rua da Paz, 321, Uberlândia, MG',
-        'Avenida das Palmeiras, 654, Uberlândia, MG'
-      ];
+      // ❌ REMOVER: Fallback para dados mock que mascara o problema real
+      // ❌ REMOVER: Dados fake que não resolvem o problema
       
-      const randomAddress = mockAddresses[Math.floor(Math.random() * mockAddresses.length)];
-      const mockLat = -18.9 + (Math.random() - 0.5) * 0.1;
-      const mockLng = -48.2 + (Math.random() - 0.5) * 0.1;
-      
-      return {
-        address: randomAddress,
-        lat: mockLat,
-        lng: mockLng,
-        allAddresses: mockAddresses // ✅ TODOS OS ENDEREÇOS
-      };
+      // ✅ RETORNAR ERRO REAL para a interface tratar
+      throw new Error(`Erro no processamento da foto: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -335,7 +321,18 @@ export default function PhotoPage() {
                     )}
                     
                     {photo.status === 'error' && (
-                      <div className="text-red-600 text-sm">❌ {photo.error}</div>
+                      <div className="text-red-600 text-sm">
+                        <div className="font-semibold mb-1">❌ Erro no Processamento</div>
+                        <div className="text-xs text-red-500 mb-2">{photo.error}</div>
+                        <div className="text-xs text-gray-600">
+                          💡 <strong>Sugestões:</strong>
+                          <ul className="mt-1 ml-2">
+                            <li>• Verifique se a imagem está nítida</li>
+                            <li>• Use a aba &quot;Carteiro&quot; para listas ECT</li>
+                            <li>• Tente uma imagem diferente</li>
+                          </ul>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
