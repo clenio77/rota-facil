@@ -1173,42 +1173,83 @@ CEP: 38400-123`;
       console.log('🚀 SOLUÇÃO: Usando APENAS endereços limpos para Google Maps');
 
       if (items.length === 1) {
-        // Uma única parada - usar apenas o endereço
-        const cleanAddress = items[0].address;
-        console.log(`📍 Endereço único: ${cleanAddress}`);
-        
-        const params = new URLSearchParams({
-          api: '1',
-          destination: cleanAddress,
-          travelmode: 'driving'
-        });
-        return `https://www.google.com/maps/dir/?${params.toString()}`;
+        // Uma única parada
+        if (userLocation) {
+          // ✅ ROTA CIRCULAR: Dispositivo → Entrega → Dispositivo
+          const params = new URLSearchParams({
+            api: '1',
+            origin: `${userLocation.lat},${userLocation.lng}`,
+            destination: `${userLocation.lat},${userLocation.lng}`,
+            waypoints: items[0].address,
+            travelmode: 'driving'
+          });
+          console.log('🚀 Rota circular para 1 parada:', `${userLocation.lat},${userLocation.lng} → ${items[0].address} → ${userLocation.lat},${userLocation.lng}`);
+          return `https://www.google.com/maps/dir/?${params.toString()}`;
+        } else {
+          // Sem localização, apenas o destino
+          const cleanAddress = items[0].address;
+          console.log(`📍 Endereço único: ${cleanAddress}`);
+          
+          const params = new URLSearchParams({
+            api: '1',
+            destination: cleanAddress,
+            travelmode: 'driving'
+          });
+          return `https://www.google.com/maps/dir/?${params.toString()}`;
+        }
       }
 
-      // ✅ MÚLTIPLAS PARADAS: Usar APENAS endereços limpos
-      const origin = items[0].address;
-      const destination = items[items.length - 1].address;
-      
-      // ✅ WAYPOINTS: Apenas endereços limpos (sem coordenadas)
-      const waypoints = items.slice(1, -1).map(item => item.address).join('|');
+      // ✅ MÚLTIPLAS PARADAS
+      if (userLocation) {
+        // ✅ ROTA CIRCULAR: Dispositivo → Entregas → Dispositivo
+        const origin = `${userLocation.lat},${userLocation.lng}`;
+        const destination = `${userLocation.lat},${userLocation.lng}`;
+        
+        // ✅ WAYPOINTS: Todos os endereços como paradas intermediárias
+        const waypoints = items.map(item => item.address).join('|');
 
-      console.log('🚀 Origem (endereço):', origin);
-      console.log('🏁 Destino (endereço):', destination);
-      console.log('📍 Waypoints (endereços):', waypoints);
+        console.log('🚀 Rota circular (origem/destino):', origin);
+        console.log('📍 Waypoints (todas as paradas):', waypoints);
 
-      const params = new URLSearchParams({
-        api: '1',
-        origin,
-        destination,
-        waypoints,
-        travelmode: 'driving'
-      });
+        const params = new URLSearchParams({
+          api: '1',
+          origin,
+          destination,
+          waypoints,
+          travelmode: 'driving'
+        });
 
-      const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
-      console.log('🗺️ URL final do Google Maps (endereços):', finalUrl);
-      console.log('🌐 URL decodificada:', decodeURIComponent(finalUrl));
+        const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
+        console.log('🗺️ URL final do Google Maps (rota circular):', finalUrl);
+        console.log('🌐 URL decodificada:', decodeURIComponent(finalUrl));
 
-      return finalUrl;
+        return finalUrl;
+      } else {
+        // ✅ SEM LOCALIZAÇÃO: Rota entre endereços apenas
+        const origin = items[0].address;
+        const destination = items[items.length - 1].address;
+        
+        // ✅ WAYPOINTS: Apenas endereços intermediários
+        const waypoints = items.slice(1, -1).map(item => item.address).join('|');
+
+        console.log('🚀 Origem (endereço):', origin);
+        console.log('🏁 Destino (endereço):', destination);
+        console.log('📍 Waypoints (endereços):', waypoints);
+
+        const params = new URLSearchParams({
+          api: '1',
+          origin,
+          destination,
+          waypoints,
+          travelmode: 'driving'
+        });
+
+        const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
+        console.log('🗺️ URL final do Google Maps (endereços):', finalUrl);
+        console.log('🌐 URL decodificada:', decodeURIComponent(finalUrl));
+
+        return finalUrl;
+      }
     }
 
     console.log('Lista ECT processada com sucesso:', {
