@@ -3,6 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+// ✅ CORREÇÃO CRÍTICA: Desabilitar SSR para evitar hydration errors
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface ECTItem {
   sequence: number;
   objectCode: string;
@@ -55,13 +59,47 @@ export default function CarteiroPage() {
   const [showAddressEditor, setShowAddressEditor] = useState(false);
   const [editableItems, setEditableItems] = useState<ECTItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // ✅ NOVA FUNCIONALIDADE: Localização do dispositivo
+  const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   // ✅ DEBUG: Monitorar mudanças nos estados
   useEffect(() => {
     console.log('🔍 ESTADO ATUALIZADO - processedData:', processedData);
     console.log('🔍 ESTADO ATUALIZADO - showAddressEditor:', showAddressEditor);
     console.log('🔍 ESTADO ATUALIZADO - editableItems:', editableItems);
-  }, [processedData, showAddressEditor, editableItems]);
+    console.log('🔍 ESTADO ATUALIZADO - userLocation:', userLocation);
+  }, [processedData, showAddressEditor, editableItems, userLocation]);
+
+  // ✅ NOVA FUNCIONALIDADE: Obter localização do dispositivo
+  const getUserLocation = () => {
+    setIsGettingLocation(true);
+    
+    if (!navigator.geolocation) {
+      setError('Geolocalização não é suportada pelo seu navegador');
+      setIsGettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        console.log('📍 Localização obtida:', { lat: latitude, lng: longitude });
+        setIsGettingLocation(false);
+      },
+      (error) => {
+        console.error('❌ Erro ao obter localização:', error);
+        setError('Não foi possível obter sua localização. Verifique as permissões do navegador.');
+        setIsGettingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutos
+      }
+    );
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -281,6 +319,71 @@ export default function CarteiroPage() {
             ❌ {error}
           </div>
         )}
+
+        {/* ✅ NOVA SEÇÃO: Configuração de Localização */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            📍 Configuração de Localização
+          </h2>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">🏠 Localização Atual</h3>
+                <p className="text-sm text-gray-600">
+                  {userLocation 
+                    ? `📍 ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}`
+                    : '❌ Localização não configurada'
+                  }
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Esta será o ponto de partida e chegada da sua rota
+                </p>
+              </div>
+              
+              <div className="flex space-x-2">
+                {!userLocation ? (
+                  <button
+                    onClick={getUserLocation}
+                    disabled={isGettingLocation}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      isGettingLocation
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {isGettingLocation ? (
+                      <>
+                        <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Obtendo...
+                      </>
+                    ) : (
+                      '📍 Obter Localização'
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setUserLocation(null)}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                  >
+                    🗑️ Limpar
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {userLocation && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <span className="text-green-600 mr-2">✅</span>
+                  <span className="text-green-800 text-sm font-medium">
+                    Localização configurada! Sua rota começará e terminará neste ponto.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Results Display - PRIORIDADE ALTA */}
         {processedData && (
