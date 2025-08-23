@@ -140,6 +140,15 @@ function cleanAddressText(text: string): string {
   
   let cleanText = text;
   
+  // ✅ CORREÇÃO CRÍTICA: Interpretar faixas de numeração
+  // Converter "até 836/837" em "836" (primeiro número da faixa)
+  cleanText = cleanText.replace(/até\s+(\d+)\/(\d+)/gi, '$1');
+  cleanText = cleanText.replace(/at\s+(\d+)\s+(\d+)/gi, '$1');
+  
+  // ✅ CORREÇÃO ADICIONAL: Outros formatos de faixa
+  cleanText = cleanText.replace(/(\d+)\/(\d+)/gi, '$1'); // Remove barras
+  cleanText = cleanText.replace(/(\d+)\s+(\d+)/gi, '$1'); // Remove espaços entre números
+  
   // ✅ REMOVER: CEP e informações extras
   cleanText = cleanText.replace(/CEP:\s*\d{5}-?\d{3}/gi, '');
   
@@ -158,6 +167,11 @@ function cleanAddressText(text: string): string {
   // ✅ VALIDAR: Endereço deve ter pelo menos 10 caracteres e começar com tipo de via
   if (cleanText.length < 10 || !cleanText.match(/^(Rua|Avenida|Travessa|Praça)/i)) {
     return '';
+  }
+  
+  // ✅ CORREÇÃO FINAL: Garantir que o endereço termine com cidade e estado
+  if (!cleanText.includes('Uberlândia') && !cleanText.includes('MG')) {
+    cleanText += ', Uberlândia, MG';
   }
   
   return cleanText;
