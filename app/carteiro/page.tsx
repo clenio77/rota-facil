@@ -73,13 +73,28 @@ export default function CarteiroPage() {
         console.log('✅ Tipo de data.items:', typeof data.items);
         console.log('✅ Array?', Array.isArray(data.items));
         console.log('✅ Length:', data.items?.length);
+        console.log('✅ Estrutura completa de data:', JSON.stringify(data, null, 2));
         
-        // ✅ VALIDAÇÃO CRÍTICA: Verificar se data.items é um array válido
-        if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
-          console.error('❌ data.items não é um array válido:', data.items);
-          setError('Formato de dados inválido recebido da API. Tente novamente.');
+        // ✅ VALIDAÇÃO MAIS ROBUSTA: Verificar se data.items existe e é válido
+        if (!data.items) {
+          console.error('❌ data.items é null/undefined');
+          setError('Dados de itens não encontrados na resposta da API. Tente novamente.');
           return;
         }
+        
+        if (!Array.isArray(data.items)) {
+          console.error('❌ data.items não é um array:', typeof data.items, data.items);
+          setError('Formato de itens inválido na resposta da API. Tente novamente.');
+          return;
+        }
+        
+        if (data.items.length === 0) {
+          console.error('❌ data.items é um array vazio');
+          setError('Nenhum item foi extraído da imagem. Tente com uma imagem diferente.');
+          return;
+        }
+        
+        console.log('✅ VALIDAÇÃO PASSOU - Array válido com', data.items.length, 'itens');
         
         setProcessedData(data);
         setEditableItems([...data.items]); // ✅ AGORA SEGURO
