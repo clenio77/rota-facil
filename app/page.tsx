@@ -106,7 +106,6 @@ export default function HomePage() {
   const { position: deviceLocation, isLoading, refresh } = useGeolocation();
   const [deviceOrigin, setDeviceOrigin] = useState<UserLocation | undefined>(undefined);
   const [roundtrip, setRoundtrip] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
   // 🚀 NOVOS ESTADOS PARA FUNCIONALIDADES AVANÇADAS
@@ -159,10 +158,10 @@ export default function HomePage() {
 
   // handleSimpleAddresses removido - funcionalidade não implementada
 
-  // Sync settings modal with URL hash (#settings)
+  // Lógica de hash removida - aba Ajustes foi removida
   React.useEffect(() => {
     const handler = () => {
-      setIsSettingsOpen(window.location.hash === '#settings');
+      // Lógica de hash removida - aba Ajustes foi removida
     };
     handler();
     window.addEventListener('hashchange', handler);
@@ -1273,58 +1272,6 @@ export default function HomePage() {
               >
                 Confirmar
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settings modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white w-full max-w-lg rounded-xl shadow-custom p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Ajustes</h3>
-              <button onClick={() => { history.replaceState(null, '', ' '); setIsSettingsOpen(false); }} aria-label="Fechar">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-4">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={useDeviceOrigin}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setUseDeviceOrigin(checked);
-                    if (checked && navigator?.geolocation) {
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => setDeviceOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                        () => alert('Não foi possível obter sua localização.'),
-                        { enableHighAccuracy: true, timeout: 8000 }
-                      );
-                    }
-                  }}
-                />
-                <span className="text-sm text-gray-700">Usar minha localização como ponto de partida</span>
-              </label>
-
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={roundtrip}
-                  onChange={(e) => setRoundtrip(e.target.checked)}
-                />
-                <span className="text-sm text-gray-700">Retornar ao ponto de partida</span>
-              </label>
-
-              <div className="text-xs text-gray-500">
-                Trânsito em tempo real usa Mapbox quando configurado. Sem custo adicional dentro do limite grátis.
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button className="btn-primary" onClick={() => { history.replaceState(null, '', ' '); setIsSettingsOpen(false); }}>Fechar</button>
             </div>
           </div>
         </div>

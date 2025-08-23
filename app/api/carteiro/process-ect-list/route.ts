@@ -229,51 +229,33 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
           let sequence = 0;
           let objectCode = '';
           
-          // Procurar para trás na linha para encontrar o número do item
-          for (let j = i; j >= 0; j--) {
+          // Procurar para trás nas linhas para encontrar o item
+          for (let j = i - 1; j >= 0; j--) {
             const prevLine = lines[j].trim();
             
-            // Procurar por padrões de número de item (001, 002, 003, etc.)
-            const itemMatch = prevLine.match(/^(\d{3})/);
+            // Procurar por padrão de item (ex: "001", "002", etc.)
+            const itemMatch = prevLine.match(/^(\d{3})\s+([A-Z]{2,3})/);
             if (itemMatch) {
               sequence = parseInt(itemMatch[1]);
-              console.log(`✅ Encontrado item ${sequence} para endereço: ${address.substring(0, 50)}...`);
+              objectCode = itemMatch[2];
               break;
             }
+          }
+          
+          // ✅ CRÍTICO: Criar item com endereço LIMPO
+          const cleanAddress = cleanAddressText(address);
+          if (cleanAddress) {
+            items.push({
+              sequence,
+              objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
+              address: cleanAddress, // ✅ ENDEREÇO LIMPO
+              cep: '38400107',
+              arRequired: false,
+              arOrder: ''
+            });
             
-            // Procurar por códigos de objeto na mesma linha
-            const objectMatch = prevLine.match(/([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)/);
-            if (objectMatch) {
-              objectCode = objectMatch[1].replace(/\s+/g, '');
-              console.log(`✅ Encontrado código de objeto: ${objectCode}`);
-            }
+            console.log(`✅ Endereço alternativo ${sequence} extraído com sucesso: ${cleanAddress}`);
           }
-          
-          // Se não encontrou sequência, usar contador automático
-          if (sequence === 0) {
-            sequence = items.length + 1;
-          }
-          
-          // Procurar CEP associado a este endereço
-          let cep = '';
-          for (let j = i; j < Math.min(i + 3, lines.length); j++) {
-            const cepMatch = lines[j].match(/CEP:\s*(\d{5}-?\d{3})/i);
-            if (cepMatch) {
-              cep = cepMatch[1].replace('-', '');
-              break;
-            }
-          }
-          
-          items.push({
-            sequence,
-            objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
-            address: address,
-            cep: cep || '',
-            arRequired: false,
-            arOrder: ''
-          });
-          
-          console.log(`✅ Endereço ${sequence} extraído com sucesso: ${address.substring(0, 60)}...`);
         }
       }
     }
