@@ -50,10 +50,17 @@ export default function CarteiroPage() {
     formData.append('photo', file);
 
     try {
+      // ✅ TIMEOUT MAIOR: API pode demorar até 3 minutos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutos
+      
       const response = await fetch('/api/carteiro/process-ect-list', {
         method: 'POST',
         body: formData,
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       const data: ProcessedECTList = await response.json();
 
@@ -85,7 +92,19 @@ export default function CarteiroPage() {
         setError(data.error || 'Erro ao processar lista ECT');
       }
     } catch (err) {
-      setError('Erro de conexão. Tente novamente.');
+      console.error('❌ Erro no processamento:', err);
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('Processamento demorou muito tempo. A API está processando uma lista grande. Tente novamente em alguns minutos.');
+        } else if (err.message.includes('fetch')) {
+          setError('Erro de conexão com a API. Verifique sua internet e tente novamente.');
+        } else {
+          setError(`Erro no processamento: ${err.message}`);
+        }
+      } else {
+        setError('Erro desconhecido. Tente novamente.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -188,7 +207,13 @@ export default function CarteiroPage() {
             {isProcessing && (
               <div className="text-blue-600">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                Processando imagem...
+                <div className="text-sm font-medium">Processando imagem...</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  ⏱️ Pode demorar alguns minutos para listas grandes
+                </div>
+                <div className="text-xs text-gray-500">
+                  🔄 Não feche esta página durante o processamento
+                </div>
               </div>
             )}
           </div>
