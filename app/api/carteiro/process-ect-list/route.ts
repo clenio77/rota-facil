@@ -147,6 +147,35 @@ function extractECTListData(text: string): ECTListData | null {
   }
 }
 
+// Função para limpar endereços removendo lixo extra
+function cleanAddressText(text: string): string {
+  if (!text) return '';
+  
+  let cleanText = text;
+  
+  // ✅ REMOVER: CEP e informações extras
+  cleanText = cleanText.replace(/CEP:\s*\d{5}-?\d{3}/gi, '');
+  
+  // ✅ REMOVER: Texto de interface "Item Objeto Ordem AR MP DD OD"
+  cleanText = cleanText.replace(/Item\s+Objeto\s+Ordem\s+AR\s+MP\s+DD\s+OD/gi, '');
+  
+  // ✅ REMOVER: "Continua na próxima página" e números
+  cleanText = cleanText.replace(/Continua\s+na\s+próxima\s+página\s*\d*/gi, '');
+  
+  // ✅ REMOVER: Caracteres especiais e lixo
+  cleanText = cleanText.replace(/[^\w\s\-,\.]/g, ' ');
+  
+  // ✅ LIMPAR: Múltiplos espaços
+  cleanText = cleanText.replace(/\s+/g, ' ').trim();
+  
+  // ✅ VALIDAR: Endereço deve ter pelo menos 10 caracteres e começar com tipo de via
+  if (cleanText.length < 10 || !cleanText.match(/^(Rua|Avenida|Travessa|Praça)/i)) {
+    return '';
+  }
+  
+  return cleanText;
+}
+
 // Função robusta para extrair TODOS os endereços da lista ECT
 function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
   console.log('🔍 Iniciando extração robusta de TODOS os endereços...');
@@ -169,6 +198,9 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
       if (addressMatch) {
         let address = addressMatch[1].trim();
         
+        // ✅ LIMPEZA CRÍTICA: Remover lixo extra do endereço
+        address = cleanAddressText(address);
+        
         // Verificar se há continuação do endereço na próxima linha
         if (i + 1 < lines.length) {
           const nextLine = lines[i + 1].trim();
@@ -180,21 +212,20 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
               !nextLine.toLowerCase().includes('nome legível') &&
               !nextLine.match(/^item\s*\d{3}/i) &&
               !nextLine.match(/^\d{3}\s+[A-Z]/i)) {
-            address += ' ' + nextLine;
+            
+            // ✅ LIMPEZA CRÍTICA: Limpar também a linha de continuação
+            const cleanNextLine = cleanAddressText(nextLine);
+            if (cleanNextLine) {
+              address += ' ' + cleanNextLine;
+            }
           }
         }
         
-        // Limpar e validar o endereço
-        address = address
-          .replace(/^(Rua|Avenida|Travessa|Praça)\s*([A-Z])/i, '$1 $2')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        // Verificar se é um endereço válido e único
-        if (address.length > 10 && !extractedAddresses.has(address)) {
+        // ✅ VALIDAÇÃO FINAL: Verificar se o endereço limpo é válido
+        if (address && address.length > 10 && !extractedAddresses.has(address)) {
           extractedAddresses.add(address);
           
-          // Tentar encontrar o número do item associado a este endereço
+          // Tentar encontrar o número do item associado
           let sequence = 0;
           let objectCode = '';
           
@@ -262,6 +293,9 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
       console.log(`🔍 Encontrado padrão de endereço alternativo: "${line}"`);
       
       let address = line;
+      
+      // ✅ LIMPEZA CRÍTICA: Limpar o endereço alternativo
+      address = cleanAddressText(address);
       
       // Verificar se há continuação na próxima linha
       if (i + 1 < lines.length) {
