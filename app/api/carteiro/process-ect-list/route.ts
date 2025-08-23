@@ -1069,7 +1069,8 @@ export async function POST(request: NextRequest) {
           return `https://www.google.com/maps/dir/?${params.toString()}`;
         } else {
           // Sem localização do usuário, apenas o destino
-          return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(items[0].geocodedAddress || items[0].address)}`;
+          // ✅ CORREÇÃO CRÍTICA: NÃO usar encodeURIComponent para evitar dupla codificação
+          return `https://www.google.com/maps/dir/?api=1&destination=${items[0].geocodedAddress || items[0].address}`;
         }
       }
 
@@ -1088,17 +1089,17 @@ export async function POST(request: NextRequest) {
           // ✅ IMPORTANTE: Usar endereço REAL extraído da imagem OCR
           const address = item.address; // Endereço REAL da imagem
           console.log(`📍 Adicionando waypoint REAL: ${address}`);
-          return encodeURIComponent(address);
+          
+          // ✅ CORREÇÃO CRÍTICA: NÃO usar encodeURIComponent para evitar dupla codificação
+          // O Google Maps já faz a codificação necessária
+          return address;
         }).join('|');
 
         console.log('🚀 Origem:', origin);
         console.log('🏁 Destino:', destination);
-        console.log('📍 Waypoints completos:', decodeURIComponent(waypoints));
+        console.log('📍 Waypoints completos:', waypoints);
 
-
-
-
-
+        // ✅ CORREÇÃO CRÍTICA: Usar URLSearchParams que faz codificação correta
         const params = new URLSearchParams({
           api: '1',
           origin,
@@ -1116,6 +1117,8 @@ export async function POST(request: NextRequest) {
         // Sem localização do usuário, usar primeira e última entrega
         const origin = `${items[0].lat},${items[0].lng}`;
         const destination = `${items[items.length - 1].lat},${items[items.length - 1].lng}`;
+        
+        // ✅ CORREÇÃO CRÍTICA: Usar coordenadas em vez de endereços para evitar problemas de encoding
         const waypoints = items.slice(1, -1).map(item => `${item.lat},${item.lng}`).join('|');
 
         const params = new URLSearchParams({
