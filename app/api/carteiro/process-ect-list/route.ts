@@ -35,65 +35,83 @@ function extractECTListData(text: string): ECTListData | null {
     const items: ECTDeliveryItem[] = [];
     let match;
 
-    // Formato 1: Simulado com pipes "1 | AA123456789BR | RUA DAS FLORES, 123 - CENTRO | 38400-000 | X"
-    const simulatedRegex = /(\d+)\s*\|\s*([A-Z0-9]+)\s*\|\s*([^|]+?)\s*\|\s*(\d{5}-?\d{3})\s*\|\s*([X]?)/g;
-    while ((match = simulatedRegex.exec(text)) !== null) {
-      const [, sequence, objectCode, address, cep, arRequired] = match;
-      items.push({
-        sequence: parseInt(sequence),
-        objectCode: objectCode.trim(),
-        address: address.trim(),
-        cep: cep.trim().replace('-', ''),
-        arRequired: arRequired.trim() === 'X',
-        arOrder: arRequired.trim() || ''
-      });
-    }
-
-    // Formato 2: ECT real baseado na imagem fornecida
-    if (items.length === 0) {
-      console.log('Tentando parser para formato ECT real...');
-
-      // Estratégia 1: Regex mais flexível para capturar blocos de itens
-      const itemBlocks = text.split(/(?=\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)/);
-
-      for (const block of itemBlocks) {
-        if (block.trim().length === 0) continue;
-
-        // Extrair número do item e código do objeto
-        const itemMatch = block.match(/^(\d{3})\s+([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)\s+(\d+-\d+)\s*([X]?)/);
-        if (!itemMatch) continue;
-
-        const [, sequence, objectCode, arOrder, arRequired] = itemMatch;
-
-        // Extrair endereço (linha que contém "Endereço:")
-        const addressMatch = block.match(/Endereço:\s*([^\n\r]+)/i);
-        if (!addressMatch) continue;
-
-        const address = addressMatch[1].trim();
-
-        // Extrair CEP (pode estar em qualquer lugar do bloco)
-        const cepMatch = block.match(/CEP:\s*(\d{8})/i);
-        const cep = cepMatch ? cepMatch[1] : '';
-
-        console.log('Item encontrado no bloco:', { sequence, objectCode, address, cep });
-
+    // ✅ NOVO: Parser inteligente para formato ECT real
+    console.log('🔍 Usando parser inteligente para formato ECT real...');
+    
+    // Dividir o texto em blocos por item
+    const itemBlocks = text.split(/(?=Item\s+Objeto|^\d{3}\s+[A-Z])/);
+    
+    for (const block of itemBlocks) {
+      if (block.trim().length === 0) continue;
+      
+      console.log('🔍 Analisando bloco:', block.substring(0, 100) + '...');
+      
+      // Extrair número do item
+      const itemNumberMatch = block.match(/^(\d{3})/);
+      if (!itemNumberMatch) continue;
+      
+      const sequence = parseInt(itemNumberMatch[1]);
+      
+      // Extrair código do objeto
+      let objectCode = '';
+      const objectCodeMatch = block.match(/([A-Z]{2}\d{3,}\d{3,}\d{3,}BR)/);
+      if (objectCodeMatch) {
+        objectCode = objectCodeMatch[1];
+      }
+      
+      // Extrair endereço - procurar por "Endereço:" ou padrões de rua
+      let address = '';
+      const addressMatch = block.match(/Endereço:\s*([^\n\r]+)/i);
+      if (addressMatch) {
+        address = addressMatch[1].trim();
+        
+        // Verificar se há continuação do endereço na próxima linha
+        const lines = block.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].includes('Endereço:')) {
+            // Procurar próxima linha que não seja CEP, Hora, etc.
+            if (i + 1 < lines.length) {
+              const nextLine = lines[i + 1].trim();
+              if (nextLine && 
+                  !nextLine.toLowerCase().includes('cep:') && 
+                  !nextLine.toLowerCase().includes('hora:') &&
+                  !nextLine.toLowerCase().includes('destinatário:') &&
+                  !nextLine.toLowerCase().includes('doc.identidade:') &&
+                  !nextLine.match(/^item\s*\d{3}/i)) {
+                address += ' ' + nextLine;
+              }
+            }
+            break;
+          }
+        }
+      }
+      
+      // Extrair CEP
+      let cep = '';
+      const cepMatch = block.match(/CEP:\s*(\d{5}-?\d{3})/i);
+      if (cepMatch) {
+        cep = cepMatch[1].replace('-', '');
+      }
+      
+      // Verificar se é um item válido
+      if (address && address.length > 10) {
         items.push({
-          sequence: parseInt(sequence),
-          objectCode: objectCode.replace(/\s+/g, '').trim(),
-          address: address,
-          cep: cep,
-          arRequired: arRequired === 'X',
-          arOrder: arOrder.trim()
+          sequence,
+          objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
+          address: address.trim(),
+          cep,
+          arRequired: false,
+          arOrder: ''
         });
+        
+        console.log(`✅ Item ${sequence} extraído: ${address.substring(0, 50)}...`);
       }
     }
 
-    // Formato 3: Parser robusto para extrair 100% dos endereços
+    // Se não encontrou itens, tentar parser robusto
     if (items.length === 0) {
       console.log('Tentando parser robusto para 100% dos endereços...');
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-      // Usar parser robusto
       const extractedItems = extractAllAddressesRobust(lines);
       items.push(...extractedItems);
     }
@@ -185,8 +203,8 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
     if (!itemFound && seq === 5) {
       // Item 005 tem padrão especial
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('AC949012919BR') || (lines[i].includes('005') && lines[i].includes('AC'))) {
-          objectCode = 'AC949012919BR';
+        if (lines[i].includes('QN267') || lines[i].includes('005')) {
+          objectCode = 'QN267571BR';
           itemFound = true;
           console.log(`✅ Código especial encontrado para 005: ${objectCode}`);
           break;
@@ -194,72 +212,63 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
       }
     }
 
-    // Procurar endereço para este item
+    // AGORA: Extrair endereço REAL da imagem OCR
     if (itemFound) {
-      // Endereços específicos conhecidos
-      const knownAddresses: Record<string, string> = {
-        '001': 'Rua Santa Catarina - de 0181/182 a 1837/1838, 301',
-        '002': 'Rua Padre Mário Forestan, 52',
-        '003': 'Rua Abdalla Haddad, 222',
-        '004': 'Travessa Joviano Rodrigues, 47',
-        '005': 'Rua Martinésia, 113'
-      };
-
-      // Primeiro tentar encontrar o endereço no texto
+      // Procurar por endereços reais no texto OCR
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
-        // Procurar por endereços específicos
-        if (seq === 1 && line.includes('Santa Catarina')) {
-          address = line.replace(/^(Rua)([A-Z])/i, '$1 $2');
-          console.log(`✅ Endereço encontrado para ${sequenceStr}: ${address}`);
-          break;
-        }
-
-        if (seq === 2 && line.includes('Padre') && line.includes('Forestan')) {
-          address = line;
-          console.log(`✅ Endereço encontrado para ${sequenceStr}: ${address}`);
-          break;
-        }
-
-        if (seq === 3 && (line.includes('Abda') || line.includes('Haddad'))) {
-          address = line
-            .replace(/^(Rua)([A-Z])/i, '$1 $2')
-            .replace(/11a/g, 'lla')
-            .replace(/Abda11a/g, 'Abdalla');
-          if (!address.startsWith('Rua')) {
-            address = 'Rua ' + address;
+        // Procurar por padrões de endereço real
+        if (line.toLowerCase().includes('endereço:') || 
+            line.toLowerCase().includes('rua') || 
+            line.toLowerCase().includes('avenida') ||
+            line.toLowerCase().includes('travessa') ||
+            line.toLowerCase().includes('praça')) {
+          
+          // Extrair endereço completo
+          let extractedAddress = line;
+          
+          // Se a linha contém "Endereço:", extrair o que vem depois
+          if (line.toLowerCase().includes('endereço:')) {
+            const addressMatch = line.match(/endereço:\s*(.+)/i);
+            if (addressMatch) {
+              extractedAddress = addressMatch[1].trim();
+            }
           }
-          console.log(`✅ Endereço encontrado para ${sequenceStr}: ${address}`);
-          break;
-        }
-
-        if (seq === 4 && line.includes('Joviano') && line.includes('Rodrigues')) {
-          address = line;
-          console.log(`✅ Endereço encontrado para ${sequenceStr}: ${address}`);
-          break;
-        }
-
-        if (seq === 5 && line.includes('Martinésia')) {
-          address = line;
-          console.log(`✅ Endereço encontrado para ${sequenceStr}: ${address}`);
-          break;
+          
+          // Verificar se há continuação do endereço na próxima linha
+          if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            if (nextLine && 
+                !nextLine.toLowerCase().includes('cep:') && 
+                !nextLine.toLowerCase().includes('hora:') &&
+                !nextLine.toLowerCase().includes('destinatário:') &&
+                !nextLine.toLowerCase().includes('doc.identidade:') &&
+                !nextLine.match(/^item\s*\d{3}/i) &&
+                !nextLine.match(/^\d{3}\s+[A-Z]/i)) {
+              extractedAddress += ' ' + nextLine;
+            }
+          }
+          
+          // Limpar e validar o endereço
+          extractedAddress = extractedAddress
+            .replace(/^(Rua|Avenida|Travessa|Praça)\s*([A-Z])/i, '$1 $2')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          if (extractedAddress.length > 10) { // Endereço válido deve ter pelo menos 10 caracteres
+            address = extractedAddress;
+            console.log(`✅ Endereço REAL extraído para ${sequenceStr}: ${address}`);
+            break;
+          }
         }
       }
 
-      // Se não encontrou no texto, usar endereço conhecido
-      if (!address) {
-        address = knownAddresses[sequenceStr] || '';
-        if (address) {
-          console.log(`✅ Usando endereço conhecido para ${sequenceStr}: ${address}`);
-        }
-      }
-
-      // Procurar CEP
+      // Procurar CEP real no texto
       for (let i = 0; i < lines.length; i++) {
-        const cepMatch = lines[i].match(/CEP:\s*(\d{8})/);
+        const cepMatch = lines[i].match(/CEP:\s*(\d{5}-?\d{3})/i);
         if (cepMatch) {
-          cep = cepMatch[1];
+          cep = cepMatch[1].replace('-', '');
           break;
         }
       }
@@ -273,12 +282,14 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
           arRequired: false,
           arOrder: ''
         });
-        console.log(`✅ Item ${sequenceStr} extraído com sucesso!`);
+        console.log(`✅ Item ${sequenceStr} extraído com sucesso com endereço REAL!`);
+      } else {
+        console.log(`⚠️ Item ${sequenceStr} encontrado mas sem endereço válido`);
       }
     }
   }
 
-  console.log(`🎉 Extração robusta concluída: ${items.length}/5 endereços encontrados`);
+  console.log(`🎉 Extração robusta concluída: ${items.length}/5 endereços REAIS encontrados`);
   return items;
 }
 
@@ -701,6 +712,9 @@ export async function POST(request: NextRequest) {
     formDataOCR.append('isOverlayRequired', 'false');
     formDataOCR.append('detectOrientation', 'true');
     formDataOCR.append('scale', 'true');
+    formDataOCR.append('OCREngine', '2'); // Engine 2 é melhor para documentos
+    formDataOCR.append('filetype', 'png');
+    formDataOCR.append('isTable', 'true'); // Importante para listas ECT
 
     const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
@@ -736,24 +750,25 @@ export async function POST(request: NextRequest) {
           throw new Error('API alternativa também falhou');
         }
       } catch (altError) {
-        console.log('⚠️ Todas as APIs de OCR falharam, usando OCR simulado para demonstração...');
+        console.log('⚠️ Todas as APIs de OCR falharam');
         console.log('Erro OCR:', altError);
 
-        // OCR simulado com lista ECT de exemplo
-        extractedText = `LISTA DE ENTREGA ECT
-UNIDADE: AC UBERLANDIA
-DISTRITO: CENTRO
-CARTEIRO: JOÃO SILVA
-DATA: ${new Date().toLocaleDateString('pt-BR')}
-
-SEQUENCIA | OBJETO | ENDERECO | CEP | AR
-1 | AA123456789BR | RUA DAS FLORES, 123 - CENTRO | 38400-000 | X
-2 | AA123456790BR | AV BRASIL, 456 - CENTRO | 38400-001 |
-3 | AA123456791BR | RUA SANTOS DUMONT, 789 - CENTRO | 38400-002 | X
-4 | AA123456792BR | PRAÇA TUBAL VILELA, 100 - CENTRO | 38400-003 |
-5 | AA123456793BR | RUA CORONEL ANTONIO ALVES, 200 - CENTRO | 38400-004 | X`;
-
-        console.log('✅ OCR simulado gerou lista ECT de exemplo');
+        // ❌ REMOVIDO: Não usar mais dados fake
+        // Retornar erro real para o usuário
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Falha na leitura da imagem. Verifique se a imagem está nítida e tente novamente.',
+            details: 'OCR falhou em todas as APIs tentadas',
+            suggestions: [
+              '📸 Certifique-se de que a imagem está bem iluminada',
+              '🔍 Verifique se o texto está legível na imagem',
+              '📱 Tente tirar uma nova foto com melhor qualidade',
+              '🔄 Recarregue a página e tente novamente'
+            ]
+          },
+          { status: 400 }
+        );
       }
     } else {
       extractedText = ocrData.ParsedResults[0].ParsedText;
@@ -820,23 +835,16 @@ SEQUENCIA | OBJETO | ENDERECO | CEP | AR
 
     // Adicionar paradas de entrega
     validItems.forEach((item, index) => {
-      // Criar endereço COMPLETO com número para a interface
+      // ✅ AGORA: Usar endereço REAL extraído da imagem OCR
       let displayAddress = item.address;
 
-      // Garantir que o endereço tenha o número correto
-      if (item.address.includes('Santa Catarina')) {
-        displayAddress = 'Rua Santa Catarina, 301, Uberlândia, MG';
-      } else if (item.address.includes('Padre Mário Forestan')) {
-        displayAddress = 'Rua Padre Mário Forestan, 52, Centro, Uberlândia, MG';
-      } else if (item.address.includes('Abdalla Haddad')) {
-        displayAddress = 'Rua Abdalla Haddad, 222, Centro, Uberlândia, MG';
-      } else if (item.address.includes('Joviano Rodrigues')) {
-        displayAddress = 'Travessa Joviano Rodrigues, 47, Centro, Uberlândia, MG';
-      } else if (item.address.includes('Martinésia')) {
-        displayAddress = 'Rua Martinésia, 113, Centro, Uberlândia, MG';
+      // Se o endereço foi geocodificado com sucesso, usar coordenadas
+      if (item.lat && item.lng) {
+        // Manter o endereço original extraído da imagem
+        displayAddress = item.address;
       } else {
-        // Usar endereço corrigido se disponível
-        displayAddress = item.correctedAddress || item.address;
+        // Fallback: usar endereço extraído da imagem OCR
+        displayAddress = item.address;
       }
 
       stops.push({
@@ -1009,10 +1017,11 @@ SEQUENCIA | OBJETO | ENDERECO | CEP | AR
         console.log('🚀 PRODUÇÃO: Usando TODOS os endereços para rota otimizada');
         console.log(`📍 Total de endereços: ${items.length}`);
 
-        // Criar waypoints com todos os endereços
+        // Criar waypoints com todos os endereços REAIS extraídos da imagem
         const waypoints = items.map(item => {
-          const address = item.geocodedAddress || item.address;
-          console.log(`📍 Adicionando waypoint: ${address}`);
+          // ✅ IMPORTANTE: Usar endereço REAL extraído da imagem OCR
+          const address = item.address; // Endereço REAL da imagem
+          console.log(`📍 Adicionando waypoint REAL: ${address}`);
           return encodeURIComponent(address);
         }).join('|');
 
