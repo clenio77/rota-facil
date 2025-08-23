@@ -30,6 +30,8 @@ export default function BottomNavigation() {
       }
     } else if (pathname === '/carteiro') {
       setActiveTab('carteiro');
+    } else if (pathname === '/photo') {
+      setActiveTab('photo');
     } else if (pathname === '/dashboard') {
       setActiveTab('dashboard');
     }
