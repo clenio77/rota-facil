@@ -813,7 +813,8 @@ export async function POST(request: NextRequest) {
       body: formDataOCR,
       headers: {
         'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
-      }
+      },
+      signal: AbortSignal.timeout(15000) // ✅ TIMEOUT: 15 segundos para evitar travamento
     });
 
     const ocrData = await ocrResponse.json();
