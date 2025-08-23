@@ -97,9 +97,216 @@ body {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* Fix para imagens pretas do Next.js */
+img[style*="color:transparent"] {
+  color: inherit !important;
+}
+
+img[data-nimg] {
+  color: inherit !important;
+}
+
+/* Garantir que as imagens sejam exibidas corretamente */
+img {
+  color: inherit !important;
+  filter: none !important;
+}
+
+/* Fix específico para todas as logos - remover bordas pretas */
+img[alt*="Logo"], 
+img[src*="logo"], 
+img[src*="rota-facil"],
+img[src*="carro-azul"] {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  /* Remover qualquer cor de fundo forçada */
+  background-color: transparent !important;
+  /* Garantir que não há borda interna */
+  box-sizing: border-box !important;
+  /* Forçar transparência */
+  opacity: 1 !important;
+  /* Remover qualquer filtro que possa causar bordas */
+  filter: none !important;
+  /* Garantir que não há margem interna */
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Remover especificamente bordas pretas de imagens */
+img {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  /* Reset completo de bordas */
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+}
+
+/* Fix para SVGs especificamente */
+svg, img[src$=".svg"] {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Fix agressivo para remover qualquer borda preta */
+img, svg {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+  /* Forçar transparência */
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Forçar fundo transparente em todos os containers de logo */
+.w-16.h-16.relative, 
+.w-20.h-20.relative {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  /* Garantir que o container não tenha fundo */
+  background-color: transparent !important;
+}
+
+/* Reset completo para imagens problemáticas */
+*[src*="logo"], 
+*[alt*="Logo"],
+*[src*="carro-azul"] {
+  border: 0 !important;
+  background: transparent !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  /* Forçar transparência */
+  background-color: transparent !important;
+}
+
+/* Fix específico para logos transparentes */
+.logo-transparent,
+.logo-remove-bg,
+img[src*="rota-facil-logo.svg"],
+img[src*="logo-carro-azul"],
+img[src*="logo-carro-azul-transparente"] {
+  /* Remover todas as bordas possíveis */
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  
+  /* Forçar fundo transparente */
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  
+  /* Remover sombras e efeitos */
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+  text-shadow: none !important;
+  
+  /* Garantir transparência total */
+  opacity: 1 !important;
+  filter: none !important;
+  
+  /* Reset de espaçamento */
+  padding: 0 !important;
+  margin: 0 !important;
+  
+  /* Força display e overflow */
+  display: block !important;
+  overflow: visible !important;
+  
+  /* Remove qualquer transformação */
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+}
+
+/* Classe específica para remover fundo de imagens PNG */
+.logo-remove-bg {
+  /* Usar mix-blend-mode para remover fundo branco */
+  mix-blend-mode: multiply !important;
+  /* Filtro para aumentar contraste e remover fundo */
+  filter: contrast(1.2) brightness(1.1) !important;
+  /* Adicionar máscara para remover cores próximas ao branco */
+  -webkit-mask: linear-gradient(black, black) !important;
+  mask: linear-gradient(black, black) !important;
+}
+
+/* CSS adicional para PNG com fundo branco */
+img[src*="logo-carro-azul.png"] {
+  /* Tentar remover fundo branco */
+  mix-blend-mode: multiply !important;
+  filter: contrast(1.3) brightness(0.9) saturate(1.2) !important;
+}
+
+/* CSS para a nova imagem com fundo já removido */
+img[src*="logo-carro-azul-removebg-preview.png"] {
+  /* Imagem já tem fundo transparente, apenas garantir qualidade */
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+/* CSS para a nova logo do Clenio Consultory */
+img[src*="logo-clenio-photoaidcom-cropped.jpeg"] {
+  /* Tentar remover fundo branco se necessário */
+  mix-blend-mode: multiply !important;
+  filter: contrast(1.1) brightness(1.05) !important;
+}
+
 /* Loading skeleton */
 .skeleton {
   @apply animate-pulse bg-gray-200 rounded;
+}
+
+/* Variáveis de cor personalizadas para harmonizar com a logo */
+:root {
+  --primary-blue: #3B82F6;
+  --primary-blue-light: #60A5FA;
+  --primary-blue-dark: #1E40AF;
+  --accent-indigo: #6366F1;
+  --accent-indigo-light: #818CF8;
+  --accent-indigo-dark: #4338CA;
+  --neutral-slate: #64748B;
+  --neutral-slate-light: #94A3B8;
+  --neutral-slate-dark: #475569;
+}
+
+/* Gradientes personalizados para harmonizar com a logo */
+.bg-logo-harmony {
+  background: linear-gradient(135deg, #EBF8FF 0%, #FFFFFF 50%, #EEF2FF 100%);
+}
+
+.bg-card-harmony {
+  background: linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 50%, #F1F5F9 100%);
+}
+
+/* Sombras personalizadas que complementam a logo */
+.shadow-logo {
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2), 0 2px 4px -1px rgba(59, 130, 246, 0.1);
+}
+
+/* Sombra customizada mais definida */
+.shadow-custom {
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.15), 0 4px 6px -2px rgba(59, 130, 246, 0.1);
+}
+
+.shadow-logo-lg {
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(59, 130, 246, 0.05);
 }
 
 /* Map container styles */

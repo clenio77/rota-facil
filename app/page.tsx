@@ -260,6 +260,16 @@ export default function HomePage() {
       // VERIFICAR MODO DE OPERAÇÃO
       const isTestMode = !supabaseUrl || !supabaseKey || supabaseUrl.includes('seu-projeto') || supabaseKey.includes('sua-chave');
 
+      let result: {
+        success: boolean;
+        address: string;
+        extractedText?: string;
+        confidence?: number;
+        lat?: number;
+        lng?: number;
+        error?: string;
+      };
+
       if (isTestMode) {
         // MODO TESTE: Simular diferentes cenários de OCR
         const testScenarios = [
@@ -271,8 +281,8 @@ export default function HomePage() {
               address: 'Rua Augusta, 123, São Paulo, SP',
               extractedText: 'Rua Augusta, 123\nSão Paulo, SP',
               confidence: 0.8,
-              lat: null,
-              lng: null
+              lat: undefined,
+              lng: undefined
             }
           },
           {
@@ -291,7 +301,7 @@ export default function HomePage() {
         // Alternar entre cenários a cada teste
         const scenarioIndex = stops.length % testScenarios.length;
         const scenario = testScenarios[scenarioIndex];
-        const result = scenario.result;
+        result = scenario.result;
 
         console.log(`🧪 MODO TESTE: ${scenario.name}`, result);
       } else {
@@ -306,7 +316,7 @@ export default function HomePage() {
           }),
         });
 
-        const result = await response.json();
+        result = await response.json();
         console.log('📍 Resultado OCR real:', result);
       }
 
@@ -761,14 +771,17 @@ export default function HomePage() {
         name: 'Endereço de São Paulo (rejeitado)',
         address: 'Rua Augusta, 123, São Paulo, SP',
         success: false,
-        error: '❌ Endereço rejeitado: "Rua Augusta, 123, São Paulo, SP" não está em Uberlândia, MG. Tire uma foto de um endereço local.'
+        error: '❌ Endereço rejeitado: "Rua Augusta, 123, São Paulo, SP" não está em Uberlândia, MG. Tire uma foto de um endereço local.',
+        lat: undefined,
+        lng: undefined
       },
       accepted: {
         name: 'Endereço de Uberlândia (aceito)',
         address: 'Rua Coronel Antônio Alves, 1234, Uberlândia, MG',
         success: true,
         lat: -18.9186,
-        lng: -48.2772
+        lng: -48.2772,
+        error: undefined
       }
     };
 
@@ -801,7 +814,7 @@ export default function HomePage() {
       } else {
         setStops(prev => prev.map(stop =>
           stop.id === newStop.id
-            ? { ...stop, status: 'error', address: scenario.error }
+            ? { ...stop, status: 'error', address: scenario.error || 'Erro desconhecido' }
             : stop
         ));
       }
@@ -872,17 +885,17 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       {/* 🏆 HEADER PRINCIPAL COM LOGO */}
-      <div className="bg-white rounded-xl shadow-custom p-6">
+      <div className="bg-white rounded-xl shadow-custom p-6 border-2 border-blue-300">
                         <div className="flex items-center justify-center gap-4 mb-4">
-                  <div className="w-16 h-16 relative">
-                    <Image
-                      src="/logo-carro-azul.png"
-                      alt="Rota Fácil Logo"
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-contain drop-shadow-lg"
-                    />
-                  </div>
+                                  <div className="w-16 h-16 relative">
+                  <img
+                    src="/logo-carro-azul-removebg-preview.png"
+                    alt="Rota Fácil Logo"
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
           <div className="text-center">
             <h1 className="text-3xl font-bold text-slate-800 leading-tight">ROTA FÁCIL</h1>
             <p className="text-lg text-slate-600 leading-tight">MOURA <span className="bg-green-500 text-white px-2 py-1 rounded text-sm font-bold ml-2">PRO</span></p>
@@ -925,7 +938,7 @@ export default function HomePage() {
       )}
 
       {/* Header Section */}
-      <div id="stops-section" className="bg-white rounded-xl shadow-custom p-6 scroll-mt-24">
+      <div id="stops-section" className="bg-white rounded-xl shadow-custom p-6 scroll-mt-24 border-2 border-slate-300">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Minhas Paradas</h2>
@@ -1134,7 +1147,7 @@ export default function HomePage() {
 
           <div className="space-y-4">
         {stops.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-custom p-12 text-center">
+          <div className="bg-white rounded-xl shadow-custom p-12 text-center border-2 border-blue-300">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -1168,8 +1181,8 @@ export default function HomePage() {
 
         {/* Map Display - sticky on large screens */}
         <div id="route-section" className="order-1 lg:order-2 scroll-mt-24">
-          {showMap && confirmedStops.length > 0 && (
-            <div className="bg-white rounded-xl shadow-custom p-4 lg:p-6 lg:sticky lg:top-6">
+          {showMap && confirmedStops.length > 0 ? (
+            <div className="bg-white rounded-xl shadow-custom p-4 lg:p-6 lg:sticky lg:top-6 border-2 border-slate-300">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Rota Otimizada</h3>
                 <div className="flex items-center gap-2">
@@ -1180,6 +1193,24 @@ export default function HomePage() {
               <div className="h-96 lg:h-[600px]">
                 <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
               </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-custom p-8 text-center border-2 border-slate-300">
+              <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma rota otimizada</h3>
+              <p className="text-gray-500 mb-4">Adicione paradas e otimize sua rota para ver o mapa</p>
+              <button 
+                onClick={() => setShowMap(true)}
+                className="btn-primary inline-flex items-center gap-2"
+                disabled={confirmedStops.length === 0}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Ver Rota
+              </button>
             </div>
           )}
         </div>

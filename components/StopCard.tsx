@@ -55,7 +55,7 @@ export default function StopCard({
   const config = statusConfig[status];
   
   return (
-    <div className="bg-white rounded-xl shadow-custom p-4 card-hover animate-fadeIn">
+    <div className="bg-white rounded-xl shadow-custom p-4 card-hover animate-fadeIn border-2 border-blue-300">
       <div className="flex items-start space-x-4">
         {/* Sequence Number */}
         {sequence && (

@@ -1,11 +1,9 @@
-import withPWA from 'next-pwa';
-
-const config = withPWA({
+const withPWA = require('next-pwa')({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
 });
 
-export default config({
+module.exports = withPWA({
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,

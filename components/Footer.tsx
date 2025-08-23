@@ -20,12 +20,12 @@ export default function Footer({ className = '' }: FooterProps) {
           <div className="text-center">
             <div className="flex items-center justify-center gap-4 mb-3">
                               <div className="w-20 h-20 relative">
-                  <Image
-                    src="/logo-carro-azul.png"
+                  <img
+                    src="/logo-carro-azul-removebg-preview.png"
                     alt="Rota Fácil Logo"
                     width={80}
                     height={80}
-                    className="w-full h-full object-contain drop-shadow-lg"
+                    className="w-full h-full object-contain"
                   />
                 </div>
               <div className="text-left">
@@ -39,34 +39,16 @@ export default function Footer({ className = '' }: FooterProps) {
           </div>
 
           {/* Developer Section - Destaque Maior */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 text-center">
+          <div className="bg-white border-2 border-blue-300 rounded-2xl p-6 text-center shadow-lg">
             <div className="flex items-center justify-center gap-4 mb-4">
               <div className="w-20 h-20 relative">
-                <svg viewBox="0 0 800 800" className="w-full h-full">
-                  <defs>
-                    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style={{stopColor:'#00bcd4', stopOpacity:1}} />
-                      <stop offset="50%" style={{stopColor:'#2196f3', stopOpacity:1}} />
-                      <stop offset="100%" style={{stopColor:'#9c27b0', stopOpacity:1}} />
-                    </linearGradient>
-                  </defs>
-
-                  <g fill="url(#brainGradient)" stroke="url(#brainGradient)" strokeWidth="8">
-                    <path d="M200 300 C200 200, 300 150, 400 150 C500 150, 600 200, 600 300 C600 350, 580 400, 550 450 C520 500, 480 520, 450 530 C420 540, 380 540, 350 530 C320 520, 280 500, 250 450 C220 400, 200 350, 200 300 Z" fill="none" strokeWidth="12"/>
-
-                    <circle cx="300" cy="250" r="15" fill="currentColor"/>
-                    <circle cx="400" cy="220" r="18" fill="currentColor"/>
-                    <circle cx="500" cy="250" r="15" fill="currentColor"/>
-                    <circle cx="350" cy="320" r="16" fill="currentColor"/>
-                    <circle cx="450" cy="320" r="16" fill="currentColor"/>
-                    <circle cx="400" cy="380" r="14" fill="currentColor"/>
-
-                    <line x1="300" y1="250" x2="400" y2="220" strokeWidth="6" opacity="0.8"/>
-                    <line x1="400" y1="220" x2="500" y2="250" strokeWidth="6" opacity="0.8"/>
-                    <line x1="350" y1="320" x2="450" y2="320" strokeWidth="6" opacity="0.8"/>
-                    <line x1="400" y1="220" x2="400" y2="380" strokeWidth="6" opacity="0.8"/>
-                  </g>
-                </svg>
+                <img
+                  src="/logo-clenio-photoaidcom-cropped.jpeg"
+                  alt="Clenio Consultory AI Logo"
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div className="text-left">
                 <div className="text-xl font-bold text-slate-800 leading-tight">CLENIO</div>
