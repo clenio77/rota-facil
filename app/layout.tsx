@@ -43,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -54,7 +54,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Rota Fácil Moura" />
         <meta name="theme-color" content="#4CAF50" />
       </head>
-      <body className={`${inter.className} bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300 text-gray-900`}>
+      <body className={`${inter.className} bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300 text-gray-900`} suppressHydrationWarning>
         <div className="min-h-screen flex flex-col">
           {/* Header Fixo - Sempre Visível */}
           <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">

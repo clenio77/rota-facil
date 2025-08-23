@@ -1,260 +1,303 @@
-'use client'
+'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import PhotoUpload from './components/PhotoUpload';
-import ProcessingStatus from './components/ProcessingStatus';
-import RouteResult from './components/RouteResult';
-import ECTListResult from './components/ECTListResult';
-import CacheStats from './components/CacheStats';
-import { useGeolocation } from '../../hooks/useGeolocation';
+import React, { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
-interface RouteData {
-  stops: Array<{
-    address: string;
-    lat: number;
-    lng: number;
-    sequence: number;
-  }>;
-  totalDistance: number;
-  totalTime: number;
-  googleMapsUrl: string;
-  ectData?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  geocodedItems?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+interface ECTItem {
+  sequence: number;
+  objectCode: string;
+  address: string;
+  cep?: string;
+  lat?: number;
+  lng?: number;
+}
+
+interface ProcessedECTList {
+  success: boolean;
+  items: ECTItem[];
+  totalItems: number;
+  city: string;
+  state: string;
+  googleMapsUrl?: string;
+  error?: string;
 }
 
 export default function CarteiroPage() {
-  const [processing, setProcessing] = useState(false);
-  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedData, setProcessedData] = useState<ProcessedECTList | null>(null);
+  const [showAddressEditor, setShowAddressEditor] = useState(false);
+  const [editableItems, setEditableItems] = useState<ECTItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
-  // Hook de geolocalização para filtrar por cidade
-  const { position: deviceLocation, isLoading: locationLoading } = useGeolocation();
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setProcessedData(null);
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const response = await fetch('/api/carteiro/process-ect-list', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data: ProcessedECTList = await response.json();
+
+      if (data.success) {
+        setProcessedData(data);
+        setEditableItems([...data.items]); // Cópia editável
+        setShowAddressEditor(true); // Mostrar editor automaticamente
+      } else {
+        setError(data.error || 'Erro ao processar lista ECT');
+      }
+    } catch (err) {
+      setError('Erro de conexão. Tente novamente.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAddressEdit = (index: number, newAddress: string) => {
+    const updatedItems = [...editableItems];
+    updatedItems[index] = { ...updatedItems[index], address: newAddress };
+    setEditableItems(updatedItems);
+  };
+
+  const handleSaveAndGenerateRoute = async () => {
+    if (!processedData) return;
+
+    // Atualizar dados processados com endereços editados
+    const updatedData = {
+      ...processedData,
+      items: editableItems
+    };
+
+    // Gerar nova URL do Google Maps com endereços corrigidos
+    try {
+      const response = await fetch('/api/carteiro/generate-route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+      });
+
+      const routeData = await response.json();
+      
+      if (routeData.success) {
+        setProcessedData({
+          ...updatedData,
+          googleMapsUrl: routeData.googleMapsUrl
+        });
+        setShowAddressEditor(false);
+      } else {
+        setError('Erro ao gerar rota. Tente novamente.');
+      }
+    } catch (err) {
+      setError('Erro ao gerar rota. Tente novamente.');
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setEditableItems([...processedData!.items]); // Restaurar original
+    setShowAddressEditor(false);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Botão fixo de voltar para a tela principal */}
-        <div className="sticky top-0 z-40 flex justify-start mb-4">
-          <Link href="/" className="inline-flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-2 rounded-lg shadow hover:shadow-md border border-gray-200">
-            <span>←</span>
-            <span className="text-sm font-medium">Voltar</span>
-          </Link>
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">
+        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <img 
+              src="/logo-carro-azul-removebg-preview.png" 
+              alt="Rota Fácil" 
+              className="h-12 w-auto"
+            />
+            <h1 className="text-2xl font-bold">Versão Profissional para Carteiros</h1>
+          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+          >
+            ← Voltar
+          </button>
         </div>
-        {/* Header Profissional */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-6 shadow-lg">
-            <span className="text-5xl">📮</span>
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            RotaFácil para Carteiros
-          </h1>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Processe suas listas de entrega e gere rotas otimizadas em segundos com tecnologia de ponta
-          </p>
+      </header>
 
-          {/* Link de volta */}
-          <div className="mt-6">
-            <Link
-              href="/"
-              className="inline-flex items-center space-x-2 text-gray-600 hover:text-blue-600 font-medium transition-colors"
-            >
-              <span>←</span>
-              <span>Voltar para versão básica</span>
-            </Link>
-          </div>
-
-          {/* Badges de Recursos */}
-          <div className="flex flex-wrap justify-center gap-3 mt-6">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-              ✅ OCR Inteligente
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-              🗺️ Geocodificação BR
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-              🚀 Rota Otimizada
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
-              📱 100% Gratuito
-            </span>
-          </div>
-          
-          {/* Indicador de Localização */}
-          {deviceLocation && (
-            <div className="mt-4 inline-flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
-              <span>📍</span>
-              <span>Filtro ativo: {deviceLocation.city || 'Localizando...'}, {deviceLocation.state || ''}</span>
-            </div>
-          )}
-          {locationLoading && (
-            <div className="mt-4 inline-flex items-center space-x-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
-              <span>🔄</span>
-              <span>Detectando sua localização...</span>
-            </div>
-          )}
-        </div>
-
-        {/* Interface Principal - Design Profissional */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-12 border border-gray-100">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            🚀 Como funciona?
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 pt-20 pb-24">
+        {/* Upload Section */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            📸 Upload de Lista ECT
           </h2>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <span className="text-3xl">📸</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-3 text-lg">1. Tire uma foto</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Fotografe a lista de entrega do sistema Correios.
-                Nossa IA detecta automaticamente listas ECT.
-              </p>
-            </div>
-
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <span className="text-3xl">🤖</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-3 text-lg">2. Processamento automático</h3>
-              <p className="text-gray-600 leading-relaxed">
-                IA extrai endereços com OCR avançado e geocodifica
-                automaticamente para o Brasil.
-              </p>
-            </div>
-
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <span className="text-3xl">🗺️</span>
-              </div>
-              <h3 className="font-bold text-gray-800 mb-3 text-lg">3. Rota otimizada</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Receba rota otimizada para Google Maps com sequência
-                inteligente de entregas.
-              </p>
-            </div>
-          </div>
-
-          {/* Upload de Foto */}
-          <PhotoUpload 
-            onProcessingStart={() => setProcessing(true)}
-            onProcessingComplete={(data) => {
-              setRouteData((data as { routeData: RouteData }).routeData);
-              setProcessing(false);
-            }}
-            onError={(error) => {
-              setError(error);
-              setProcessing(false);
-            }}
-            userLocation={deviceLocation}
-          />
-        </div>
-
-        {/* Status do Processamento */}
-        {processing && (
-          <ProcessingStatus />
-        )}
-
-        {/* Resultado da Rota */}
-        {routeData && (
-          <>
-            {/* Verificar se é resultado de lista ECT */}
-            {routeData.ectData ? (
-              <ECTListResult 
-                ectData={routeData.ectData}
-                geocodedItems={routeData.geocodedItems}
-                routeData={routeData}
-              />
-            ) : (
-              <RouteResult routeData={routeData} />
-            )}
-          </>
-        )}
-
-        {/* Mensagem de Erro */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <span className="text-red-400">⚠️</span>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
-                  Erro no processamento
-                </h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
-                </div>
-                <div className="mt-4">
-                  <button
-                    onClick={() => setError(null)}
-                    className="bg-red-100 text-red-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-200"
-                  >
-                    Tentar novamente
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* GPX Optimizer Section */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
-            🚀 GPX Optimizer - Nova Funcionalidade
-          </h3>
-          <div className="space-y-3">
-            <p className="text-green-700">
-              Otimize suas rotas GPX com algoritmos avançados e filtro de localização inteligente!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/gpx-optimizer"
-                className="inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            
+            {!isProcessing && !processedData && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                <span className="mr-2">🚀</span>
-                Acessar GPX Optimizer
-              </Link>
-              <div className="text-sm text-green-600 flex items-center">
-                {deviceLocation && (
-                  <span>✅ Filtro de localização ativo para {deviceLocation.city}</span>
-                )}
-                {!deviceLocation && (
-                  <span>📍 Ative a localização para filtro automático</span>
-                )}
+                📁 Selecionar Imagem da Lista ECT
+              </button>
+            )}
+
+            {isProcessing && (
+              <div className="text-blue-600">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                Processando imagem...
               </div>
-            </div>
-            <div className="text-xs text-green-600 space-y-1">
-              <p>• Algoritmos: Nearest Neighbor, 2-opt, Genetic Algorithm</p>
-              <p>• Filtro automático por proximidade da sua localização</p>
-              <p>• Economia de combustível e tempo calculada automaticamente</p>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Informações Adicionais */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-800 mb-4">
-            💡 Dicas para melhor resultado
-          </h3>
-          <ul className="text-blue-700 space-y-2">
-            <li>• Tire a foto em boa luz e com a tela bem visível</li>
-            <li>• Certifique-se de que todos os endereços estão legíveis</li>
-            <li>• A foto deve incluir a lista completa de entregas</li>
-            <li>• Use o modo paisagem para capturar mais conteúdo</li>
-            {deviceLocation && (
-              <li>• ✅ <strong>Filtro ativo:</strong> Priorizando endereços em {deviceLocation.city}</li>
-            )}
-            {!deviceLocation && !locationLoading && (
-              <li>• ⚠️ <strong>Permitir localização</strong> para filtrar endereços da sua cidade</li>
-            )}
-          </ul>
-        </div>
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            ❌ {error}
+          </div>
+        )}
 
-        {/* Componente de Estatísticas do Cache */}
-        <CacheStats />
-      </div>
+        {/* Address Editor */}
+        {showAddressEditor && editableItems.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              ✏️ Editor de Endereços
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Revise e edite os endereços extraídos antes de gerar a rota no Google Maps.
+            </p>
+            
+            <div className="space-y-4">
+              {editableItems.map((item, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-700">
+                      Item {item.sequence.toString().padStart(3, '0')} - {item.objectCode}
+                    </span>
+                    {item.cep && (
+                      <span className="text-sm text-gray-500">CEP: {item.cep}</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <label className="text-sm font-medium text-gray-700 min-w-0">
+                      Endereço:
+                    </label>
+                    <input
+                      type="text"
+                      value={item.address}
+                      onChange={(e) => handleAddressEdit(index, e.target.value)}
+                      className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Digite o endereço correto..."
+                    />
+                  </div>
+                  
+                  {item.lat && item.lng && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Coordenadas: {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleSaveAndGenerateRoute}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+              >
+                ✅ Salvar e Gerar Rota
+              </button>
+              <button
+                onClick={handleDiscardChanges}
+                className="bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+              >
+                ❌ Descartar Alterações
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Results Display */}
+        {processedData && !showAddressEditor && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              🎯 Resultados do Processamento
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-2">📊 Estatísticas</h3>
+                <p className="text-blue-700">Total de itens: {processedData.totalItems}</p>
+                <p className="text-blue-700">Cidade: {processedData.city}</p>
+                <p className="text-blue-700">Estado: {processedData.state}</p>
+              </div>
+              
+              {processedData.googleMapsUrl && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-green-800 mb-2">🗺️ Rota Gerada</h3>
+                  <a
+                    href={processedData.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-block"
+                  >
+                    🚀 Abrir no Google Maps
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-800">📍 Endereços Processados</h3>
+              {processedData.items.map((item, index) => (
+                <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">
+                      {item.sequence.toString().padStart(3, '0')} - {item.objectCode}
+                    </span>
+                    {item.cep && (
+                      <span className="text-sm text-gray-500">CEP: {item.cep}</span>
+                    )}
+                  </div>
+                  <p className="text-gray-600">{item.address}</p>
+                  {item.lat && item.lng && (
+                    <p className="text-xs text-gray-500">
+                      Coordenadas: {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6">
+              <button
+                onClick={() => setShowAddressEditor(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              >
+                ✏️ Editar Endereços Novamente
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
