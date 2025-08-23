@@ -816,39 +816,35 @@ export async function POST(request: NextRequest) {
     let extractedText = '';
 
     if (ocrData.IsErroredOnProcessing || !ocrData.ParsedResults?.[0]?.ParsedText) {
-      console.log('⚠️ OCR.space falhou, tentando API alternativa...');
+      // ✅ FALLBACK: Tentar API alternativa com timeout reduzido
+      if (!extractedText) {
+        console.log('⚠️ OCR.space falhou, tentando API alternativa...');
+        try {
+          const altResponse = await fetch(`https://api.ocr.space/parse/imageurl?url=data:${photo.type};base64,${base64Image}&language=por&apikey=${process.env.OCR_SPACE_API_KEY || 'helloworld'}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            // ✅ TIMEOUT REDUZIDO: 30 segundos em vez de indefinido
+            signal: AbortSignal.timeout(30000)
+          });
+          
+          // ✅ VERIFICAÇÃO DE TIPO DE CONTEÚDO
+          const contentType = altResponse.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            console.log('⚠️ API alternativa retornou HTML em vez de JSON, pulando...');
+            throw new Error('API retornou HTML em vez de JSON');
+          }
+          
+          const altData = await altResponse.json();
 
-      // Tentar API alternativa com URL direta
-      try {
-        const altResponse = await fetch(`https://api.ocr.space/parse/imageurl?url=data:${photo.type};base64,${base64Image}&language=por&apikey=${process.env.OCR_SPACE_API_KEY || 'helloworld'}`);
-        const altData = await altResponse.json();
-
-        if (!altData.IsErroredOnProcessing && altData.ParsedResults?.[0]?.ParsedText) {
-          extractedText = altData.ParsedResults[0].ParsedText;
-          console.log('✅ API alternativa funcionou!');
-        } else {
-          throw new Error('API alternativa também falhou');
+          if (!altData.IsErroredOnProcessing && altData.ParsedResults?.[0]?.ParsedText) {
+            extractedText = altData.ParsedResults[0].ParsedText;
+            console.log('✅ API alternativa funcionou:', extractedText.substring(0, 100) + '...');
+          }
+        } catch (altError) {
+          console.log('⚠️ API alternativa falhou:', altError instanceof Error ? altError.message : 'Erro desconhecido');
         }
-      } catch (altError) {
-        console.log('⚠️ Todas as APIs de OCR falharam');
-        console.log('Erro OCR:', altError);
-
-        // ❌ REMOVIDO: Não usar mais dados fake
-        // Retornar erro real para o usuário
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Falha na leitura da imagem. Verifique se a imagem está nítida e tente novamente.',
-            details: 'OCR falhou em todas as APIs tentadas',
-            suggestions: [
-              '📸 Certifique-se de que a imagem está bem iluminada',
-              '🔍 Verifique se o texto está legível na imagem',
-              '📱 Tente tirar uma nova foto com melhor qualidade',
-              '🔄 Recarregue a página e tente novamente'
-            ]
-          },
-          { status: 400 }
-        );
       }
     } else {
       extractedText = ocrData.ParsedResults[0].ParsedText;
