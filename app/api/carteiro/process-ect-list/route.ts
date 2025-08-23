@@ -152,144 +152,207 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
   console.log('🔍 Iniciando extração robusta de TODOS os endereços...');
 
   const items: ECTDeliveryItem[] = [];
+  const extractedAddresses = new Set<string>(); // Para evitar duplicatas
 
-  // Procurar por todos os padrões de itens (001, 002, 003, 004, 005)
-  for (let seq = 1; seq <= 5; seq++) {
-    const sequenceStr = seq.toString().padStart(3, '0');
-    console.log(`🔍 Procurando item ${sequenceStr}...`);
-
-    let itemFound = false;
-    let objectCode = '';
-    let address = '';
-    let cep = '';
-
-    // Procurar o código do objeto para este item
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Padrões para encontrar códigos de objeto
-      const patterns = [
-        new RegExp(`^${sequenceStr}\\s+([A-Z0-9]+(?:BR)?)\\s+(\\d+-\\d+)\\s*([X]?)`, 'i'),
-        new RegExp(`^${sequenceStr}\\s+([A-Z0-9]+(?:BR)?)(\\d+-\\d+)\\s*([X]?)`, 'i'),
-        new RegExp(`^([A-Z0-9]+(?:BR)?)\\s*${sequenceStr.replace(/^0+/, '')}-\\d+`, 'i'),
-      ];
-
-      for (const pattern of patterns) {
-        const match = line.match(pattern);
-        if (match) {
-          objectCode = match[1];
-          itemFound = true;
-          console.log(`✅ Código encontrado para ${sequenceStr}: ${objectCode}`);
-          break;
+  // ✅ NOVA ESTRATÉGIA: Analisar o texto linha por linha para encontrar TODOS os endereços
+  console.log('🔍 Analisando texto linha por linha para encontrar TODOS os endereços...');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Procurar por linhas que contêm "Endereço:"
+    if (line.toLowerCase().includes('endereço:')) {
+      console.log(`🔍 Encontrada linha com endereço: "${line}"`);
+      
+      // Extrair o endereço da linha
+      const addressMatch = line.match(/endereço:\s*(.+)/i);
+      if (addressMatch) {
+        let address = addressMatch[1].trim();
+        
+        // Verificar se há continuação do endereço na próxima linha
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (nextLine && 
+              !nextLine.toLowerCase().includes('cep:') && 
+              !nextLine.toLowerCase().includes('hora:') &&
+              !nextLine.toLowerCase().includes('destinatário:') &&
+              !nextLine.toLowerCase().includes('doc.identidade:') &&
+              !nextLine.toLowerCase().includes('nome legível') &&
+              !nextLine.match(/^item\s*\d{3}/i) &&
+              !nextLine.match(/^\d{3}\s+[A-Z]/i)) {
+            address += ' ' + nextLine;
+          }
         }
-      }
-
-      if (itemFound) break;
-    }
-
-    // Se não encontrou código, tentar padrões específicos
-    if (!itemFound && seq === 3) {
-      // Item 003 tem padrão especial
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('TJ397') || lines[i].includes('003')) {
-          objectCode = 'TJ397331607BR';
-          itemFound = true;
-          console.log(`✅ Código especial encontrado para 003: ${objectCode}`);
-          break;
-        }
-      }
-    }
-
-    if (!itemFound && seq === 5) {
-      // Item 005 tem padrão especial
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('QN267') || lines[i].includes('005')) {
-          objectCode = 'QN267571BR';
-          itemFound = true;
-          console.log(`✅ Código especial encontrado para 005: ${objectCode}`);
-          break;
-        }
-      }
-    }
-
-    // AGORA: Extrair endereço REAL da imagem OCR
-    if (itemFound) {
-      // Procurar por endereços reais no texto OCR
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // Procurar por padrões de endereço real
-        if (line.toLowerCase().includes('endereço:') || 
-            line.toLowerCase().includes('rua') || 
-            line.toLowerCase().includes('avenida') ||
-            line.toLowerCase().includes('travessa') ||
-            line.toLowerCase().includes('praça')) {
+        
+        // Limpar e validar o endereço
+        address = address
+          .replace(/^(Rua|Avenida|Travessa|Praça)\s*([A-Z])/i, '$1 $2')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        // Verificar se é um endereço válido e único
+        if (address.length > 10 && !extractedAddresses.has(address)) {
+          extractedAddresses.add(address);
           
-          // Extrair endereço completo
-          let extractedAddress = line;
+          // Tentar encontrar o número do item associado a este endereço
+          let sequence = 0;
+          let objectCode = '';
           
-          // Se a linha contém "Endereço:", extrair o que vem depois
-          if (line.toLowerCase().includes('endereço:')) {
-            const addressMatch = line.match(/endereço:\s*(.+)/i);
-            if (addressMatch) {
-              extractedAddress = addressMatch[1].trim();
+          // Procurar para trás na linha para encontrar o número do item
+          for (let j = i; j >= 0; j--) {
+            const prevLine = lines[j].trim();
+            
+            // Procurar por padrões de número de item (001, 002, 003, etc.)
+            const itemMatch = prevLine.match(/^(\d{3})/);
+            if (itemMatch) {
+              sequence = parseInt(itemMatch[1]);
+              console.log(`✅ Encontrado item ${sequence} para endereço: ${address.substring(0, 50)}...`);
+              break;
+            }
+            
+            // Procurar por códigos de objeto na mesma linha
+            const objectMatch = prevLine.match(/([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)/);
+            if (objectMatch) {
+              objectCode = objectMatch[1].replace(/\s+/g, '');
+              console.log(`✅ Encontrado código de objeto: ${objectCode}`);
             }
           }
           
-          // Verificar se há continuação do endereço na próxima linha
-          if (i + 1 < lines.length) {
-            const nextLine = lines[i + 1].trim();
-            if (nextLine && 
-                !nextLine.toLowerCase().includes('cep:') && 
-                !nextLine.toLowerCase().includes('hora:') &&
-                !nextLine.toLowerCase().includes('destinatário:') &&
-                !nextLine.toLowerCase().includes('doc.identidade:') &&
-                !nextLine.match(/^item\s*\d{3}/i) &&
-                !nextLine.match(/^\d{3}\s+[A-Z]/i)) {
-              extractedAddress += ' ' + nextLine;
+          // Se não encontrou sequência, usar contador automático
+          if (sequence === 0) {
+            sequence = items.length + 1;
+          }
+          
+          // Procurar CEP associado a este endereço
+          let cep = '';
+          for (let j = i; j < Math.min(i + 3, lines.length); j++) {
+            const cepMatch = lines[j].match(/CEP:\s*(\d{5}-?\d{3})/i);
+            if (cepMatch) {
+              cep = cepMatch[1].replace('-', '');
+              break;
             }
           }
           
-          // Limpar e validar o endereço
-          extractedAddress = extractedAddress
-            .replace(/^(Rua|Avenida|Travessa|Praça)\s*([A-Z])/i, '$1 $2')
-            .replace(/\s+/g, ' ')
-            .trim();
+          items.push({
+            sequence,
+            objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
+            address: address,
+            cep: cep || '',
+            arRequired: false,
+            arOrder: ''
+          });
           
-          if (extractedAddress.length > 10) { // Endereço válido deve ter pelo menos 10 caracteres
-            address = extractedAddress;
-            console.log(`✅ Endereço REAL extraído para ${sequenceStr}: ${address}`);
+          console.log(`✅ Endereço ${sequence} extraído com sucesso: ${address.substring(0, 60)}...`);
+        }
+      }
+    }
+  }
+
+  // ✅ SEGUNDA ESTRATÉGIA: Procurar por padrões de endereço sem "Endereço:"
+  console.log('🔍 Procurando por padrões de endereço alternativos...');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Procurar por linhas que começam com "Rua", "Avenida", etc.
+    if (line.match(/^(Rua|Avenida|Travessa|Praça)\s+[A-Z]/i) && 
+        !line.toLowerCase().includes('endereço:') &&
+        !extractedAddresses.has(line)) {
+      
+      console.log(`🔍 Encontrado padrão de endereço alternativo: "${line}"`);
+      
+      let address = line;
+      
+      // Verificar se há continuação na próxima linha
+      if (i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        if (nextLine && 
+            !nextLine.toLowerCase().includes('cep:') && 
+            !nextLine.toLowerCase().includes('hora:') &&
+            !nextLine.toLowerCase().includes('destinatário:') &&
+            !nextLine.toLowerCase().includes('doc.identidade:') &&
+            !nextLine.toLowerCase().includes('nome legível') &&
+            !nextLine.match(/^item\s*\d{3}/i) &&
+            !nextLine.match(/^\d{3}\s+[A-Z]/i)) {
+          address += ' ' + nextLine;
+        }
+      }
+      
+      // Limpar e validar o endereço
+      address = address
+        .replace(/^(Rua|Avenida|Travessa|Praça)\s*([A-Z])/i, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Verificar se é um endereço válido e único
+      if (address.length > 10 && !extractedAddresses.has(address)) {
+        extractedAddresses.add(address);
+        
+        // Tentar encontrar o número do item associado
+        let sequence = 0;
+        let objectCode = '';
+        
+        // Procurar para trás na linha para encontrar o número do item
+        for (let j = i; j >= 0; j--) {
+          const prevLine = lines[j].trim();
+          
+          // Procurar por padrões de número de item
+          const itemMatch = prevLine.match(/^(\d{3})/);
+          if (itemMatch) {
+            sequence = parseInt(itemMatch[1]);
+            break;
+          }
+          
+          // Procurar por códigos de objeto
+          const objectMatch = prevLine.match(/([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)/);
+          if (objectMatch) {
+            objectCode = objectMatch[1].replace(/\s+/g, '');
+          }
+        }
+        
+        // Se não encontrou sequência, usar contador automático
+        if (sequence === 0) {
+          sequence = items.length + 1;
+        }
+        
+        // Procurar CEP associado
+        let cep = '';
+        for (let j = i; j < Math.min(i + 3, lines.length); j++) {
+          const cepMatch = lines[j].match(/CEP:\s*(\d{5}-?\d{3})/i);
+          if (cepMatch) {
+            cep = cepMatch[1].replace('-', '');
             break;
           }
         }
-      }
-
-      // Procurar CEP real no texto
-      for (let i = 0; i < lines.length; i++) {
-        const cepMatch = lines[i].match(/CEP:\s*(\d{5}-?\d{3})/i);
-        if (cepMatch) {
-          cep = cepMatch[1].replace('-', '');
-          break;
-        }
-      }
-
-      if (address) {
+        
         items.push({
-          sequence: seq,
-          objectCode: objectCode || `ITEM${sequenceStr}`,
+          sequence,
+          objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
           address: address,
           cep: cep || '',
           arRequired: false,
           arOrder: ''
         });
-        console.log(`✅ Item ${sequenceStr} extraído com sucesso com endereço REAL!`);
-      } else {
-        console.log(`⚠️ Item ${sequenceStr} encontrado mas sem endereço válido`);
+        
+        console.log(`✅ Endereço alternativo ${sequence} extraído: ${address.substring(0, 60)}...`);
       }
     }
   }
 
-  console.log(`🎉 Extração robusta concluída: ${items.length}/5 endereços REAIS encontrados`);
+  // Ordenar por sequência
+  items.sort((a, b) => a.sequence - b.sequence);
+  
+  // Renumerar sequências se necessário
+  items.forEach((item, index) => {
+    item.sequence = index + 1;
+  });
+
+  console.log(`🎉 Extração robusta concluída: ${items.length} endereços REAIS e ÚNICOS encontrados`);
+  console.log('📋 Endereços extraídos:');
+  items.forEach((item, index) => {
+    console.log(`  ${index + 1}. ${item.address.substring(0, 60)}...`);
+  });
+  
   return items;
 }
 
