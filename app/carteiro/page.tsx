@@ -233,7 +233,83 @@ export default function CarteiroPage() {
           </div>
         )}
 
-        {/* Address Editor */}
+        {/* Results Display - PRIORIDADE ALTA */}
+        {processedData && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              🎯 Resultados do Processamento
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-2">📊 Estatísticas</h3>
+                <p className="text-blue-700">Total de itens: {processedData.totalItems || 0}</p>
+                <p className="text-blue-700">Cidade: {processedData.city || 'Não especificada'}</p>
+                <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
+              </div>
+              
+              {processedData.googleMapsUrl && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-green-800 mb-2">🗺️ Rota Gerada</h3>
+                  <a
+                    href={processedData.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-block"
+                  >
+                    🚀 Abrir no Google Maps
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-800">📍 Endereços Processados</h3>
+              {processedData.items && processedData.items.length > 0 ? (
+                processedData.items.map((item, index) => (
+                  <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700">
+                        {item.sequence?.toString().padStart(3, '0') || '000'} - {item.objectCode || 'N/A'}
+                      </span>
+                      {item.cep && (
+                        <span className="text-sm text-gray-500">CEP: {item.cep}</span>
+                      )}
+                    </div>
+                    <p className="text-gray-600">{item.address || 'Endereço não disponível'}</p>
+                    {item.lat && item.lng && (
+                      <p className="text-xs text-gray-500">
+                        Coordenadas: {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500 text-center py-4">
+                  Nenhum endereço processado ainda.
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => setShowAddressEditor(true)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              >
+                ✏️ Editar Endereços
+              </button>
+              
+              <button
+                onClick={() => setShowAddressEditor(false)}
+                className="bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+              >
+                🔒 Ocultar Editor
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Address Editor - APENAS QUANDO SOLICITADO */}
         {showAddressEditor && editableItems.length > 0 && (
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -289,75 +365,6 @@ export default function CarteiroPage() {
                 className="bg-gray-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
               >
                 ❌ Descartar Alterações
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Results Display */}
-        {processedData && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              🎯 Resultados do Processamento
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-800 mb-2">📊 Estatísticas</h3>
-                <p className="text-blue-700">Total de itens: {processedData.totalItems || 0}</p>
-                <p className="text-blue-700">Cidade: {processedData.city || 'Não especificada'}</p>
-                <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
-              </div>
-              
-              {processedData.googleMapsUrl && (
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-green-800 mb-2">🗺️ Rota Gerada</h3>
-                  <a
-                    href={processedData.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-block"
-                  >
-                    🚀 Abrir no Google Maps
-                  </a>
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-800">📍 Endereços Processados</h3>
-              {processedData.items && processedData.items.length > 0 ? (
-                processedData.items.map((item, index) => (
-                  <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-700">
-                        {item.sequence?.toString().padStart(3, '0') || '000'} - {item.objectCode || 'N/A'}
-                      </span>
-                      {item.cep && (
-                        <span className="text-sm text-gray-500">CEP: {item.cep}</span>
-                      )}
-                    </div>
-                    <p className="text-gray-600">{item.address || 'Endereço não disponível'}</p>
-                    {item.lat && item.lng && (
-                      <p className="text-xs text-gray-500">
-                        Coordenadas: {item.lat.toFixed(6)}, {item.lng.toFixed(6)}
-                      </p>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-gray-500 text-center py-4">
-                  Nenhum endereço processado ainda.
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-6">
-              <button
-                onClick={() => setShowAddressEditor(true)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                ✏️ Editar Endereços Novamente
               </button>
             </div>
           </div>
