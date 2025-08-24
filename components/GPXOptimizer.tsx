@@ -151,21 +151,21 @@ export default function GPXOptimizer() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          <span className="inline-block mr-2 text-2xl">🚀</span>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+          <span className="inline-block mr-2 text-xl sm:text-2xl">🚀</span>
           GPX Optimizer
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600 px-2">
           Otimize suas rotas GPX com algoritmos avançados e filtro de localização inteligente
         </p>
       </div>
 
       {/* Location Section */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
           <span className="mr-2">📍</span>
           Localização e Filtros
         </h2>
@@ -177,7 +177,7 @@ export default function GPXOptimizer() {
             className="mb-4"
           />
           
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
             <label className="flex items-center">
               <input
                 type="checkbox"
@@ -229,13 +229,13 @@ export default function GPXOptimizer() {
       </div>
 
       {/* Upload Section */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center">
           <span className="mr-2">📁</span>
           Upload do Arquivo GPX
         </h2>
         
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center">
           <input
             type="file"
             accept=".gpx"
@@ -245,82 +245,85 @@ export default function GPXOptimizer() {
           />
           <label htmlFor="gpx-upload" className="cursor-pointer">
             <div className="space-y-2">
-              <div className="text-4xl mx-auto text-gray-400">📁</div>
-              <p className="text-lg font-medium text-gray-700">
+              <div className="text-3xl sm:text-4xl mx-auto text-gray-400">📁</div>
+              <p className="text-base sm:text-lg font-medium text-gray-700">
                 {selectedFile ? selectedFile.name : 'Clique para selecionar arquivo GPX'}
               </p>
               <p className="text-sm text-gray-500">
-                Suporte para waypoints, tracks e routes
+                {selectedFile ? 'Arquivo selecionado' : 'Arraste e solte ou clique para selecionar'}
               </p>
             </div>
           </label>
         </div>
-
+        
         {selectedFile && (
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-blue-900">{selectedFile.name}</p>
-                <p className="text-sm text-blue-700">
-                  {(selectedFile.size / 1024).toFixed(1)} KB
-                </p>
-              </div>
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-              >
-                <span className="mr-1">⚙️</span>
-                Opções Avançadas
-              </button>
-            </div>
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              ✅ Arquivo selecionado: <strong>{selectedFile.name}</strong>
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Tamanho: {(selectedFile.size / 1024).toFixed(1)} KB
+            </p>
           </div>
         )}
       </div>
 
       {/* Advanced Options */}
-      {showAdvanced && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Opções de Otimização</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Algoritmo
-              </label>
-              <select
-                value={options.algorithm}
-                onChange={(e) => setOptions(prev => ({ 
-                  ...prev, 
-                  algorithm: e.target.value as OptimizationOptions['algorithm']
-                }))}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              >
-                <option value="auto">Automático (Recomendado)</option>
-                <option value="nearest-neighbor">Vizinho Mais Próximo</option>
-                <option value="two-opt">2-opt (Melhor qualidade)</option>
-                <option value="genetic">Algoritmo Genético</option>
-              </select>
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold flex items-center">
+            <span className="mr-2">⚙️</span>
+            Opções Avançadas
+          </h2>
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showAdvanced ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </div>
+        
+        {showAdvanced && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Algoritmo de Otimização
+                </label>
+                <select
+                  value={options.algorithm}
+                  onChange={(e) => setOptions(prev => ({ 
+                    ...prev, 
+                    algorithm: e.target.value as any
+                  }))}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="auto">Auto (Recomendado)</option>
+                  <option value="nearest-neighbor">Nearest Neighbor (Rápido)</option>
+                  <option value="two-opt">2-opt Improvement (Qualidade)</option>
+                  <option value="genetic">Algoritmo Genético (Avançado)</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Máximo de Iterações
+                </label>
+                <input
+                  type="number"
+                  value={options.maxIterations}
+                  onChange={(e) => setOptions(prev => ({ 
+                    ...prev, 
+                    maxIterations: parseInt(e.target.value) || 1000
+                  }))}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                  min="100"
+                  max="10000"
+                />
+              </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Máximo de Iterações
-              </label>
-              <input
-                type="number"
-                value={options.maxIterations}
-                onChange={(e) => setOptions(prev => ({ 
-                  ...prev, 
-                  maxIterations: parseInt(e.target.value) || 1000
-                }))}
-                className="w-full p-2 border border-gray-300 rounded-md"
-                min="100"
-                max="10000"
-                step="100"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-6">
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -331,9 +334,9 @@ export default function GPXOptimizer() {
                   }))}
                   className="mr-2"
                 />
-                Viagem de ida e volta
+                <span className="text-sm font-medium">Rota de ida e volta</span>
               </label>
-
+              
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -344,54 +347,54 @@ export default function GPXOptimizer() {
                   }))}
                   className="mr-2"
                 />
-                Preservar ordem original
+                <span className="text-sm font-medium">Preservar ordem original</span>
               </label>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Optimize Button */}
-      {selectedFile && (
-        <div className="text-center">
-          <button
-            onClick={handleOptimize}
-            disabled={isProcessing}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Otimizando...
-              </>
-            ) : (
-              <>
-                <span className="mr-2">⚡</span>
-                Otimizar Rota
-              </>
-            )}
-          </button>
-        </div>
-      )}
+      <div className="text-center">
+        <button
+          onClick={handleOptimize}
+          disabled={!selectedFile || isProcessing}
+          className={`px-8 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+            !selectedFile || isProcessing
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 shadow-lg hover:shadow-xl transform hover:scale-105'
+          }`}
+        >
+          {isProcessing ? (
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Otimizando...
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <span className="mr-2">🚀</span>
+              Otimizar Rota GPX
+            </div>
+          )}
+        </button>
+      </div>
 
       {/* Results */}
       {result && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
           {result.success ? (
             <div className="space-y-6">
-              {/* Success Header */}
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-green-600 mb-2">
-                  ✅ Otimização Concluída!
-                </h3>
-                <p className="text-gray-600">
-                  Processado em {result.optimization?.processingTime}ms usando {result.optimization?.algorithm}
+                <div className="text-4xl mb-2">🎉</div>
+                <h3 className="text-xl font-semibold text-green-800 mb-2">Rota Otimizada com Sucesso!</h3>
+                <p className="text-green-600">
+                  Sua rota foi otimizada usando o algoritmo {result.optimization?.algorithm}
                 </p>
               </div>
 
               {/* Filter Info */}
-              {result.filterInfo?.applied && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              {result.filterInfo && result.filterInfo.applied && (
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <h4 className="font-semibold text-blue-800 mb-2">🎯 Filtro de Localização Aplicado</h4>
                   <p className="text-blue-700 text-sm">
                     {result.filterInfo.filteredCount} de {result.filterInfo.originalCount} pontos foram otimizados
@@ -402,11 +405,11 @@ export default function GPXOptimizer() {
 
               {/* Metrics */}
               {result.optimization && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-green-50 p-4 rounded-lg text-center">
-                    <div className="text-3xl mx-auto text-green-600 mb-2">🛣️</div>
+                    <div className="text-2xl sm:text-3xl mx-auto text-green-600 mb-2">🛣️</div>
                     <p className="text-sm text-green-700">Distância Economizada</p>
-                    <p className="text-2xl font-bold text-green-800">
+                    <p className="text-xl sm:text-2xl font-bold text-green-800">
                       {formatDistance(result.optimization.distanceSaved)}
                     </p>
                     <p className="text-sm text-green-600">
@@ -415,9 +418,9 @@ export default function GPXOptimizer() {
                   </div>
 
                   <div className="bg-blue-50 p-4 rounded-lg text-center">
-                    <div className="text-3xl mx-auto text-blue-600 mb-2">⏱️</div>
+                    <div className="text-2xl sm:text-3xl mx-auto text-blue-600 mb-2">⏱️</div>
                     <p className="text-sm text-blue-700">Tempo Economizado</p>
-                    <p className="text-2xl font-bold text-blue-800">
+                    <p className="text-xl sm:text-2xl font-bold text-blue-800">
                       {formatTime(result.optimization.timeSaved)}
                     </p>
                     <p className="text-sm text-blue-600">
@@ -426,9 +429,9 @@ export default function GPXOptimizer() {
                   </div>
 
                   <div className="bg-purple-50 p-4 rounded-lg text-center">
-                    <div className="text-3xl mx-auto text-purple-600 mb-2">📍</div>
+                    <div className="text-2xl sm:text-3xl mx-auto text-purple-600 mb-2">📍</div>
                     <p className="text-sm text-purple-700">Pontos Otimizados</p>
-                    <p className="text-2xl font-bold text-purple-800">
+                    <p className="text-xl sm:text-2xl font-bold text-purple-800">
                       {result.optimization.totalWaypoints}
                     </p>
                     <p className="text-sm text-purple-600">
@@ -459,7 +462,7 @@ export default function GPXOptimizer() {
                     <span className="mr-2">📊</span>
                     Estatísticas Detalhadas
                   </h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-600">Distância Original:</span>
                       <span className="font-medium ml-2">{formatDistance(result.optimization.originalDistance)}</span>

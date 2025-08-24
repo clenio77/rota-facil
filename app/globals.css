@@ -28,6 +28,68 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* ✅ CORREÇÃO CRÍTICA: Melhorar responsividade em dispositivos móveis */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* Ajustar padding e margens para telas pequenas */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Melhorar espaçamento entre elementos */
+  .space-y-4 > * + * {
+    margin-top: 1rem;
+  }
+  
+  .space-y-6 > * + * {
+    margin-top: 1.5rem;
+  }
+  
+  /* Ajustar tamanhos de texto para mobile */
+  h1 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+  
+  h2 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  
+  h3 {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+}
+
+/* ✅ CORREÇÃO: Garantir que a navegação inferior seja sempre visível */
+.bottom-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* ✅ CORREÇÃO: Ajustar padding do conteúdo principal para mobile */
+.main-content {
+  padding-bottom: 6rem; /* Espaço para navegação inferior */
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    padding-bottom: 5rem;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

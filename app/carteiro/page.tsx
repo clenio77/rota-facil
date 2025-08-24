@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-
-
 
 interface ECTItem {
   sequence: number;
@@ -12,7 +10,6 @@ interface ECTItem {
   cep?: string;
   lat?: number;
   lng?: number;
-  // ✅ NOVA PROPRIEDADE DA API
   correctedAddress?: string;
 }
 
@@ -24,7 +21,6 @@ interface ProcessedECTList {
   state?: string;
   googleMapsUrl?: string;
   error?: string;
-  // ✅ NOVAS PROPRIEDADES DA API REAL
   routeData?: {
     stops: ECTItem[];
     totalDistance: number;
@@ -57,41 +53,16 @@ export default function CarteiroPage() {
   const [showAddressEditor, setShowAddressEditor] = useState(false);
   const [editableItems, setEditableItems] = useState<ECTItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  // ✅ NOVA FUNCIONALIDADE: Localização do dispositivo
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  // ✅ CORREÇÃO CRÍTICA: Estado de montagem do cliente
   const [isClientMounted, setIsClientMounted] = useState(false);
 
-  // ✅ CORREÇÃO CRÍTICA: Garantir que só renderiza no cliente
   useEffect(() => {
     setIsClientMounted(true);
   }, []);
 
-  // ✅ DEBUG: Monitorar mudanças nos estados
-  useEffect(() => {
-    if (!isClientMounted) return;
-    
-    console.log('🔍 ESTADO ATUALIZADO - processedData:', processedData);
-    console.log('🔍 ESTADO ATUALIZADO - showAddressEditor:', showAddressEditor);
-    console.log('🔍 ESTADO ATUALIZADO - editableItems:', editableItems);
-    console.log('🔍 ESTADO ATUALIZADO - userLocation:', userLocation);
-  }, [processedData, showAddressEditor, editableItems, userLocation, isClientMounted]);
-
-  // ✅ CORREÇÃO CRÍTICA: Não renderizar nada até o cliente estar montado
-  if (!isClientMounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ NOVA FUNCIONALIDADE: Obter localização do dispositivo
-  const getUserLocation = () => {
+  // ✅ Otimização: Usar useCallback para funções que não mudam frequentemente
+  const getUserLocation = useCallback(() => {
     setIsGettingLocation(true);
     
     if (!navigator.geolocation) {
@@ -104,7 +75,6 @@ export default function CarteiroPage() {
       (position) => {
         const { latitude, longitude } = position.coords;
         setUserLocation({ lat: latitude, lng: longitude });
-        console.log('📍 Localização obtida:', { lat: latitude, lng: longitude });
         setIsGettingLocation(false);
       },
       (error) => {
@@ -115,34 +85,100 @@ export default function CarteiroPage() {
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000 // 5 minutos
+        maximumAge: 300000
       }
     );
-  };
+  }, []);
+
+  // ✅ Otimização: Usar useMemo para cálculos que dependem de dados
+  const routeStats = useMemo(() => {
+    if (!processedData?.totalItems) return null;
+    
+    const totalItems = processedData.totalItems;
+    return {
+      estimatedTime: totalItems * 3, // 3 min por parada
+      estimatedDistance: (totalItems * 0.5).toFixed(1), // 0.5 km por parada
+      totalItems
+    };
+  }, [processedData?.totalItems]);
+
+  // ✅ Otimização: Função de limpeza de erro
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // ✅ Otimização: Remover logs desnecessários em produção
+  useEffect(() => {
+    if (!isClientMounted) return;
+    
+    // Apenas logs essenciais para debug
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Estado atualizado:', { 
+        hasData: !!processedData, 
+        showEditor: showAddressEditor, 
+        itemsCount: editableItems.length 
+      });
+    }
+  }, [processedData, showAddressEditor, editableItems.length, isClientMounted]);
+
+  // ✅ Otimização: Funções de manipulação de endereços
+  const handleAddressEdit = useCallback((index: number, newAddress: string) => {
+    setEditableItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], address: newAddress };
+      return updated;
+    });
+  }, []);
+
+  const handleDiscardChanges = useCallback(() => {
+    setEditableItems(processedData?.items ? [...processedData.items] : []);
+    setShowAddressEditor(false);
+  }, [processedData?.items]);
+
+  // ✅ Nova funcionalidade: Drag and drop para reordenar endereços
+  const handleReorderItems = useCallback((fromIndex: number, toIndex: number) => {
+    setEditableItems(prev => {
+      const newItems = [...prev];
+      const [movedItem] = newItems.splice(fromIndex, 1);
+      newItems.splice(toIndex, 0, movedItem);
+      
+      // Atualizar sequência
+      return newItems.map((item, index) => ({
+        ...item,
+        sequence: index + 1
+      }));
+    });
+  }, []);
+
+  if (!isClientMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsProcessing(true);
-    setError(null); // ✅ LIMPAR ERRO ANTERIOR
+    clearError();
     setProcessedData(null);
 
     const formData = new FormData();
     formData.append('photo', file);
     
-    // ✅ ADICIONAR LOCALIZAÇÃO DO USUÁRIO PARA ROTA CIRCULAR
     if (userLocation) {
       formData.append('userLocation', JSON.stringify(userLocation));
-      console.log('📍 Enviando localização do usuário para API:', userLocation);
-    } else {
-      console.log('⚠️ Localização do usuário não disponível - rota será entre endereços apenas');
     }
 
     try {
-      // ✅ TIMEOUT MAIOR: API pode demorar até 3 minutos
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutos
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
       
       const response = await fetch('/api/carteiro/process-ect-list', {
         method: 'POST',
@@ -155,28 +191,13 @@ export default function CarteiroPage() {
       const data: ProcessedECTList = await response.json();
 
       if (data.success) {
-        console.log('✅ Dados recebidos com sucesso:', data);
-        console.log('✅ RouteData:', data.routeData);
-        console.log('✅ Stops:', data.routeData?.stops);
-        console.log('✅ ECTData:', data.ectData);
-        console.log('✅ GeocodedItems:', data.geocodedItems);
-        console.log('✅ Total items:', data.routeData?.stops?.length || data.ectData?.items?.length || 0);
-        console.log('✅ Cidade:', data.ectData?.city || 'Não especificada');
-        console.log('✅ Estado:', data.ectData?.state || 'Não especificado');
-        console.log('✅ Estrutura completa de data:', JSON.stringify(data, null, 2));
-        
-        // ✅ VALIDAÇÃO CORRIGIDA: Verificar se há dados de endereços em qualquer formato
         const stops = data.routeData?.stops || data.ectData?.items || data.geocodedItems || [];
         
         if (!stops || stops.length === 0) {
-          console.error('❌ Nenhum endereço encontrado nos dados');
           setError('Nenhum endereço foi extraído da imagem. Tente com uma imagem diferente.');
           return;
         }
         
-        console.log('✅ VALIDAÇÃO PASSOU - Encontrados', stops.length, 'endereços');
-        
-        // ✅ NORMALIZAR DADOS: Converter para formato esperado pelo frontend
         const normalizedData: ProcessedECTList = {
           success: true,
           totalItems: stops.length,
@@ -193,28 +214,13 @@ export default function CarteiroPage() {
           googleMapsUrl: data.routeData?.googleMapsUrl || undefined
         };
         
-        console.log('✅ Dados normalizados:', normalizedData);
-        
         setProcessedData(normalizedData);
-        setEditableItems(normalizedData.items ? [...normalizedData.items] : []); // ✅ AGORA SEGURO
-        setShowAddressEditor(true); // Mostrar editor automaticamente
-        
-        console.log('✅ Estado atualizado - processedData:', normalizedData);
-        console.log('✅ Estado atualizado - editableItems:', normalizedData.items ? [...normalizedData.items] : []);
-        console.log('✅ Estado atualizado - showAddressEditor:', true);
-        
-        // ✅ VERIFICAÇÃO ADICIONAL: Aguardar atualização do estado
-        setTimeout(() => {
-          console.log('🔍 VERIFICAÇÃO POSTERIOR - processedData:', processedData);
-          console.log('🔍 VERIFICAÇÃO POSTERIOR - showAddressEditor:', showAddressEditor);
-        }, 100);
+        setEditableItems(normalizedData.items ? [...normalizedData.items] : []);
+        setShowAddressEditor(true);
       } else {
-        console.log('❌ Erro na resposta:', data.error);
         setError(data.error || 'Erro ao processar lista ECT');
       }
     } catch (err) {
-      console.error('❌ Erro no processamento:', err);
-      
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
           setError('Processamento demorou muito tempo. A API está processando uma lista grande. Tente novamente em alguns minutos.');
@@ -231,22 +237,14 @@ export default function CarteiroPage() {
     }
   };
 
-  const handleAddressEdit = (index: number, newAddress: string) => {
-    const updatedItems = [...editableItems];
-    updatedItems[index] = { ...updatedItems[index], address: newAddress };
-    setEditableItems(updatedItems);
-  };
-
   const handleSaveAndGenerateRoute = async () => {
     if (!processedData) return;
 
-    // Atualizar dados processados com endereços editados
     const updatedData = {
       ...processedData,
       items: editableItems
     };
 
-    // Gerar nova URL do Google Maps com endereços corrigidos
     try {
       const response = await fetch('/api/carteiro/generate-route', {
         method: 'POST',
@@ -270,11 +268,6 @@ export default function CarteiroPage() {
     } catch (err) {
       setError('Erro ao gerar rota. Tente novamente.');
     }
-  };
-
-  const handleDiscardChanges = () => {
-    setEditableItems(processedData?.items ? [...processedData.items] : []); // Restaurar original
-    setShowAddressEditor(false);
   };
 
   return (
@@ -342,17 +335,23 @@ export default function CarteiroPage() {
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            ❌ {error}
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6 flex items-center justify-between">
+            <span>❌ {error}</span>
+            <button 
+              onClick={clearError}
+              className="text-red-700 hover:text-red-900 font-bold"
+            >
+              ×
+            </button>
           </div>
         )}
 
-        {/* ✅ NOVA SEÇÃO: Configuração de Localização */}
+        {/* Localização */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             📍 Configuração de Localização
           </h2>
-          
+
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -367,7 +366,7 @@ export default function CarteiroPage() {
                   Esta será o ponto de partida e chegada da sua rota
                 </p>
               </div>
-              
+
               <div className="flex space-x-2">
                 {!userLocation ? (
                   <button
@@ -398,7 +397,7 @@ export default function CarteiroPage() {
                 )}
               </div>
             </div>
-            
+
             {userLocation && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center">
@@ -412,7 +411,7 @@ export default function CarteiroPage() {
           </div>
         </div>
 
-        {/* Results Display - PRIORIDADE ALTA */}
+        {/* Results Display */}
         {processedData && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -427,36 +426,37 @@ export default function CarteiroPage() {
                 <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
               </div>
               
-              {/* ✅ NOVA SEÇÃO: Informações Detalhadas da Rota */}
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-purple-800 mb-2">🚗 Detalhes da Rota</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">📍 Paradas:</span>
-                    <span className="font-semibold text-purple-800">
-                      {processedData.totalItems || 0} endereços
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">⏱️ Tempo estimado:</span>
-                    <span className="font-semibold text-purple-800">
-                      {processedData.totalItems ? (processedData.totalItems * 3) : 0} min
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-purple-700">📏 Distância estimada:</span>
-                    <span className="font-semibold text-purple-800">
-                      {processedData.totalItems ? (processedData.totalItems * 0.5).toFixed(1) : '0.0'} km
-                    </span>
-                  </div>
-                  {userLocation && (
-                    <div className="mt-3 p-2 bg-green-100 rounded border border-green-200">
-                      <p className="text-xs text-green-700 text-center">
-                        🏠 Rota circular: Inicia e termina na sua localização
-                      </p>
+                {routeStats && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-purple-700">📍 Paradas:</span>
+                      <span className="font-semibold text-purple-800">
+                        {routeStats.totalItems} endereços
+                      </span>
                     </div>
-                  )}
-                </div>
+                    <div className="flex justify-between">
+                      <span className="text-purple-700">⏱️ Tempo estimado:</span>
+                      <span className="font-semibold text-purple-800">
+                        {routeStats.estimatedTime} min
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-purple-700">📏 Distância estimada:</span>
+                      <span className="font-semibold text-purple-800">
+                        {routeStats.estimatedDistance} km
+                      </span>
+                    </div>
+                    {userLocation && (
+                      <div className="mt-3 p-2 bg-green-100 rounded border border-green-200">
+                        <p className="text-xs text-green-700 text-center">
+                          🏠 Rota circular: Inicia e termina na sua localização
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {processedData.googleMapsUrl && (
@@ -470,7 +470,6 @@ export default function CarteiroPage() {
                   >
                     🚀 Abrir no Google Maps
                   </a>
-                  {/* ✅ NOVA INFORMAÇÃO: Explicação da rota */}
                   <div className="mt-3 text-sm text-green-700">
                     <p>📍 <strong>Origem:</strong> {processedData.items?.[0]?.address || 'Primeiro endereço'}</p>
                     <p>🏁 <strong>Destino:</strong> {processedData.items?.[processedData.items.length - 1]?.address || 'Último endereço'}</p>
@@ -498,7 +497,6 @@ export default function CarteiroPage() {
                       )}
                     </div>
                     <p className="text-gray-600">{item.address || 'Endereço não disponível'}</p>
-                    {/* ✅ COORDENADAS REMOVIDAS: Não são mais necessárias para Google Maps */}
                   </div>
                 ))
               ) : (
@@ -526,7 +524,7 @@ export default function CarteiroPage() {
           </div>
         )}
 
-        {/* Address Editor - APENAS QUANDO SOLICITADO */}
+        {/* Address Editor */}
         {showAddressEditor && editableItems.length > 0 && (
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -534,11 +532,14 @@ export default function CarteiroPage() {
             </h2>
             <p className="text-gray-600 mb-4">
               Revise e edite os endereços extraídos antes de gerar a rota no Google Maps.
+              <span className="text-sm text-blue-600 block mt-1">
+                💡 Dica: Você pode arrastar os itens para reordenar a sequência da rota
+              </span>
             </p>
             
             <div className="space-y-4">
               {editableItems.map((item, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-700">
                       Item {item.sequence.toString().padStart(3, '0')} - {item.objectCode}

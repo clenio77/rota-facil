@@ -34,7 +34,8 @@ export const viewport: Viewport = {
   themeColor: '#3B82F6',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 }
 
 export default function RootLayout({
@@ -53,8 +54,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Rota Fácil Moura" />
         <meta name="theme-color" content="#4CAF50" />
-        {/* ✅ CORREÇÃO CRÍTICA: Prevenir injeção de extensões */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* ✅ CORREÇÃO: Removida meta tag duplicada do viewport */}
       </head>
       <body className={`${inter.className} bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300 text-gray-900`} suppressHydrationWarning>
         {/* ✅ CORREÇÃO CRÍTICA: Wrapper para evitar conflitos de extensões */}
@@ -87,8 +87,8 @@ export default function RootLayout({
               </div>
             </header>
 
-            {/* Main Content com Padding para Header e Navegação Fixos */}
-            <main className="flex-1 container mx-auto px-4 py-6 pt-20 pb-24">
+            {/* Main Content com Padding para Header e Navegação Fixos - CORRIGIDO */}
+            <main className="flex-1 container mx-auto px-4 py-6 pt-20 pb-24 sm:px-6 lg:px-8 main-content">
               {children}
             </main>
 

@@ -96,7 +96,7 @@ function extractECTListData(text: string): ECTListData | null {
           const cleanAddress = cleanAddressText(address);
           
           if (cleanAddress) {
-            items.push({
+        items.push({
               sequence,
               objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
               address: cleanAddress,
@@ -116,7 +116,7 @@ function extractECTListData(text: string): ECTListData | null {
       console.log('❌ Nenhum item válido encontrado');
       return null;
     }
-    
+
     console.log(`🎉 Parser simplificado extraiu ${items.length} itens válidos`);
     
     return {
@@ -209,7 +209,7 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
   // ✅ NOVA ESTRATÉGIA: Analisar o texto linha por linha para encontrar TODOS os endereços
   console.log('🔍 Analisando texto linha por linha para encontrar TODOS os endereços...');
   
-  for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Procurar por linhas que contêm "Endereço:"
@@ -261,7 +261,7 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
             if (itemMatch) {
               sequence = parseInt(itemMatch[1]);
               objectCode = itemMatch[2];
-              break;
+          break;
             }
           }
           
@@ -287,7 +287,7 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
   // ✅ SEGUNDA ESTRATÉGIA: Procurar por padrões de endereço sem "Endereço:"
   console.log('🔍 Procurando por padrões de endereço alternativos...');
   
-  for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Procurar por linhas que começam com "Rua", "Avenida", etc.
@@ -339,9 +339,9 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
           const itemMatch = prevLine.match(/^(\d{3})/);
           if (itemMatch) {
             sequence = parseInt(itemMatch[1]);
-            break;
-          }
-          
+          break;
+        }
+
           // Procurar por códigos de objeto
           const objectMatch = prevLine.match(/([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR)/);
           if (objectMatch) {
@@ -358,12 +358,12 @@ function extractAllAddressesRobust(lines: string[]): ECTDeliveryItem[] {
         let cep = '';
         for (let j = i; j < Math.min(i + 3, lines.length); j++) {
           const cepMatch = lines[j].match(/CEP:\s*(\d{5}-?\d{3})/i);
-          if (cepMatch) {
+        if (cepMatch) {
             cep = cepMatch[1].replace('-', '');
-            break;
-          }
+          break;
         }
-        
+      }
+
         items.push({
           sequence,
           objectCode: objectCode || `ITEM${sequence.toString().padStart(3, '0')}`,
@@ -666,21 +666,21 @@ function getKnownAddressCoordinates(address: string): { lat: number; lng: number
         };
       } else {
         // ✅ OUTRAS RUAS: Adicionar pequena variação para não sobrepor pontos
-        const latOffset = (Math.random() - 0.5) * 0.002; // ~100m de variação
-        const lngOffset = (Math.random() - 0.5) * 0.002;
+      const latOffset = (Math.random() - 0.5) * 0.002; // ~100m de variação
+      const lngOffset = (Math.random() - 0.5) * 0.002;
 
-        const finalLat = known.lat + latOffset;
-        const finalLng = known.lng + lngOffset;
+      const finalLat = known.lat + latOffset;
+      const finalLng = known.lng + lngOffset;
 
-        // Validar se está em Uberlândia
-        if (isValidUberlandiaCoordinate(finalLat, finalLng)) {
-          console.log(`✅ Coordenada validada para ${known.name}: ${finalLat.toFixed(6)}, ${finalLng.toFixed(6)}`);
-          return {
-            lat: finalLat,
-            lng: finalLng
-          };
-        } else {
-          console.log(`❌ Coordenada fora de Uberlândia para ${known.name}`);
+      // Validar se está em Uberlândia
+      if (isValidUberlandiaCoordinate(finalLat, finalLng)) {
+        console.log(`✅ Coordenada validada para ${known.name}: ${finalLat.toFixed(6)}, ${finalLng.toFixed(6)}`);
+        return {
+          lat: finalLat,
+          lng: finalLng
+        };
+      } else {
+        console.log(`❌ Coordenada fora de Uberlândia para ${known.name}`);
         }
       }
     }
@@ -880,13 +880,13 @@ export async function POST(request: NextRequest) {
             throw new Error('API retornou HTML em vez de JSON');
           }
           
-          const altData = await altResponse.json();
+        const altData = await altResponse.json();
 
-          if (!altData.IsErroredOnProcessing && altData.ParsedResults?.[0]?.ParsedText) {
-            extractedText = altData.ParsedResults[0].ParsedText;
+        if (!altData.IsErroredOnProcessing && altData.ParsedResults?.[0]?.ParsedText) {
+          extractedText = altData.ParsedResults[0].ParsedText;
             console.log('✅ API alternativa OCR.space funcionou:', extractedText.substring(0, 100) + '...');
-          }
-        } catch (altError) {
+        }
+      } catch (altError) {
           console.log('⚠️ API alternativa OCR.space falhou:', altError instanceof Error ? altError.message : 'Erro desconhecido');
         }
       }
@@ -1005,7 +1005,7 @@ CEP: 38400-123`;
     // Adicionar ponto de partida (localização atual)
     if (userLocation && userLocation.lat && userLocation.lng) {
       stops.push({
-        address: userLocation.city ? `${userLocation.city}, ${userLocation.state || 'MG'}` : 'Localização Atual',
+        address: 'Localização Atual',
         lat: userLocation.lat,
         lng: userLocation.lng,
         sequence: 0,
@@ -1014,6 +1014,7 @@ CEP: 38400-123`;
         arRequired: false,
         isStartPoint: true
       });
+      console.log('📍 Ponto de partida adicionado:', { lat: userLocation.lat, lng: userLocation.lng });
     }
 
     // Adicionar paradas de entrega
@@ -1043,9 +1044,9 @@ CEP: 38400-123`;
     });
 
     // Adicionar ponto de retorno (localização atual)
-    if (userLocation && userLocation.lat && userLocation.lng) {
+    if (userLocation && userLocation.lng) {
       stops.push({
-        address: userLocation.city ? `${userLocation.city}, ${userLocation.state || 'MG'}` : 'Localização Atual',
+        address: 'Localização Atual',
         lat: userLocation.lat,
         lng: userLocation.lng,
         sequence: validItems.length + 1,
@@ -1054,6 +1055,7 @@ CEP: 38400-123`;
         arRequired: false,
         isEndPoint: true
       });
+      console.log('📍 Ponto de retorno adicionado:', { lat: userLocation.lat, lng: userLocation.lng });
     }
 
     // Verificar paradas criadas
@@ -1207,10 +1209,10 @@ CEP: 38400-123`;
         // ✅ ROTA CIRCULAR: Dispositivo → Entregas → Dispositivo
         const origin = `${userLocation.lat},${userLocation.lng}`;
         const destination = `${userLocation.lat},${userLocation.lng}`;
-        
+
         // ✅ WAYPOINTS: Apenas endereços de entrega (excluir início/fim)
         const deliveryWaypoints = items
-          .filter(item => !item.isStartPoint && !item.isEndPoint)
+          .filter(item => !item.isStartPoint && !item.isEndPoint && item.address && item.address !== 'Localização Atual')
           .map(item => item.address)
           .join('|');
 
@@ -1236,7 +1238,11 @@ CEP: 38400-123`;
         const destination = items[items.length - 1].address;
         
         // ✅ WAYPOINTS: Apenas endereços intermediários
-        const waypoints = items.slice(1, -1).map(item => item.address).join('|');
+        const waypoints = items
+          .slice(1, -1)
+          .filter(item => item.address && item.address !== 'Localização Atual')
+          .map(item => item.address)
+          .join('|');
 
         console.log('🚀 Origem (endereço):', origin);
         console.log('🏁 Destino (endereço):', destination);

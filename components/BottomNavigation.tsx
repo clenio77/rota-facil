@@ -21,8 +21,9 @@ export default function BottomNavigation() {
   useEffect(() => {
     if (!isMounted) return;
 
+    // ✅ CORREÇÃO: Lógica mais robusta para determinar aba ativa
     if (pathname === '/') {
-      // ✅ USAR ESTADO LOCAL em vez de window.location.hash
+      // Página principal - verificar hash
       if (currentHash === '#route-section') {
         setActiveTab('routes');
       } else {
@@ -33,6 +34,7 @@ export default function BottomNavigation() {
     } else if (pathname === '/dashboard') {
       setActiveTab('dashboard');
     } else if (pathname === '/gpx-optimizer') {
+      // ✅ CORREÇÃO CRÍTICA: Garantir que aba "Rotas" seja selecionada
       setActiveTab('routes');
     }
   }, [pathname, isMounted, currentHash]);
@@ -99,7 +101,7 @@ export default function BottomNavigation() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50 bottom-navigation">
       <div className="flex justify-around items-center py-2">
         {tabs.map((tab) => (
           <button
