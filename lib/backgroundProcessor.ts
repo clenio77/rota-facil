@@ -1,17 +1,53 @@
 // 🔄 PROCESSAMENTO EM BACKGROUND - OPEN SOURCE
 // Sistema de processamento assíncrono para otimização de rotas
 
+// ✅ INTERFACES TIPADAS ESPECÍFICAS
 export interface BackgroundTask {
   id: string;
   type: 'route-optimization' | 'data-processing' | 'notification-send';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
-  data: any;
-  result?: any;
+  data: TaskData;
+  result?: TaskResult;
   error?: string;
   createdAt: Date;
   startedAt?: Date;
   completedAt?: Date;
+}
+
+export interface TaskData {
+  points?: RoutePoint[];
+  algorithm?: string;
+  options?: OptimizationOptions;
+  message?: string;
+  recipient?: string;
+}
+
+export interface TaskResult {
+  route?: RoutePoint[];
+  totalDistance?: number;
+  algorithm?: string;
+  processingTime?: number;
+  processed?: boolean;
+  timestamp?: number;
+  dataSize?: number;
+}
+
+export interface RoutePoint {
+  id: string;
+  lat: number;
+  lng: number;
+  address: string;
+  sequence?: number;
+}
+
+export interface OptimizationOptions {
+  maxIterations?: number;
+  timeLimit?: number;
+  constraints?: {
+    maxDistance?: number;
+    maxTime?: number;
+  };
 }
 
 export interface BackgroundProcessorConfig {
@@ -210,7 +246,7 @@ export class BackgroundProcessor {
   }
 
   // 🚀 ADICIONAR NOVA TAREFA
-  async addTask(type: BackgroundTask['type'], data: any): Promise<string> {
+  async addTask(type: BackgroundTask['type'], data: TaskData): Promise<string> {
     const task: BackgroundTask = {
       id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
@@ -377,7 +413,7 @@ export class BackgroundProcessor {
       const tasksData = localStorage.getItem(this.config.storageKey);
       if (tasksData) {
         const tasks = JSON.parse(tasksData);
-        tasks.forEach((task: any) => {
+        tasks.forEach((task: BackgroundTask) => {
           task.createdAt = new Date(task.createdAt);
           if (task.startedAt) task.startedAt = new Date(task.startedAt);
           if (task.completedAt) task.completedAt = new Date(task.completedAt);
@@ -473,9 +509,9 @@ export function useBackgroundTasks() {
 
 // 📱 FUNÇÃO PARA PROCESSAR ROTA EM BACKGROUND
 export async function processRouteInBackground(
-  points: any[],
+  points: RoutePoint[],
   algorithm: string = 'auto',
-  options: any = {}
+  options: OptimizationOptions = {}
 ): Promise<string> {
   return backgroundProcessor.addTask('route-optimization', {
     points,

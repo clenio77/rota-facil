@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation';
 import CarteiroAutomation from '../../components/CarteiroAutomation';
 
+// ✅ INTERFACES TIPADAS ESPECÍFICAS
 interface ECTItem {
   sequence: number;
   objectCode: string;
@@ -46,7 +47,7 @@ interface ProcessedECTList {
   suggestions?: string[];
 }
 
-// ✅ NOVA INTERFACE: Configuração de Automação
+// ✅ INTERFACE: Configuração de Automação
 interface AutoRouteConfig {
   mode: 'manual' | 'semi-auto' | 'full-auto';
   preferences: {
@@ -76,6 +77,15 @@ interface ScheduledRoute {
   time: string;
   items: ECTItem[];
   status: 'pending' | 'processing' | 'ready' | 'delivered';
+}
+
+// ✅ INTERFACE: Dados de rota otimizada
+interface OptimizedRouteData {
+  route: ECTItem[];
+  totalDistance: number;
+  totalTime: number;
+  algorithm: string;
+  googleMapsUrl: string;
 }
 
 export default function CarteiroPage() {
@@ -145,57 +155,6 @@ export default function CarteiroPage() {
     setError(null);
   }, []);
 
-  // ✅ Otimização: Remover logs desnecessários em produção
-  useEffect(() => {
-    if (!isClientMounted) return;
-    
-    // Apenas logs essenciais para debug
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Estado atualizado:', { 
-        hasData: !!processedData, 
-        showEditor: showAddressEditor, 
-        itemsCount: editableItems.length 
-      });
-    }
-  }, [processedData, showAddressEditor, editableItems.length, isClientMounted]);
-
-  // ✅ NOVA FUNCIONALIDADE: Agendar Rota Automática
-  const handleScheduleRoute = useCallback(async (config: AutoRouteConfig) => {
-    if (!processedData?.items || processedData.items.length === 0) {
-      setError('Nenhuma rota para agendar');
-      return;
-    }
-
-    setIsAutoProcessing(true);
-    
-    try {
-      const routeId = `route_${Date.now()}`;
-      const newScheduledRoute: ScheduledRoute = {
-        id: routeId,
-        date: new Date().toISOString().split('T')[0],
-        time: config.constraints.startTime,
-        items: processedData.items || [],
-        status: 'pending'
-      };
-
-      // ✅ SIMULAR PROCESSAMENTO AUTOMÁTICO
-      setTimeout(() => {
-        setScheduledRoutes(prev => [...prev, newScheduledRoute]);
-        
-        // ✅ PROCESSAR ROTA AUTOMATICAMENTE
-        if (config.preferences.autoOptimize) {
-          processAutoRoute(newScheduledRoute, config);
-        }
-        
-        setIsAutoProcessing(false);
-      }, 2000);
-
-    } catch (error) {
-      setError('Erro ao agendar rota automática');
-      setIsAutoProcessing(false);
-    }
-  }, [processedData?.items]);
-
   // ✅ NOVA FUNCIONALIDADE: Processar Rota Automaticamente
   const processAutoRoute = useCallback(async (scheduledRoute: ScheduledRoute, config: AutoRouteConfig) => {
     try {
@@ -240,6 +199,43 @@ export default function CarteiroPage() {
       );
     }
   }, []);
+
+  // ✅ NOVA FUNCIONALIDADE: Agendar Rota Automática
+  const handleScheduleRoute = useCallback(async (config: AutoRouteConfig) => {
+    if (!processedData?.items || processedData.items.length === 0) {
+      setError('Nenhuma rota para agendar');
+      return;
+    }
+
+    setIsAutoProcessing(true);
+    
+    try {
+      const routeId = `route_${Date.now()}`;
+      const newScheduledRoute: ScheduledRoute = {
+        id: routeId,
+        date: new Date().toISOString().split('T')[0],
+        time: config.constraints.startTime,
+        items: processedData.items || [],
+        status: 'pending'
+      };
+
+      // ✅ SIMULAR PROCESSAMENTO AUTOMÁTICO
+      setTimeout(() => {
+        setScheduledRoutes(prev => [...prev, newScheduledRoute]);
+        
+        // ✅ PROCESSAR ROTA AUTOMATICAMENTE
+        if (config.preferences.autoOptimize) {
+          processAutoRoute(newScheduledRoute, config);
+        }
+        
+        setIsAutoProcessing(false);
+      }, 2000);
+
+    } catch (error) {
+      setError('Erro ao agendar rota automática');
+      setIsAutoProcessing(false);
+    }
+  }, [processedData?.items, processAutoRoute]);
 
   // ✅ NOVA FUNCIONALIDADE: Solicitar Permissão de Notificação
   const requestNotificationPermission = useCallback(async () => {
@@ -384,9 +380,9 @@ export default function CarteiroPage() {
         body: JSON.stringify(updatedData),
       });
 
-      const routeData = await response.json();
+      const routeData: OptimizedRouteData = await response.json();
       
-      if (routeData.success) {
+      if (routeData.googleMapsUrl) {
         setProcessedData({
           ...updatedData,
           googleMapsUrl: routeData.googleMapsUrl

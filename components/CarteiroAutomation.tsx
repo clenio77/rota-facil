@@ -26,12 +26,24 @@ interface AutoRouteConfig {
   };
 }
 
+// ✅ INTERFACE: Rota Agendada
 interface ScheduledRoute {
   id: string;
   date: string;
   time: string;
-  items: any[];
+  items: RouteItem[];
   status: 'pending' | 'processing' | 'ready' | 'delivered';
+}
+
+// ✅ INTERFACE: Item da Rota
+interface RouteItem {
+  id: string;
+  sequence: number;
+  address: string;
+  objectCode?: string;
+  cep?: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface CarteiroAutomationProps {
@@ -40,10 +52,10 @@ interface CarteiroAutomationProps {
   isAutoProcessing: boolean;
 }
 
-export default function CarteiroAutomation({ 
-  onScheduleRoute, 
-  scheduledRoutes, 
-  isAutoProcessing 
+export default function CarteiroAutomation({
+  onScheduleRoute,
+  scheduledRoutes,
+  isAutoProcessing
 }: CarteiroAutomationProps) {
   const [showAutoConfig, setShowAutoConfig] = useState(false);
   const [autoConfig, setAutoConfig] = useState<AutoRouteConfig>({
@@ -108,7 +120,7 @@ export default function CarteiroAutomation({
                 ].map((mode) => (
                   <button
                     key={mode.id}
-                    onClick={() => setAutoConfig(prev => ({ ...prev, mode: mode.id as any }))}
+                    onClick={() => setAutoConfig(prev => ({ ...prev, mode: mode.id as AutoRouteConfig['mode'] }))}
                     className={`p-4 rounded-lg border-2 transition-all ${
                       autoConfig.mode === mode.id
                         ? 'border-blue-500 bg-blue-50 text-blue-700'
@@ -139,7 +151,7 @@ export default function CarteiroAutomation({
                   />
                   <span className="text-sm">🚦 Evitar tráfego</span>
                 </label>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -152,7 +164,7 @@ export default function CarteiroAutomation({
                   />
                   <span className="text-sm">⛽ Economia de combustível</span>
                 </label>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -165,7 +177,7 @@ export default function CarteiroAutomation({
                   />
                   <span className="text-sm">🧮 Otimização automática</span>
                 </label>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -197,7 +209,7 @@ export default function CarteiroAutomation({
                     className="w-full p-2 border border-gray-300 rounded-md"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Fim</label>
                   <input
@@ -210,7 +222,7 @@ export default function CarteiroAutomation({
                     className="w-full p-2 border border-gray-300 rounded-md"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Pausas (min)</label>
                   <input
@@ -244,7 +256,7 @@ export default function CarteiroAutomation({
                   />
                   <span className="text-sm">✅ Rota pronta</span>
                 </label>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -257,7 +269,7 @@ export default function CarteiroAutomation({
                   />
                   <span className="text-sm">📦 Atualizações de entrega</span>
                 </label>
-                
+
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -271,7 +283,7 @@ export default function CarteiroAutomation({
                   <span className="text-sm">⚠️ Alertas de performance</span>
                 </label>
               </div>
-              
+
               <button
                 onClick={requestNotificationPermission}
                 className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
@@ -289,7 +301,7 @@ export default function CarteiroAutomation({
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
             📅 Rotas Agendadas
           </h2>
-          
+
           <div className="space-y-3">
             {scheduledRoutes.map((route) => (
               <div key={route.id} className="border border-gray-200 rounded-lg p-4">
@@ -314,7 +326,7 @@ export default function CarteiroAutomation({
                     {route.items.length} endereços
                   </span>
                 </div>
-                
+
                 {route.status === 'ready' && (
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-800 mb-2">

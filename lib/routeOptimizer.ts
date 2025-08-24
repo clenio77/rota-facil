@@ -297,7 +297,7 @@ export function antColonyOptimization(
 
   for (let iteration = 0; iteration < iterations; iteration++) {
     // Cada formiga constrói uma rota
-    const antRoutes = [];
+    const antRoutes: RoutePoint[][] = [];
     
     for (let ant = 0; ant < antCount; ant++) {
       const route = constructAntRoute(points, pheromones, alpha, beta);
@@ -325,8 +325,8 @@ export function antColonyOptimization(
       for (let i = 0; i < route.length - 1; i++) {
         const current = route[i];
         const next = route[i + 1];
-        pheromones[current.id][next.id] += pheromoneDeposit;
-        pheromones[next.id][current.id] += pheromoneDeposit;
+        pheromones[current.id]?.[next.id] += pheromoneDeposit;
+        pheromones[next.id]?.[current.id] += pheromoneDeposit;
       }
     });
   }
