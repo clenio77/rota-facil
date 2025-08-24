@@ -35,34 +35,39 @@ export default function AddressSearch({
   userLocation,
   className = ""
 }: AddressSearchProps) {
-  const [query, setQuery] = useState('');
+  const [streetQuery, setStreetQuery] = useState('');
+  const [numberQuery, setNumberQuery] = useState('');
   const [results, setResults] = useState<AddressResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [searchMode, setSearchMode] = useState<'street' | 'number' | 'combined'>('street');
 
   // Estados para reconhecimento de voz
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const streetInputRef = useRef<HTMLInputElement>(null);
+  const numberInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   
   // Debounce da query para evitar muitas requisições
-  const debouncedQuery = useDebounce(query, 300);
+  const debouncedStreetQuery = useDebounce(streetQuery, 300);
+  const debouncedNumberQuery = useDebounce(numberQuery, 300);
 
-  // Buscar endereços quando a query mudar - BUSCA INSTANTÂNEA!
+  // Buscar endereços quando a query mudar - BUSCA INTELIGENTE!
   useEffect(() => {
-    if (debouncedQuery.length >= 1) { // 🚀 MUDANÇA: busca desde o 1º caractere!
-      searchAddresses(debouncedQuery);
+    if (debouncedStreetQuery.length >= 2) {
+      const searchQuery = numberQuery ? `${debouncedStreetQuery}, ${numberQuery}` : debouncedStreetQuery;
+      searchAddresses(searchQuery, numberQuery ? 'combined' : 'street');
     } else {
       setResults([]);
       setIsOpen(false);
     }
-  }, [debouncedQuery, userLocation]);
+  }, [debouncedStreetQuery, debouncedNumberQuery, userLocation]);
 
-  const searchAddresses = async (searchQuery: string) => {
+  const searchAddresses = async (searchQuery: string, mode: 'street' | 'number' | 'combined') => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/address-search', {
@@ -71,14 +76,28 @@ export default function AddressSearch({
         body: JSON.stringify({
           query: searchQuery,
           userLocation,
-          limit: 8
+          limit: 10,
+          searchMode: mode,
+          streetOnly: mode === 'street',
+          numberOnly: mode === 'number'
         })
       });
 
       const data = await response.json();
       
       if (data.success && data.results) {
-        setResults(data.results);
+        // ✅ PRIORIZAR resultados com número quando disponível
+        const prioritizedResults = data.results.sort((a: AddressResult, b: AddressResult) => {
+          const aHasNumber = a.address.house_number && a.address.house_number === numberQuery;
+          const bHasNumber = b.address.house_number && b.address.house_number === numberQuery;
+          
+          if (aHasNumber && !bHasNumber) return -1;
+          if (!aHasNumber && bHasNumber) return 1;
+          
+          return (b.importance || 0) - (a.importance || 0);
+        });
+
+        setResults(prioritizedResults);
         setIsOpen(true);
         setSelectedIndex(-1);
       } else {
@@ -113,7 +132,12 @@ export default function AddressSearch({
         recognitionRef.current.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           console.log('🎤 Texto reconhecido:', transcript);
-          setQuery(transcript);
+          
+          // ✅ INTELIGENTE: Tentar separar rua e número automaticamente
+          const addressParts = extractAddressParts(transcript);
+          setStreetQuery(addressParts.street);
+          setNumberQuery(addressParts.number);
+          
           setIsListening(false);
         };
 
@@ -129,6 +153,31 @@ export default function AddressSearch({
       }
     }
   }, []);
+
+  // ✅ NOVA FUNÇÃO: Extrair rua e número do texto falado
+  const extractAddressParts = (text: string): { street: string; number: string } => {
+    const patterns = [
+      /^(.+?)\s*,?\s*(\d+)$/i,           // "Rua ABC, 123"
+      /^(.+?)\s+(\d+)$/i,                // "Rua ABC 123"
+      /^(\d+)\s+(.+)$/i,                 // "123 Rua ABC"
+      /^(.+?)\s+n[°º]?\s*(\d+)$/i,      // "Rua ABC nº 123"
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const [, part1, part2] = match;
+        if (/^\d+$/.test(part1)) {
+          return { street: part2.trim(), number: part1 };
+        } else {
+          return { street: part1.trim(), number: part2 };
+        }
+      }
+    }
+
+    // Se não conseguir separar, colocar tudo na rua
+    return { street: text.trim(), number: '' };
+  };
 
   const startListening = () => {
     if (recognitionRef.current && speechSupported) {
@@ -147,14 +196,35 @@ export default function AddressSearch({
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(e.target.value);
+  const handleStreetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStreetQuery(e.target.value);
+  };
+
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNumberQuery(e.target.value);
   };
 
   const handleResultClick = (result: AddressResult) => {
-    setQuery(result.display_name);
+    const displayAddress = numberQuery 
+      ? `${result.address.road || streetQuery}, ${numberQuery}`
+      : result.display_name;
+    
+    setStreetQuery(result.address.road || streetQuery);
+    setNumberQuery(result.address.house_number || numberQuery);
     setIsOpen(false);
-    onAddressSelect(result);
+    
+    // Criar resultado com endereço completo
+    const completeResult = {
+      ...result,
+      display_name: displayAddress,
+      address: {
+        ...result.address,
+        house_number: result.address.house_number || numberQuery
+      }
+    };
+    
+    onAddressSelect(completeResult);
+    console.log('✅ Endereço selecionado:', completeResult);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -188,10 +258,14 @@ export default function AddressSearch({
     const addr = result.address;
     const parts = [];
     
-    if (addr.house_number && addr.road) {
-      parts.push(`${addr.road}, ${addr.house_number}`);
-    } else if (addr.road) {
-      parts.push(addr.road);
+    // ✅ PRIORIZAR: Mostrar rua + número primeiro
+    if (addr.road) {
+      const number = addr.house_number || numberQuery;
+      if (number) {
+        parts.push(`${addr.road}, ${number}`);
+      } else {
+        parts.push(addr.road);
+      }
     }
     
     if (addr.neighbourhood) parts.push(addr.neighbourhood);
@@ -219,85 +293,109 @@ export default function AddressSearch({
     }
   };
 
+  const clearSearch = () => {
+    setStreetQuery('');
+    setNumberQuery('');
+    setResults([]);
+    setIsOpen(false);
+    streetInputRef.current?.focus();
+  };
+
   return (
     <div className={`relative ${className}`}>
-      {/* Input de busca */}
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => query.length >= 1 && setIsOpen(true)} // 🚀 Mostrar resultados desde o 1º caractere
-          placeholder={isListening ? "🎤 Fale agora..." : placeholder}
-          className={`w-full px-4 py-3 pl-12 pr-16 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
-            isListening
-              ? 'border-red-300 focus:ring-red-500 bg-red-50'
-              : 'border-gray-300 focus:ring-blue-500'
-          }`}
-        />
-        
-        {/* Ícone de busca */}
-        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      {/* ✅ NOVA INTERFACE: Campos separados para rua e número */}
+      <div className="space-y-3">
+        {/* Campo da Rua */}
+        <div className="relative">
+          <input
+            ref={streetInputRef}
+            type="text"
+            value={streetQuery}
+            onChange={handleStreetChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => streetQuery.length >= 2 && setIsOpen(true)}
+            placeholder="Nome da rua (ex: Rua Principal)"
+            className="w-full px-4 py-3 pl-12 pr-16 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent border-gray-300 focus:ring-blue-500"
+          />
+          
+          {/* Ícone de busca */}
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          
+          {/* Loading spinner */}
+          {isLoading && (
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+
+          {/* Botões do lado direito */}
+          {!isLoading && (
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              {/* Botão de microfone */}
+              {speechSupported && (
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  className={`p-1 rounded-full transition-colors ${
+                    isListening
+                      ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                      : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
+                  }`}
+                  title={isListening ? 'Parar gravação' : 'Falar endereço'}
+                >
+                  {isListening ? (
+                    <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+
+              {/* Botão limpar */}
+              {streetQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                  title="Limpar busca"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        
-        {/* Loading spinner */}
-        {isLoading && (
+
+        {/* Campo do Número */}
+        <div className="relative">
+          <input
+            ref={numberInputRef}
+            type="text"
+            value={numberQuery}
+            onChange={handleNumberChange}
+            placeholder="Número (opcional)"
+            className="w-full px-4 py-3 pl-12 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent border-gray-300 focus:ring-blue-500"
+          />
+          
+          {/* Ícone de número */}
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+            <span className="text-gray-400 text-lg">🔢</span>
+          </div>
+          
+          {/* Dica de uso */}
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs text-gray-400">Opcional</span>
           </div>
-        )}
-
-        {/* Botões do lado direito */}
-        {!isLoading && (
-          <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-            {/* Botão de microfone - sempre visível quando suportado */}
-            {speechSupported && (
-              <button
-                onClick={isListening ? stopListening : startListening}
-                className={`p-1 rounded-full transition-colors ${
-                  isListening
-                    ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                    : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
-                }`}
-                title={isListening ? 'Parar gravação' : 'Falar endereço'}
-              >
-                {isListening ? (
-                  <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                )}
-              </button>
-            )}
-
-            {/* Botão limpar - só aparece quando há texto */}
-            {query && (
-              <button
-                onClick={() => {
-                  setQuery('');
-                  setResults([]);
-                  setIsOpen(false);
-                  inputRef.current?.focus();
-                }}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
-                title="Limpar busca"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Resultados da busca */}
@@ -328,6 +426,12 @@ export default function AddressSearch({
                       📍 {result.distance.toFixed(1)}km de distância
                     </div>
                   )}
+                  {/* ✅ NOVO: Indicador de número encontrado */}
+                  {result.address.house_number && (
+                    <div className="text-xs text-green-600 mt-1">
+                      ✅ Número: {result.address.house_number}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -336,17 +440,28 @@ export default function AddressSearch({
       )}
       
       {/* Mensagem quando não há resultados */}
-      {isOpen && !isLoading && query.length >= 1 && results.length === 0 && ( // 🚀 Desde o 1º caractere
+      {isOpen && !isLoading && streetQuery.length >= 2 && results.length === 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
           <div className="text-center text-gray-500">
             <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <p className="text-sm">Nenhum endereço encontrado</p>
-            <p className="text-xs text-gray-400 mt-1">Tente ser mais específico</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {numberQuery ? 'Tente ajustar o número ou nome da rua' : 'Tente ser mais específico'}
+            </p>
           </div>
         </div>
       )}
+
+      {/* ✅ NOVA: Dicas de uso */}
+      <div className="mt-2 text-xs text-gray-500 space-y-1">
+        <p>💡 <strong>Dica:</strong> Digite o nome da rua primeiro, depois o número</p>
+        <p>🎤 <strong>Voz:</strong> Fale "Rua Principal, 123" para preenchimento automático</p>
+        {numberQuery && (
+          <p className="text-blue-600">🔍 Buscando por: <strong>{streetQuery}, {numberQuery}</strong></p>
+        )}
+      </div>
     </div>
   );
 }

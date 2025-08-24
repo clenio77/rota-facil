@@ -32,6 +32,54 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * c;
 }
 
+// ✅ INTERFACES TIPADAS para evitar 'any'
+interface PhotonFeature {
+  geometry: {
+    coordinates: [number, number];
+  };
+  properties: {
+    osm_id?: number;
+    osm_value?: string;
+    osm_type?: string;
+    name?: string;
+    street?: string;
+    housenumber?: string;
+    district?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+    countrycode?: string; // ✅ ADICIONADO: countrycode
+    type?: string;
+  };
+  type: string;
+}
+
+interface PhotonResponse {
+  features: PhotonFeature[];
+}
+
+interface NominatimItem {
+  place_id?: number;
+  lat: string;
+  lon: string;
+  display_name: string;
+  importance?: string;
+  type?: string;
+  address?: {
+    house_number?: string;
+    road?: string;
+    neighbourhood?: string;
+    suburb?: string;
+    city?: string;
+    town?: string;
+    municipality?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+}
+
 // Busca otimizada no Photon com suporte a números
 async function searchPhotonOptimized(query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }, limit = 10): Promise<SearchResult[]> {
   try {
@@ -61,84 +109,77 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
       throw new Error(`Photon HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: PhotonResponse = await response.json();
 
     if (!data.features || !Array.isArray(data.features)) {
       return [];
     }
 
     const results: SearchResult[] = data.features
-      .filter((feature: any) => {
-        // Filtrar apenas resultados do Brasil
+      .filter((feature: PhotonFeature) => {
         const props = feature.properties;
-        return props?.country === 'Brazil' ||
+        return props?.countrycode === 'BR' ||
                props?.country === 'Brasil' ||
-               props?.countrycode === 'BR';
+               props?.country === 'Brazil';
       })
-      .map((feature: any) => {
+      .map((feature: PhotonFeature) => {
         const [lng, lat] = feature.geometry.coordinates;
         const props = feature.properties;
 
+        // Calcular confiança baseada nos dados disponíveis
+        let confidence = 0.6;
         let distance: number | undefined;
-        if (userLocation?.lat && userLocation?.lng) {
-          distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
-        }
-
-        // Calcular confiança baseada em completude dos dados
-        let confidence = 0.5;
 
         // BONUS ESPECIAL: se tem o número exato que procuramos
-        if (number && props.housenumber === number) {
+        if (number && props?.housenumber === number) {
           confidence += 0.3; // Grande bonus para número exato
-          console.log(`🎯 PHOTON: Número exato encontrado: ${props.housenumber}`);
-        } else if (props.housenumber) {
+          console.log(`🎯 NÚMERO EXATO encontrado: ${props.housenumber}`);
+        } else if (props?.housenumber) {
           confidence += 0.1; // Bonus menor para qualquer número
         }
 
-        if (props.street) confidence += 0.2;
-        if (props.city) confidence += 0.1;
-        if (distance !== undefined && distance < 10) confidence += 0.1; // Bonus proximidade
-        if (distance !== undefined && distance < 2) confidence += 0.1; // Bonus proximidade alta
+        if (props?.street) confidence += 0.1;
+        if (props?.city) confidence += 0.1;
 
-        // Criar display_name formatado com prioridade para número
-        const displayParts = [];
-        if (props.street) {
-          if (props.housenumber) {
-            displayParts.push(`${props.street}, ${props.housenumber}`);
-          } else {
-            displayParts.push(props.street);
-          }
-        } else if (props.name) {
-          displayParts.push(props.name);
+        // Calcular distância se temos localização do usuário
+        if (userLocation?.lat && userLocation?.lng) {
+          distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+          // Bonus para proximidade
+          if (distance < 5) confidence += 0.2;
+          else if (distance < 20) confidence += 0.1;
         }
 
-        if (props.district) displayParts.push(props.district);
-        if (props.city) displayParts.push(props.city);
-        if (props.state) displayParts.push(props.state);
+        // Construir display_name
+        const displayParts: string[] = [];
+        if (props?.street) displayParts.push(props.street);
+        if (props?.housenumber) displayParts.push(props.housenumber);
+        if (props?.district) displayParts.push(props.district);
+        if (props?.city) displayParts.push(props.city);
+        if (props?.state) displayParts.push(props.state);
 
         const display_name = displayParts.join(', ') || 'Endereço sem nome';
 
         return {
-          id: props.osm_id?.toString() || `${lat}-${lng}`,
+          id: props?.osm_id?.toString() || `${lat}-${lng}`,
           display_name,
           lat,
           lng,
           address: {
-            house_number: props.housenumber,
-            road: props.street,
-            neighbourhood: props.district,
-            city: props.city,
-            state: props.state,
-            postcode: props.postcode,
-            country: props.country
+            house_number: props?.housenumber,
+            road: props?.street,
+            neighbourhood: props?.district,
+            city: props?.city,
+            state: props?.state,
+            postcode: props?.postcode,
+            country: props?.country
           },
-          type: props.osm_value || props.type || 'place',
+          type: props?.osm_value || props?.type || 'place',
           importance: confidence, // Usar nossa confiança calculada
           distance,
           confidence
         };
       })
-      .filter(result => {
+      .filter((result: SearchResult) => {
         // Se procuramos um número específico, priorizar resultados relevantes
         if (number) {
           // Manter resultados com número exato OU da mesma rua
@@ -151,32 +192,18 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
 
     // Ordenar por confiança, proximidade e relevância
     results.sort((a, b) => {
-      // Priorizar resultados com número exato
-      if (number) {
-        const aHasExactNumber = a.address.house_number === number;
-        const bHasExactNumber = b.address.house_number === number;
-
-        if (aHasExactNumber && !bHasExactNumber) return -1;
-        if (bHasExactNumber && !aHasExactNumber) return 1;
+      // Prioridade 1: Confiança
+      if (Math.abs(a.confidence - b.confidence) > 0.1) {
+        return b.confidence - a.confidence;
       }
-
-      // Se temos localização do usuário, considerar distância
-      if (userLocation?.lat && userLocation?.lng && a.distance !== undefined && b.distance !== undefined) {
-        // Priorizar resultados muito próximos (< 5km)
-        if (a.distance < 5 && b.distance >= 5) return -1;
-        if (b.distance < 5 && a.distance >= 5) return 1;
-
-        // Para resultados próximos, ordenar por confiança
-        if (a.distance < 20 && b.distance < 20) {
-          return b.confidence - a.confidence;
-        }
-
-        // Para resultados distantes, ordenar por distância
+      
+      // Prioridade 2: Proximidade (se temos localização)
+      if (a.distance !== undefined && b.distance !== undefined) {
         return a.distance - b.distance;
       }
-
-      // Sem localização, ordenar apenas por confiança
-      return b.confidence - a.confidence;
+      
+      // Prioridade 3: Importância
+      return (b.importance || 0) - (a.importance || 0);
     });
 
     console.log(`✅ Photon: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
@@ -188,24 +215,29 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
   }
 }
 
-// Busca adicional com filtro de cidade específica
+// Busca no Photon com filtro por cidade
 async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }, limit = 5): Promise<SearchResult[]> {
-  if (!userLocation?.city) return [];
-
   try {
-    // Buscar especificamente na cidade do usuário
-    const cityQuery = `${query} ${userLocation.city}`;
-    const url = new URL('https://photon.komoot.io/api/');
-    url.searchParams.set('q', cityQuery);
-    url.searchParams.set('limit', limit.toString());
-    // Removido 'lang=pt' pois Photon não suporta português
-
-    if (userLocation.lat && userLocation.lng) {
-      url.searchParams.set('lat', userLocation.lat.toString());
-      url.searchParams.set('lon', userLocation.lng.toString());
+    if (!userLocation?.city) {
+      console.log('Photon cidade: PULANDO - sem cidade do usuário');
+      return [];
     }
 
-    console.log(`🎯 Photon City Filter: ${url.toString()}`);
+    const { street, number } = extractAddressNumber(query);
+    const cityQuery = `${query}, ${userLocation.city}`;
+
+    const url = new URL('https://photon.komoot.io/api/');
+    url.searchParams.set('q', cityQuery);
+    url.searchParams.set('limit', (limit * 2).toString()); // Buscar mais para filtrar depois
+
+    // Se temos localização do usuário, priorizar resultados próximos
+    if (userLocation?.lat && userLocation?.lng) {
+      url.searchParams.set('lat', userLocation.lat.toString());
+      url.searchParams.set('lon', userLocation.lng.toString());
+      url.searchParams.set('location_bias_scale', '0.3'); // Bias forte para localização
+    }
+
+    console.log(`🔍 Photon cidade: "${cityQuery}" (número extraído: ${number || 'nenhum'})`);
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -214,108 +246,167 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
     });
 
     if (!response.ok) {
-      throw new Error(`Photon City Filter HTTP ${response.status}`);
+      throw new Error(`Photon cidade HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: PhotonResponse = await response.json();
 
     if (!data.features || !Array.isArray(data.features)) {
       return [];
     }
 
     const results: SearchResult[] = data.features
-      .filter((feature: any) => {
+      .filter((feature: PhotonFeature) => {
         const props = feature.properties;
-        // Filtrar apenas Brasil E cidade específica
-        const isBrazil = props?.country === 'Brazil' || props?.country === 'Brasil' || props?.countrycode === 'BR';
-        const isCorrectCity = props?.city?.toLowerCase().includes(userLocation.city!.toLowerCase());
-        return isBrazil && isCorrectCity;
+        // Filtrar apenas resultados do Brasil e da cidade específica
+        const isBrazil = props?.countrycode === 'BR' ||
+                        props?.country === 'Brasil' ||
+                        props?.country === 'Brazil';
+        
+        const isSameCity = props?.city?.toLowerCase().includes(userLocation!.city!.toLowerCase());
+        
+        return isBrazil && isSameCity;
       })
-      .map((feature: any) => {
+      .map((feature: PhotonFeature) => {
         const [lng, lat] = feature.geometry.coordinates;
         const props = feature.properties;
 
+        // Calcular confiança baseada nos dados disponíveis
+        let confidence = 0.7; // Bonus base para cidade específica
         let distance: number | undefined;
-        if (userLocation.lat && userLocation.lng) {
+
+        // BONUS ESPECIAL: se tem o número exato que procuramos
+        if (number && props?.housenumber === number) {
+          confidence += 0.3; // Grande bonus para número exato
+          console.log(`🎯 PHOTON CIDADE: Número exato encontrado: ${props.housenumber}`);
+        } else if (props?.housenumber) {
+          confidence += 0.1; // Bonus menor para qualquer número
+        }
+
+        if (props?.street) confidence += 0.1;
+        if (props?.city) confidence += 0.1;
+
+        // Calcular distância se temos localização do usuário
+        if (userLocation?.lat && userLocation?.lng) {
           distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+          // Bonus para proximidade
+          if (distance < 5) confidence += 0.2;
+          else if (distance < 20) confidence += 0.1;
         }
 
-        // Confiança alta para resultados filtrados por cidade
-        let confidence = 0.8;
-        if (props.housenumber) confidence += 0.1;
-        if (props.street) confidence += 0.1;
-        if (distance !== undefined && distance < 5) confidence += 0.1;
-
-        const displayParts = [];
-        if (props.street) {
-          if (props.housenumber) {
-            displayParts.push(`${props.street}, ${props.housenumber}`);
-          } else {
-            displayParts.push(props.street);
-          }
-        } else if (props.name) {
-          displayParts.push(props.name);
-        }
-
-        if (props.district) displayParts.push(props.district);
-        if (props.city) displayParts.push(props.city);
+        // Construir display_name
+        const displayParts: string[] = [];
+        if (props?.street) displayParts.push(props.street);
+        if (props?.housenumber) displayParts.push(props.housenumber);
+        if (props?.district) displayParts.push(props.district);
+        if (props?.city) displayParts.push(props.city);
+        if (props?.state) displayParts.push(props.state);
 
         const display_name = displayParts.join(', ') || 'Endereço sem nome';
 
         return {
-          id: props.osm_id?.toString() || `${lat}-${lng}`,
+          id: props?.osm_id?.toString() || `${lat}-${lng}`,
           display_name,
           lat,
           lng,
           address: {
-            house_number: props.housenumber,
-            road: props.street,
-            neighbourhood: props.district,
-            city: props.city,
-            state: props.state,
-            postcode: props.postcode,
-            country: props.country
+            house_number: props?.housenumber,
+            road: props?.street,
+            neighbourhood: props?.district,
+            city: props?.city,
+            state: props?.state,
+            postcode: props?.postcode,
+            country: props?.country
           },
-          type: props.osm_value || props.type || 'place',
+          type: props?.osm_value || props?.type || 'place',
           importance: confidence,
           distance,
           confidence
         };
-      });
+      })
+      .filter((result: SearchResult) => {
+        // Se procuramos um número específico, priorizar resultados relevantes
+        if (number) {
+          // Manter resultados com número exato OU da mesma rua
+          return result.address.house_number === number ||
+                 result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+                 result.display_name.toLowerCase().includes(street.toLowerCase());
+        }
+        return true;
+      })
+      .slice(0, limit); // Limitar após filtrar
 
-    console.log(`✅ Photon City Filter: ${results.length} resultados encontrados`);
+    console.log(`✅ Photon cidade: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
     return results;
 
   } catch (error) {
-    console.error('Erro no Photon City Filter:', error);
+    console.error('Erro no Photon cidade:', error);
     return [];
   }
 }
 
-// Função para extrair número do endereço
+// Função para extrair número do endereço - MELHORADA
 function extractAddressNumber(query: string): { street: string; number?: string } {
-  // Regex para capturar número no final ou no meio
+  const cleaned = query.trim();
+  console.log(`🔍 Extraindo endereço de: "${cleaned}"`);
+
+  // ✅ PADRÕES MELHORADOS para endereços brasileiros
   const patterns = [
-    /^(.+?)\s+(\d+)$/,           // "Rua ABC 123"
-    /^(.+?),\s*(\d+)$/,          // "Rua ABC, 123"
-    /^(\d+)\s+(.+)$/,            // "123 Rua ABC"
-    /^(.+?)\s+n[°º]?\s*(\d+)$/i, // "Rua ABC nº 123"
+    // Padrão 1: "Rua ABC, 123" ou "Rua ABC 123"
+    /^(.+?)\s*,?\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
+    
+    // Padrão 2: "123 Rua ABC" (número primeiro)
+    /^(\d{1,6})\s+(.+)$/i,
+    
+    // Padrão 3: "Rua ABC nº 123" ou "Rua ABC n° 123"
+    /^(.+?)\s+n[°º]?\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
+    
+    // Padrão 4: "Rua ABC número 123"
+    /^(.+?)\s+número\s+(\d{1,6})(?:\s*[^\d].*)?$/i,
+    
+    // Padrão 5: "Rua ABC - 123" (com hífen)
+    /^(.+?)\s*-\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
+    
+    // Padrão 6: "Rua ABC / 123" (com barra)
+    /^(.+?)\s*\/\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
+    
+    // Padrão 7: "Rua ABC, 123, Bairro" (com vírgulas extras)
+    /^(.+?)\s*,\s*(\d{1,6})\s*,.*$/i,
+    
+    // Padrão 8: "Rua ABC 123 Bairro" (sem separador)
+    /^(.+?)\s+(\d{1,6})\s+[^\d]+$/i
   ];
 
   for (const pattern of patterns) {
-    const match = query.match(pattern);
+    const match = cleaned.match(pattern);
     if (match) {
       const [, part1, part2] = match;
-      // Se o primeiro grupo é número, inverter
-      if (/^\d+$/.test(part1)) {
-        return { street: part2.trim(), number: part1 };
+      
+      // Determinar qual é rua e qual é número
+      let street: string, number: string;
+      
+      if (/^\d{1,6}$/.test(part1)) {
+        // Primeiro grupo é número
+        number = part1;
+        street = part2.trim();
       } else {
-        return { street: part1.trim(), number: part2 };
+        // Primeiro grupo é rua
+        street = part1.trim();
+        number = part2;
+      }
+
+      // Validar se o número é razoável (não é CEP)
+      const numValue = parseInt(number);
+      if (numValue > 0 && numValue <= 99999) {
+        console.log(`✅ Extraído: rua="${street}", número="${number}"`);
+        return { street, number };
       }
     }
   }
 
-  return { street: query.trim() };
+  // Se não conseguiu extrair, retornar apenas a rua
+  console.log(`⚠️ Nenhum número válido encontrado, retornando apenas rua: "${cleaned}"`);
+  return { street: cleaned };
 }
 
 // Busca no Nominatim com suporte a números
@@ -356,13 +447,13 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
       throw new Error(`Nominatim HTTP ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: NominatimItem[] = await response.json();
 
     if (!Array.isArray(data)) {
       return [];
     }
 
-    const results: SearchResult[] = data.map((item: any) => {
+    const results: SearchResult[] = data.map((item: NominatimItem) => {
       const lat = parseFloat(item.lat);
       const lng = parseFloat(item.lon);
 
@@ -413,7 +504,7 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
         confidence
       };
     })
-    .filter(result => {
+    .filter((result: SearchResult) => {
       // Se procuramos um número específico, priorizar resultados com números
       if (number) {
         // Manter resultados com número exato OU resultados da mesma rua
@@ -422,8 +513,23 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
                result.display_name.toLowerCase().includes(street.toLowerCase());
       }
       return true;
-    })
-    .slice(0, limit); // Limitar após filtrar
+    });
+
+    // Ordenar por confiança e proximidade
+    results.sort((a, b) => {
+      // Prioridade 1: Confiança
+      if (Math.abs(a.confidence - b.confidence) > 0.1) {
+        return b.confidence - a.confidence;
+      }
+      
+      // Prioridade 2: Proximidade (se temos localização)
+      if (a.distance !== undefined && b.distance !== undefined) {
+        return a.distance - b.distance;
+      }
+      
+      // Prioridade 3: Importância
+      return (b.importance || 0) - (a.importance || 0);
+    });
 
     console.log(`✅ Nominatim: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
     return results;
@@ -436,155 +542,112 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, userLocation, limit = 8 } = await request.json();
+    const { query, userLocation, limit = 10, searchMode, streetOnly, numberOnly } = await request.json();
 
-    if (!query || typeof query !== 'string' || query.trim().length < 3) {
-      return NextResponse.json({
-        success: false,
-        error: 'Query deve ter pelo menos 3 caracteres'
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Query inválida' 
       }, { status: 400 });
     }
 
-    console.log(`🔍 Address Search (Híbrida): "${query}" (limit: ${limit})`);
+    console.log(`🔍 Busca de endereços: "${query}" (modo: ${searchMode}, rua: ${streetOnly}, número: ${numberOnly})`);
 
-    // ESTRATÉGIA HÍBRIDA: Photon + Nominatim + Filtro por cidade
-    const [photonResults, nominatimResults, cityResults] = await Promise.all([
-      searchPhotonOptimized(query, userLocation, Math.ceil(limit * 0.4)),
-      searchNominatim(query, userLocation, Math.ceil(limit * 0.4)),
-      searchPhotonWithCityFilter(query, userLocation, Math.ceil(limit * 0.2))
-    ]);
+    // ✅ NOVA LÓGICA: Extrair rua e número da query
+    const { street, number } = extractAddressNumber(query);
+    console.log(`📍 Extraído: rua="${street}", número="${number}"`);
 
-    // Combinar todos os resultados
-    const allResults = [...cityResults, ...photonResults, ...nominatimResults];
+    // ✅ PRIORIZAR: Se temos número, buscar por rua + número primeiro
+    let results: SearchResult[] = [];
+    
+    if (number && street) {
+      console.log(`🎯 Buscando por rua + número: "${street}, ${number}"`);
+      
+      // 1. Tentar Photon com número específico
+      const photonResults = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
+      results.push(...photonResults);
+      
+      // 2. Tentar Nominatim com número específico
+      const nominatimResults = await searchNominatim(`${street} ${number}`, userLocation, limit);
+      results.push(...nominatimResults);
+      
+      // 3. Se não encontrou, tentar apenas a rua
+      if (results.length === 0) {
+        console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua`);
+        const streetOnlyResults = await searchPhotonOptimized(street, userLocation, limit);
+        results.push(...streetOnlyResults);
+        
+        const streetNominatimResults = await searchNominatim(street, userLocation, limit);
+        results.push(...streetNominatimResults);
+      }
+    } else if (street) {
+      console.log(`🔍 Buscando apenas por rua: "${street}"`);
+      
+      // Busca normal por rua
+      const photonResults = await searchPhotonOptimized(street, userLocation, limit);
+      results.push(...photonResults);
+      
+      const nominatimResults = await searchNominatim(street, userLocation, limit);
+      results.push(...nominatimResults);
+    }
 
-    if (allResults.length === 0) {
-      console.log(`❌ Nenhum resultado encontrado para: "${query}"`);
-      return NextResponse.json({
-        success: false,
-        results: [],
-        query,
-        total: 0,
-        message: 'Nenhum endereço encontrado. Tente ser mais específico.'
+    // ✅ NOVA LÓGICA: Priorizar resultados com número quando disponível
+    if (number) {
+      results = results.sort((a, b) => {
+        const aHasExactNumber = a.address.house_number === number;
+        const bHasExactNumber = b.address.house_number === number;
+        
+        // Prioridade 1: Número exato
+        if (aHasExactNumber && !bHasExactNumber) return -1;
+        if (!aHasExactNumber && bHasExactNumber) return 1;
+        
+        // Prioridade 2: Mesma rua com qualquer número
+        const aSameStreet = a.address.road?.toLowerCase().includes(street.toLowerCase());
+        const bSameStreet = b.address.road?.toLowerCase().includes(street.toLowerCase());
+        
+        if (aSameStreet && !bSameStreet) return -1;
+        if (!aSameStreet && bSameStreet) return 1;
+        
+        // Prioridade 3: Importância e proximidade
+        return (b.importance || 0) - (a.importance || 0);
       });
     }
 
-    // Deduplificar resultados
-    const uniqueResults = new Map<string, SearchResult>();
-
-    allResults.forEach(result => {
-      const key = `${result.lat.toFixed(4)}-${result.lng.toFixed(4)}`;
-      if (!uniqueResults.has(key) ||
-          (uniqueResults.get(key)!.confidence < result.confidence)) {
-        uniqueResults.set(key, result);
-      }
+    // Remover duplicatas baseado em coordenadas
+    const uniqueResults = results.filter((result, index, self) => {
+      const firstIndex = self.findIndex(r => 
+        Math.abs(r.lat - result.lat) < 0.001 && 
+        Math.abs(r.lng - result.lng) < 0.001
+      );
+      return firstIndex === index;
     });
 
-    // 🎯 FILTRO AGRESSIVO: Se temos localização, filtrar por proximidade primeiro
-    let filteredResults = Array.from(uniqueResults.values());
+    // Limitar resultados
+    const limitedResults = uniqueResults.slice(0, limit);
 
-    if (userLocation?.lat && userLocation?.lng && userLocation?.city) {
-      console.log(`🎯 Aplicando filtro por cidade: ${userLocation.city}`);
-
-      // Separar resultados da cidade do usuário vs outras cidades
-      const localResults = filteredResults.filter(result => {
-        const cityMatch = result.address?.city?.toLowerCase().includes(userLocation.city!.toLowerCase()) ||
-                         result.display_name.toLowerCase().includes(userLocation.city!.toLowerCase());
-        const isNearby = result.distance !== undefined && result.distance < 30; // 30km de raio (mais restritivo)
-
-        console.log(`📍 ${result.display_name} - Cidade: ${result.address?.city} - Distância: ${result.distance}km - Match: ${cityMatch} - Próximo: ${isNearby}`);
-
-        return cityMatch || isNearby;
-      });
-
-      console.log(`✅ Resultados locais encontrados: ${localResults.length}`);
-
-      // Se temos resultados locais suficientes, usar APENAS eles
-      if (localResults.length >= 3) {
-        filteredResults = localResults;
-        console.log(`🎯 Usando APENAS resultados locais (${localResults.length} encontrados)`);
-      } else {
-        // Caso contrário, priorizar locais mas permitir alguns distantes
-        const otherResults = filteredResults.filter(result => {
-          const cityMatch = result.address?.city?.toLowerCase().includes(userLocation.city!.toLowerCase()) ||
-                           result.display_name.toLowerCase().includes(userLocation.city!.toLowerCase());
-          const isNearby = result.distance !== undefined && result.distance < 30;
-          return !(cityMatch || isNearby);
-        });
-
-        filteredResults = [...localResults, ...otherResults.slice(0, Math.max(1, limit - localResults.length))];
-        console.log(`🎯 Misturando: ${localResults.length} locais + ${Math.max(1, limit - localResults.length)} distantes`);
-      }
-    }
-
-    // 🎯 FILTRO SUPER AGRESSIVO POR CIDADE DO USUÁRIO
-    let cityFilteredResults = filteredResults;
-    if (userLocation?.city) {
-      const userCity = userLocation.city.toLowerCase();
-
-      // Primeiro, tentar filtrar apenas pela cidade exata
-      const exactCityResults = filteredResults.filter(result => {
-        const resultCity = result.address.city?.toLowerCase();
-        return resultCity === userCity;
-      });
-
-      console.log(`🎯 Filtro exato por cidade: ${exactCityResults.length}/${filteredResults.length} resultados para "${userLocation.city}"`);
-
-      // Se temos resultados da cidade exata, usar apenas eles
-      if (exactCityResults.length > 0) {
-        cityFilteredResults = exactCityResults;
-        console.log(`✅ Usando apenas resultados de "${userLocation.city}": ${exactCityResults.length} resultados`);
-      }
-    }
-
-    const finalResults = cityFilteredResults
-      .slice(0, limit)
-      .sort((a, b) => {
-        // 🎯 PRIORIDADE 1: Resultados da cidade do usuário
-        if (userLocation?.city) {
-          const aCityMatch = a.address?.city?.toLowerCase().includes(userLocation.city.toLowerCase()) ||
-                            a.display_name.toLowerCase().includes(userLocation.city.toLowerCase());
-          const bCityMatch = b.address?.city?.toLowerCase().includes(userLocation.city.toLowerCase()) ||
-                            b.display_name.toLowerCase().includes(userLocation.city.toLowerCase());
-
-          if (aCityMatch && !bCityMatch) return -1;
-          if (bCityMatch && !aCityMatch) return 1;
-        }
-
-        // 🎯 PRIORIDADE 2: Proximidade geográfica
-        if (userLocation?.lat && userLocation?.lng && a.distance !== undefined && b.distance !== undefined) {
-          // Priorizar resultados muito próximos (< 5km)
-          if (a.distance < 5 && b.distance >= 5) return -1;
-          if (b.distance < 5 && a.distance >= 5) return 1;
-
-          // Para resultados próximos (< 20km), ordenar por confiança
-          if (a.distance < 20 && b.distance < 20) {
-            return b.confidence - a.confidence;
-          }
-
-          // Para resultados distantes, ordenar por distância
-          return a.distance - b.distance;
-        }
-
-        // 🎯 PRIORIDADE 3: Confiança (sem localização)
-        return b.confidence - a.confidence;
-      });
-
-    console.log(`✅ Address Search (Híbrida): ${finalResults.length} resultados finais`);
+    console.log(`✅ Encontrados ${limitedResults.length} resultados únicos`);
+    
+    // ✅ NOVO: Log detalhado dos resultados
+    limitedResults.forEach((result, index) => {
+      const hasNumber = result.address.house_number ? `✅ ${result.address.house_number}` : '❌ sem número';
+      const sameStreet = result.address.road?.toLowerCase().includes(street.toLowerCase()) ? '✅ mesma rua' : '❌ rua diferente';
+      console.log(`  [${index + 1}] ${result.display_name} | ${hasNumber} | ${sameStreet}`);
+    });
 
     return NextResponse.json({
       success: true,
-      results: finalResults,
+      results: limitedResults,
       query,
-      total: finalResults.length,
-      provider: 'hybrid-photon-nominatim'
+      searchMode,
+      extracted: { street, number },
+      totalFound: limitedResults.length
     });
 
   } catch (error) {
-    console.error('Erro na busca de endereços:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Erro interno do servidor',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    console.error('❌ Erro na busca de endereços:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
     }, { status: 500 });
   }
 }
