@@ -325,8 +325,16 @@ export function antColonyOptimization(
       for (let i = 0; i < route.length - 1; i++) {
         const current = route[i];
         const next = route[i + 1];
-        pheromones[current.id]?.[next.id] += pheromoneDeposit;
-        pheromones[next.id]?.[current.id] += pheromoneDeposit;
+        
+        // ✅ CORREÇÃO: Usar acesso seguro aos índices
+        const currentIndex = parseInt(current.id) - 1;
+        const nextIndex = parseInt(next.id) - 1;
+        
+        if (currentIndex >= 0 && currentIndex < pheromones.length && 
+            nextIndex >= 0 && nextIndex < pheromones.length) {
+          pheromones[currentIndex][nextIndex] += pheromoneDeposit;
+          pheromones[nextIndex][currentIndex] += pheromoneDeposit;
+        }
       }
     });
   }
@@ -423,7 +431,15 @@ function constructAntRoute(
   while (unvisited.length > 0) {
     const current = route[route.length - 1];
     const probabilities = unvisited.map(point => {
-      const pheromone = pheromones[current.id]?.[point.id] || 1;
+      const currentIndex = parseInt(current.id) - 1;
+      const pointIndex = parseInt(point.id) - 1;
+      
+      let pheromone = 1;
+      if (currentIndex >= 0 && currentIndex < pheromones.length && 
+          pointIndex >= 0 && pointIndex < pheromones.length) {
+        pheromone = pheromones[currentIndex][pointIndex];
+      }
+      
       const distance = calculateDistance(current, point);
       const heuristic = 1 / distance;
       return Math.pow(pheromone, alpha) * Math.pow(heuristic, beta);
