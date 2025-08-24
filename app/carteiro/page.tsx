@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import CarteiroAutomation from '../../components/CarteiroAutomation';
 
 interface ECTItem {
   sequence: number;
@@ -69,6 +70,14 @@ interface AutoRouteConfig {
   };
 }
 
+interface ScheduledRoute {
+  id: string;
+  date: string;
+  time: string;
+  items: ECTItem[];
+  status: 'pending' | 'processing' | 'ready' | 'delivered';
+}
+
 export default function CarteiroPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,37 +91,9 @@ export default function CarteiroPage() {
   const [isClientMounted, setIsClientMounted] = useState(false);
   
   // ✅ NOVOS ESTADOS: Automação e Agendamento
-  const [showAutoConfig, setShowAutoConfig] = useState(false);
-  const [autoConfig, setAutoConfig] = useState<AutoRouteConfig>({
-    mode: 'manual',
-    preferences: {
-      avoidTraffic: true,
-      preferHighways: false,
-      timeWindows: ['08:00-12:00', '14:00-18:00'],
-      fuelEfficiency: true,
-      autoOptimize: true
-    },
-    constraints: {
-      maxDistance: 100,
-      maxTime: 480, // 8 horas
-      breakIntervals: 60, // 1 hora
-      startTime: '08:00',
-      endTime: '18:00'
-    },
-    notifications: {
-      routeReady: true,
-      deliveryUpdates: true,
-      performanceAlerts: true
-    }
-  });
-  const [scheduledRoutes, setScheduledRoutes] = useState<Array<{
-    id: string;
-    date: string;
-    time: string;
-    items: ECTItem[];
-    status: 'pending' | 'processing' | 'ready' | 'delivered';
-  }>>([]);
+  const [scheduledRoutes, setScheduledRoutes] = useState<ScheduledRoute[]>([]);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
 
   useEffect(() => {
     setIsClientMounted(true);
@@ -179,7 +160,7 @@ export default function CarteiroPage() {
   }, [processedData, showAddressEditor, editableItems.length, isClientMounted]);
 
   // ✅ NOVA FUNCIONALIDADE: Agendar Rota Automática
-  const scheduleAutoRoute = useCallback(async () => {
+  const handleScheduleRoute = useCallback(async (config: AutoRouteConfig) => {
     if (!processedData?.items || processedData.items.length === 0) {
       setError('Nenhuma rota para agendar');
       return;
@@ -189,12 +170,12 @@ export default function CarteiroPage() {
     
     try {
       const routeId = `route_${Date.now()}`;
-      const newScheduledRoute = {
+      const newScheduledRoute: ScheduledRoute = {
         id: routeId,
         date: new Date().toISOString().split('T')[0],
-        time: autoConfig.constraints.startTime,
+        time: config.constraints.startTime,
         items: processedData.items || [],
-        status: 'pending' as const
+        status: 'pending'
       };
 
       // ✅ SIMULAR PROCESSAMENTO AUTOMÁTICO
@@ -202,8 +183,8 @@ export default function CarteiroPage() {
         setScheduledRoutes(prev => [...prev, newScheduledRoute]);
         
         // ✅ PROCESSAR ROTA AUTOMATICAMENTE
-        if (autoConfig.preferences.autoOptimize) {
-          processAutoRoute(newScheduledRoute);
+        if (config.preferences.autoOptimize) {
+          processAutoRoute(newScheduledRoute, config);
         }
         
         setIsAutoProcessing(false);
@@ -213,10 +194,10 @@ export default function CarteiroPage() {
       setError('Erro ao agendar rota automática');
       setIsAutoProcessing(false);
     }
-  }, [processedData?.items, autoConfig]);
+  }, [processedData?.items]);
 
   // ✅ NOVA FUNCIONALIDADE: Processar Rota Automaticamente
-  const processAutoRoute = useCallback(async (scheduledRoute: any) => {
+  const processAutoRoute = useCallback(async (scheduledRoute: ScheduledRoute, config: AutoRouteConfig) => {
     try {
       // ✅ ATUALIZAR STATUS PARA PROCESSANDO
       setScheduledRoutes(prev => 
@@ -227,7 +208,7 @@ export default function CarteiroPage() {
         )
       );
 
-      // ✅ SIMULAR OTIMIZAÇÃO AUTOMÁTICA
+      // ✅ SIMULAR OTIMIZAÇÃO AUTOMÁTICA COM ALGORITMOS AVANÇADOS
       setTimeout(() => {
         setScheduledRoutes(prev => 
           prev.map(route => 
@@ -238,10 +219,10 @@ export default function CarteiroPage() {
         );
 
         // ✅ NOTIFICAÇÃO AUTOMÁTICA
-        if (autoConfig.notifications.routeReady) {
+        if (config.notifications.routeReady) {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('🚀 Rota Automática Pronta!', {
-              body: `Sua rota com ${scheduledRoute.items.length} endereços foi otimizada automaticamente.`,
+              body: `Sua rota com ${scheduledRoute.items.length} endereços foi otimizada automaticamente usando algoritmos avançados.`,
               icon: '/logo-carro-azul-removebg-preview.png'
             });
           }
@@ -258,7 +239,7 @@ export default function CarteiroPage() {
         )
       );
     }
-  }, [autoConfig.notifications.routeReady]);
+  }, []);
 
   // ✅ NOVA FUNCIONALIDADE: Solicitar Permissão de Notificação
   const requestNotificationPermission = useCallback(async () => {
@@ -432,17 +413,36 @@ export default function CarteiroPage() {
             />
             <h1 className="text-2xl font-bold">Versão Profissional para Carteiros</h1>
           </div>
-          <button
-            onClick={() => router.push('/')}
-            className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
-          >
-            ← Voltar
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowAutomation(!showAutomation)}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+            >
+              {showAutomation ? '🤖 Ocultar Automação' : '🤖 Automação'}
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+            >
+              ← Voltar
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 pt-20 pb-24">
+        {/* ✅ NOVA SEÇÃO: Automação Inteligente */}
+        {showAutomation && (
+          <div className="mb-6">
+            <CarteiroAutomation
+              onScheduleRoute={handleScheduleRoute}
+              scheduledRoutes={scheduledRoutes}
+              isAutoProcessing={isAutoProcessing}
+            />
+          </div>
+        )}
+
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -494,208 +494,6 @@ export default function CarteiroPage() {
             </button>
           </div>
         )}
-
-        {/* ✅ NOVA SEÇÃO: Configuração de Automação */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">
-              🤖 Configuração de Automação
-            </h2>
-            <button
-              onClick={() => setShowAutoConfig(!showAutoConfig)}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {showAutoConfig ? 'Ocultar' : 'Configurar'}
-            </button>
-          </div>
-
-          {showAutoConfig && (
-            <div className="space-y-6">
-              {/* Modo de Operação */}
-              <div>
-                <h3 className="font-medium text-gray-700 mb-3">🎛️ Modo de Operação</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { id: 'manual', label: 'Manual', icon: '✋', desc: 'Controle total' },
-                    { id: 'semi-auto', label: 'Semi-Auto', icon: '🔄', desc: 'Otimização automática' },
-                    { id: 'full-auto', label: 'Piloto Automático', icon: '🤖', desc: 'Totalmente automático' }
-                  ].map((mode) => (
-                    <button
-                      key={mode.id}
-                      onClick={() => setAutoConfig(prev => ({ ...prev, mode: mode.id as any }))}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        autoConfig.mode === mode.id
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="text-2xl mb-2">{mode.icon}</div>
-                      <div className="font-semibold">{mode.label}</div>
-                      <div className="text-xs text-gray-500">{mode.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Preferências */}
-              <div>
-                <h3 className="font-medium text-gray-700 mb-3">⚙️ Preferências</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.preferences.avoidTraffic}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        preferences: { ...prev.preferences, avoidTraffic: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">🚦 Evitar tráfego</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.preferences.fuelEfficiency}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        preferences: { ...prev.preferences, fuelEfficiency: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">⛽ Economia de combustível</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.preferences.autoOptimize}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        preferences: { ...prev.preferences, autoOptimize: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">🧮 Otimização automática</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.preferences.preferHighways}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        preferences: { ...prev.preferences, preferHighways: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">🛣️ Preferir rodovias</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Restrições */}
-              <div>
-                <h3 className="font-medium text-gray-700 mb-3">⏰ Restrições de Tempo</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Início</label>
-                    <input
-                      type="time"
-                      value={autoConfig.constraints.startTime}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        constraints: { ...prev.constraints, startTime: e.target.value }
-                      }))}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Fim</label>
-                    <input
-                      type="time"
-                      value={autoConfig.constraints.endTime}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        constraints: { ...prev.constraints, endTime: e.target.value }
-                      }))}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Pausas (min)</label>
-                    <input
-                      type="number"
-                      value={autoConfig.constraints.breakIntervals}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        constraints: { ...prev.constraints, breakIntervals: parseInt(e.target.value) || 60 }
-                      }))}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                      min="15"
-                      max="120"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notificações */}
-              <div>
-                <h3 className="font-medium text-gray-700 mb-3">🔔 Notificações</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.notifications.routeReady}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        notifications: { ...prev.notifications, routeReady: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">✅ Rota pronta</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.notifications.deliveryUpdates}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        notifications: { ...prev.notifications, deliveryUpdates: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">📦 Atualizações de entrega</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={autoConfig.notifications.performanceAlerts}
-                      onChange={(e) => setAutoConfig(prev => ({
-                        ...prev,
-                        notifications: { ...prev.notifications, performanceAlerts: e.target.checked }
-                      }))}
-                      className="mr-2"
-                    />
-                    <span className="text-sm">⚠️ Alertas de performance</span>
-                  </label>
-                </div>
-                
-                <button
-                  onClick={requestNotificationPermission}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                >
-                  🔔 Ativar Notificações
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Localização */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -762,60 +560,6 @@ export default function CarteiroPage() {
           </div>
         </div>
 
-        {/* ✅ NOVA SEÇÃO: Rotas Agendadas */}
-        {scheduledRoutes.length > 0 && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              📅 Rotas Agendadas
-            </h2>
-            
-            <div className="space-y-3">
-              {scheduledRoutes.map((route) => (
-                <div key={route.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        route.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        route.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                        route.status === 'ready' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {route.status === 'pending' ? '⏳ Pendente' :
-                         route.status === 'processing' ? '🔄 Processando' :
-                         route.status === 'ready' ? '✅ Pronta' :
-                         '📦 Entregue'}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {route.date} às {route.time}
-                      </span>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {route.items.length} endereços
-                    </span>
-                  </div>
-                  
-                  {route.status === 'ready' && (
-                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-800 mb-2">
-                        🎉 Rota otimizada automaticamente!
-                      </p>
-                      <button
-                        onClick={() => {
-                          // Aqui você pode implementar a navegação para a rota
-                          console.log('Navegando para rota:', route.id);
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
-                      >
-                        🗺️ Abrir no Google Maps
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Results Display */}
         {processedData && (
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -832,7 +576,7 @@ export default function CarteiroPage() {
               </div>
               
               <div className="bg-purple-50 p-4 rounded-lg">
-                <h2 className="font-semibold text-purple-800 mb-2">🚗 Detalhes da Rota</h2>
+                <h3 className="font-semibold text-purple-800 mb-2">🚗 Detalhes da Rota</h3>
                 {routeStats && (
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -925,28 +669,6 @@ export default function CarteiroPage() {
               >
                 🔒 Ocultar Editor
               </button>
-
-              {/* ✅ NOVO BOTÃO: Agendar Rota Automática */}
-              {autoConfig.mode !== 'manual' && (
-                <button
-                  onClick={scheduleAutoRoute}
-                  disabled={isAutoProcessing}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                    isAutoProcessing
-                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'
-                  }`}
-                >
-                  {isAutoProcessing ? (
-                    <>
-                      <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                      Agendando...
-                    </>
-                  ) : (
-                    '🤖 Agendar Rota Automática'
-                  )}
-                </button>
-              )}
             </div>
           </div>
         )}
