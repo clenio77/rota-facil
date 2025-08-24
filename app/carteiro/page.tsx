@@ -13,6 +13,7 @@ interface ECTItem {
   lat?: number;
   lng?: number;
   correctedAddress?: string;
+  id?: string; // ✅ ADICIONAR ID para compatibilidade
 }
 
 interface ProcessedECTList {
@@ -75,7 +76,7 @@ interface ScheduledRoute {
   id: string;
   date: string;
   time: string;
-  items: ECTItem[];
+  items: ECTItem[]; // ✅ USAR ECTItem em vez de RouteItem
   status: 'pending' | 'processing' | 'ready' | 'delivered';
 }
 
@@ -215,7 +216,10 @@ export default function CarteiroPage() {
         id: routeId,
         date: new Date().toISOString().split('T')[0],
         time: config.constraints.startTime,
-        items: processedData.items || [],
+        items: processedData.items.map((item, index) => ({
+          ...item,
+          id: item.id || `item_${index + 1}` // ✅ GARANTIR ID ÚNICO
+        })),
         status: 'pending'
       };
 
@@ -400,28 +404,47 @@ export default function CarteiroPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300">
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-orange-500 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <img 
-              src="/logo-carro-azul-removebg-preview.png" 
-              alt="Rota Fácil" 
-              className="h-12 w-auto"
-            />
-            <h1 className="text-2xl font-bold">Versão Profissional para Carteiros</h1>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowAutomation(!showAutomation)}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
-            >
-              {showAutomation ? '🤖 Ocultar Automação' : '🤖 Automação'}
-            </button>
-            <button
-              onClick={() => router.push('/')}
-              className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
-            >
-              ← Voltar
-            </button>
+        <div className="container mx-auto px-4 py-4 sm:py-6">
+          {/* Layout responsivo para header */}
+          <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
+            {/* Logo e título */}
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <img 
+                src="/logo-carro-azul-removebg-preview.png" 
+                alt="Rota Fácil" 
+                className="h-8 w-auto sm:h-12"
+              />
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-center sm:text-left">
+                Versão Profissional para Carteiros
+              </h1>
+            </div>
+            
+            {/* Botões de ação */}
+            <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+              {/* Botão de Automação - Responsivo */}
+              <button
+                onClick={() => setShowAutomation(!showAutomation)}
+                className="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-sm sm:text-base flex items-center justify-center space-x-2"
+              >
+                <span className="text-lg sm:text-xl">🤖</span>
+                <span className="hidden sm:inline">
+                  {showAutomation ? 'Ocultar Automação' : 'Automação'}
+                </span>
+                <span className="sm:hidden">
+                  {showAutomation ? 'Ocultar' : 'Automação'}
+                </span>
+              </button>
+              
+              {/* Botão Voltar - Responsivo */}
+              <button
+                onClick={() => router.push('/')}
+                className="w-full sm:w-auto bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm sm:text-base flex items-center justify-center space-x-2"
+              >
+                <span className="text-lg sm:text-xl">←</span>
+                <span className="hidden sm:inline">Voltar</span>
+                <span className="sm:hidden">Voltar</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>

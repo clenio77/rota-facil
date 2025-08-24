@@ -54,15 +54,15 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
 
   if (!currentLocation) {
     return (
-      <div className={`bg-gray-100 rounded-lg p-3 text-center ${className}`}>
-        <p className="text-sm text-gray-600">Localização não disponível</p>
+      <div className={`bg-gray-100 rounded-lg p-2 sm:p-3 text-center ${className}`}>
+        <p className="text-xs sm:text-sm text-gray-600">Localização não disponível</p>
       </div>
     );
   }
 
   if (isEditing) {
     return (
-      <div className={`bg-white border border-blue-300 rounded-lg p-3 ${className}`}>
+      <div className={`bg-white border border-blue-300 rounded-lg p-2 sm:p-3 ${className}`}>
         <div className="space-y-2">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -73,7 +73,7 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
               value={customCity}
               onChange={(e) => setCustomCity(e.target.value)}
               placeholder="Ex: São Paulo"
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -85,14 +85,14 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
               value={customState}
               onChange={(e) => setCustomState(e.target.value)}
               placeholder="Ex: SP"
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleCustomLocationSubmit}
               disabled={!customCity.trim()}
-              className="flex-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 px-2 sm:px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             >
               Confirmar
             </button>
@@ -102,7 +102,7 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
                 setCustomCity('');
                 setCustomState('');
               }}
-              className="px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              className="px-2 sm:px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
             >
               Cancelar
             </button>
@@ -113,12 +113,12 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
   }
 
   return (
-    <div className={`bg-blue-50 border border-blue-200 rounded-lg p-3 ${className}`}>
-      <div className="flex items-center justify-between">
+    <div className={`bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3 ${className}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
           <div>
-            <p className="text-sm font-medium text-blue-900">
+            <p className="text-xs sm:text-sm font-medium text-blue-900">
               {currentLocation.city ? currentLocation.city.charAt(0).toUpperCase() + currentLocation.city.slice(1) : 'Localização atual'}
             </p>
             {currentLocation.state && (
@@ -130,7 +130,7 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
         </div>
         <button
           onClick={() => setIsEditing(true)}
-          className="text-xs text-blue-600 hover:text-blue-800 underline"
+          className="text-xs text-blue-600 hover:text-blue-800 underline self-start sm:self-auto"
         >
           Alterar
         </button>
