@@ -563,19 +563,30 @@ export async function POST(request: NextRequest) {
     if (number && street) {
       console.log(`🎯 Buscando por rua + número: "${street}, ${number}"`);
       
-      // 1. Tentar Photon com número específico
-      const photonResults = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
+      // 1. Tentar Photon com número específico e filtro de cidade
+      const photonResults = await searchPhotonWithCityFilter(`${street} ${number}`, userLocation, limit);
       results.push(...photonResults);
       
-      // 2. Tentar Nominatim com número específico
+      // 2. Se não encontrou com filtro de cidade, tentar busca mais ampla
+      if (results.length === 0) {
+        const photonOptimized = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
+        results.push(...photonOptimized);
+      }
+      
+      // 3. Tentar Nominatim com número específico
       const nominatimResults = await searchNominatim(`${street} ${number}`, userLocation, limit);
       results.push(...nominatimResults);
       
-      // 3. Se não encontrou, tentar apenas a rua
+      // 4. Se não encontrou, tentar apenas a rua
       if (results.length === 0) {
         console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua`);
-        const streetOnlyResults = await searchPhotonOptimized(street, userLocation, limit);
+        const streetOnlyResults = await searchPhotonWithCityFilter(street, userLocation, limit);
         results.push(...streetOnlyResults);
+        
+        if (results.length === 0) {
+          const streetPhotonResults = await searchPhotonOptimized(street, userLocation, limit);
+          results.push(...streetPhotonResults);
+        }
         
         const streetNominatimResults = await searchNominatim(street, userLocation, limit);
         results.push(...streetNominatimResults);
@@ -583,12 +594,37 @@ export async function POST(request: NextRequest) {
     } else if (street) {
       console.log(`🔍 Buscando apenas por rua: "${street}"`);
       
-      // Busca normal por rua
-      const photonResults = await searchPhotonOptimized(street, userLocation, limit);
-      results.push(...photonResults);
+      // Busca com filtro de cidade primeiro
+      const photonCityResults = await searchPhotonWithCityFilter(street, userLocation, limit);
+      results.push(...photonCityResults);
+      
+      // Se não encontrou, busca mais ampla
+      if (results.length === 0) {
+        const photonResults = await searchPhotonOptimized(street, userLocation, limit);
+        results.push(...photonResults);
+      }
       
       const nominatimResults = await searchNominatim(street, userLocation, limit);
       results.push(...nominatimResults);
+    }
+    
+    // ✅ FILTRAR RESULTADOS: Manter apenas da cidade do usuário se disponível
+    if (userLocation?.city) {
+      const cityLower = userLocation.city.toLowerCase();
+      console.log(`🏙️ Filtrando resultados para cidade: ${userLocation.city}`);
+      
+      results = results.filter(result => {
+        const resultCity = result.address.city?.toLowerCase() || '';
+        const inSameCity = resultCity.includes(cityLower) || cityLower.includes(resultCity);
+        
+        if (!inSameCity) {
+          console.log(`❌ Removendo resultado de outra cidade: ${result.address.city} (${result.display_name})`);
+        }
+        
+        return inSameCity;
+      });
+      
+      console.log(`✅ ${results.length} resultados após filtro de cidade`);
     }
 
     // ✅ NOVA LÓGICA: Priorizar resultados com número quando disponível
