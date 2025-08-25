@@ -230,20 +230,73 @@ export default function HomePage() {
         formData.append('userLocation', JSON.stringify(deviceOrigin || deviceLocation));
       }
 
+      console.log('📤 Enviando imagem para API de OCR...');
+      console.log('📤 Dados do FormData:', {
+        imageName: file.name,
+        imageType: file.type,
+        imageSize: file.size,
+        userLocation: deviceOrigin || deviceLocation
+      });
+
       const ocrResponse = await fetch('/api/ocr/extract-address', {
         method: 'POST',
         body: formData
       });
 
+      console.log('📥 Resposta da API de OCR:', {
+        status: ocrResponse.status,
+        statusText: ocrResponse.statusText,
+        ok: ocrResponse.ok,
+        headers: Object.fromEntries(ocrResponse.headers.entries())
+      });
+
       if (!ocrResponse.ok) {
-        throw new Error(`Erro na API de OCR: ${ocrResponse.status}`);
+        // ✅ CORRIGIDO: Tentar ler o corpo da resposta para erro detalhado
+        let errorDetails = '';
+        try {
+          const errorBody = await ocrResponse.text();
+          console.error('❌ Corpo do erro da API:', errorBody);
+          
+          try {
+            const errorJson = JSON.parse(errorBody);
+            errorDetails = errorJson.error || errorJson.details || errorBody;
+          } catch {
+            errorDetails = errorBody;
+          }
+        } catch (readError) {
+          console.error('❌ Erro ao ler corpo da resposta:', readError);
+          errorDetails = `Erro HTTP ${ocrResponse.status}: ${ocrResponse.statusText}`;
+        }
+        
+        throw new Error(`Erro na API de OCR: ${errorDetails}`);
       }
 
-      const ocrResult = await ocrResponse.json();
-      console.log('✅ Resultado do OCR:', ocrResult);
+      // ✅ CORRIGIDO: Verificar se a resposta é JSON válido
+      const contentType = ocrResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('❌ Resposta não é JSON:', contentType);
+        throw new Error('Resposta inválida da API de OCR');
+      }
+
+      let ocrResult;
+      try {
+        ocrResult = await ocrResponse.json();
+        console.log('✅ Resultado do OCR parseado:', ocrResult);
+      } catch (parseError) {
+        console.error('❌ Erro ao parsear JSON da resposta:', parseError);
+        throw new Error('Resposta inválida da API de OCR');
+      }
+
+      if (!ocrResult || typeof ocrResult !== 'object') {
+        throw new Error('Resposta inválida da API de OCR');
+      }
 
       if (!ocrResult.success) {
         throw new Error(ocrResult.error || 'Falha na extração do endereço');
+      }
+
+      if (!ocrResult.address || typeof ocrResult.address !== 'string') {
+        throw new Error('Endereço não encontrado na resposta da API');
       }
 
       // ✅ NOVO: Validar se o endereço está na cidade correta

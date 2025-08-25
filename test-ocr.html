@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste API OCR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #d32f2f;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste da API de OCR</h1>
+    
+    <div class="test-section">
+        <h2>📸 Teste de Upload de Imagem</h2>
+        <input type="file" id="imageInput" accept="image/*">
+        <button onclick="testImageUpload()">Testar Upload</button>
+        <div id="uploadResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Teste de Busca de Endereço</h2>
+        <input type="text" id="addressInput" placeholder="Digite um endereço para testar" style="width: 100%; padding: 10px; margin: 10px 0;">
+        <button onclick="testAddressSearch()">Testar Busca</button>
+        <div id="searchResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Status das APIs</h2>
+        <button onclick="checkAPIStatus()">Verificar Status</button>
+        <div id="apiStatus" class="result"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = `result ${isError ? 'error' : 'success'}`;
+        }
+
+        async function testImageUpload() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showResult('uploadResult', '❌ Nenhuma imagem selecionada', true);
+                return;
+            }
+
+            showResult('uploadResult', '🔄 Processando imagem...');
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                // Simular localização do usuário
+                const userLocation = {
+                    lat: -18.9186,
+                    lng: -48.2772,
+                    city: 'Uberlândia',
+                    state: 'MG'
+                };
+                formData.append('userLocation', JSON.stringify(userLocation));
+
+                console.log('📤 Enviando para API:', {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    userLocation
+                });
+
+                const response = await fetch('/api/ocr/extract-address', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('📥 Resposta recebida:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Erro da API:', errorText);
+                    
+                    let errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorMessage = errorJson.error || errorJson.details || errorText;
+                    } catch {
+                        errorMessage = errorText;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+                console.log('✅ Resultado:', result);
+
+                if (result.success) {
+                    showResult('uploadResult', `✅ SUCESSO!\n\n📍 Endereço: ${result.address}\n📝 Texto: ${result.extractedText}\n🎯 Confiança: ${result.confidence}\n📁 Arquivo: ${result.imageName}\n📏 Tamanho: ${result.imageSize} bytes`);
+                } else {
+                    showResult('uploadResult', `❌ FALHA: ${result.error}`, true);
+                }
+
+            } catch (error) {
+                console.error('❌ Erro no teste:', error);
+                showResult('uploadResult', `❌ ERRO: ${error.message}`, true);
+            }
+        }
+
+        async function testAddressSearch() {
+            const addressInput = document.getElementById('addressInput');
+            const address = addressInput.value.trim();
+            
+            if (!address) {
+                showResult('searchResult', '❌ Nenhum endereço digitado', true);
+                return;
+            }
+
+            showResult('searchResult', '🔄 Buscando endereço...');
+
+            try {
+                const userLocation = {
+                    lat: -18.9186,
+                    lng: -48.2772,
+                    city: 'Uberlândia',
+                    state: 'MG'
+                };
+
+                const response = await fetch('/api/address-search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: address,
+                        userLocation,
+                        limit: 5
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ Resultado da busca:', result);
+
+                if (result.success && result.results.length > 0) {
+                    const results = result.results.map((r, i) => 
+                        `${i + 1}. ${r.display_name}\n   📍 ${r.lat}, ${r.lng}\n   🎯 Confiança: ${r.confidence}`
+                    ).join('\n\n');
+                    
+                    showResult('searchResult', `✅ ${result.results.length} resultado(s) encontrado(s):\n\n${results}`);
+                } else {
+                    showResult('searchResult', `ℹ️ Nenhum resultado encontrado para: ${address}`);
+                }
+
+            } catch (error) {
+                console.error('❌ Erro na busca:', error);
+                showResult('searchResult', `❌ ERRO: ${error.message}`, true);
+            }
+        }
+
+        async function checkAPIStatus() {
+            showResult('apiStatus', '🔄 Verificando status das APIs...');
+
+            try {
+                // Testar API de OCR
+                const ocrResponse = await fetch('/api/ocr/extract-address', {
+                    method: 'POST',
+                    body: new FormData()
+                });
+
+                // Testar API de busca
+                const searchResponse = await fetch('/api/address-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: 'teste' })
+                });
+
+                const status = {
+                    ocr: ocrResponse.status,
+                    search: searchResponse.status,
+                    timestamp: new Date().toISOString()
+                };
+
+                showResult('apiStatus', `📊 Status das APIs:\n\n🔍 OCR: ${status.ocr} ${status.ocr === 400 ? '✅ (Esperado - sem imagem)' : '❌'}\n🔍 Busca: ${status.search} ${status.search === 400 ? '✅ (Esperado - query inválida)' : '❌'}\n⏰ Verificado em: ${status.timestamp}`);
+
+            } catch (error) {
+                showResult('apiStatus', `❌ Erro ao verificar status: ${error.message}`, true);
+            }
+        }
+
+        // Verificar status ao carregar a página
+        window.addEventListener('load', checkAPIStatus);
+    </script>
+</body>
+</html>
