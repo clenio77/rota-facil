@@ -99,118 +99,151 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
 
     console.log(`🔍 Photon com número: "${query}" (número extraído: ${number || 'nenhum'})`);
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'User-Agent': 'RotaFacil/1.0 (https://rotafacil.com)'
-      }
-    });
+    // ✅ CORRIGIDO: Adicionar timeout para evitar travamento
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
 
-    if (!response.ok) {
-      throw new Error(`Photon HTTP ${response.status}`);
-    }
-
-    const data: PhotonResponse = await response.json();
-
-    if (!data.features || !Array.isArray(data.features)) {
-      return [];
-    }
-
-    const results: SearchResult[] = data.features
-      .filter((feature: PhotonFeature) => {
-        const props = feature.properties;
-        return props?.countrycode === 'BR' ||
-               props?.country === 'Brasil' ||
-               props?.country === 'Brazil';
-      })
-      .map((feature: PhotonFeature) => {
-        const [lng, lat] = feature.geometry.coordinates;
-        const props = feature.properties;
-
-        // Calcular confiança baseada nos dados disponíveis
-        let confidence = 0.6;
-        let distance: number | undefined;
-
-        // BONUS ESPECIAL: se tem o número exato que procuramos
-        if (number && props?.housenumber === number) {
-          confidence += 0.3; // Grande bonus para número exato
-          console.log(`🎯 NÚMERO EXATO encontrado: ${props.housenumber}`);
-        } else if (props?.housenumber) {
-          confidence += 0.1; // Bonus menor para qualquer número
-        }
-
-        if (props?.street) confidence += 0.1;
-        if (props?.city) confidence += 0.1;
-
-        // Calcular distância se temos localização do usuário
-        if (userLocation?.lat && userLocation?.lng) {
-          distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
-          // Bonus para proximidade
-          if (distance < 5) confidence += 0.2;
-          else if (distance < 20) confidence += 0.1;
-        }
-
-        // Construir display_name
-        const displayParts: string[] = [];
-        if (props?.street) displayParts.push(props.street);
-        if (props?.housenumber) displayParts.push(props.housenumber);
-        if (props?.district) displayParts.push(props.district);
-        if (props?.city) displayParts.push(props.city);
-        if (props?.state) displayParts.push(props.state);
-
-        const display_name = displayParts.join(', ') || 'Endereço sem nome';
-
-        return {
-          id: props?.osm_id?.toString() || `${lat}-${lng}`,
-          display_name,
-          lat,
-          lng,
-          address: {
-            house_number: props?.housenumber,
-            road: props?.street,
-            neighbourhood: props?.district,
-            city: props?.city,
-            state: props?.state,
-            postcode: props?.postcode,
-            country: props?.country
-          },
-          type: props?.osm_value || props?.type || 'place',
-          importance: confidence, // Usar nossa confiança calculada
-          distance,
-          confidence
-        };
-      })
-      .filter((result: SearchResult) => {
-        // Se procuramos um número específico, priorizar resultados relevantes
-        if (number) {
-          // Manter resultados com número exato OU da mesma rua
-          return result.address.house_number === number ||
-                 result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
-                 result.display_name.toLowerCase().includes(street.toLowerCase());
-        }
-        return true;
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          'User-Agent': 'RotaFacil/1.0 (https://rotafacil.com)'
+        },
+        signal: controller.signal
       });
 
-    // Ordenar por confiança, proximidade e relevância
-    results.sort((a, b) => {
-      // Prioridade 1: Confiança
-      if (Math.abs(a.confidence - b.confidence) > 0.1) {
-        return b.confidence - a.confidence;
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Photon HTTP ${response.status}`);
+      }
+
+      // ✅ CORRIGIDO: Verificar se a resposta é JSON válido
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('⚠️ Photon retornou resposta não-JSON:', contentType);
+        return [];
+      }
+
+      let data: PhotonResponse;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Erro ao parsear JSON do Photon:', jsonError);
+        console.error('❌ Resposta recebida:', await response.text());
+        return [];
+      }
+
+      if (!data.features || !Array.isArray(data.features)) {
+        console.warn('⚠️ Photon retornou estrutura inválida:', data);
+        return [];
+      }
+
+      const results: SearchResult[] = data.features
+        .filter((feature: PhotonFeature) => {
+          const props = feature.properties;
+          return props?.countrycode === 'BR' ||
+                 props?.country === 'Brasil' ||
+                 props?.country === 'Brazil';
+        })
+        .map((feature: PhotonFeature) => {
+          const [lng, lat] = feature.geometry.coordinates;
+          const props = feature.properties;
+
+          // Calcular confiança baseada nos dados disponíveis
+          let confidence = 0.6;
+          let distance: number | undefined;
+
+          // BONUS ESPECIAL: se tem o número exato que procuramos
+          if (number && props?.housenumber === number) {
+            confidence += 0.3; // Grande bonus para número exato
+            console.log(`🎯 NÚMERO EXATO encontrado: ${props.housenumber}`);
+          } else if (props?.housenumber) {
+            confidence += 0.1; // Bonus menor para qualquer número
+          }
+
+          if (props?.street) confidence += 0.1;
+          if (props?.city) confidence += 0.1;
+
+          // Calcular distância se temos localização do usuário
+          if (userLocation?.lat && userLocation?.lng) {
+            distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
+            // Bonus para proximidade
+            if (distance < 5) confidence += 0.2;
+            else if (distance < 20) confidence += 0.1;
+          }
+
+          // Construir display_name
+          const displayParts: string[] = [];
+          if (props?.street) displayParts.push(props.street);
+          if (props?.housenumber) displayParts.push(props.housenumber);
+          if (props?.district) displayParts.push(props.district);
+          if (props?.city) displayParts.push(props.city);
+          if (props?.state) displayParts.push(props.state);
+
+          const display_name = displayParts.join(', ') || 'Endereço sem nome';
+
+          return {
+            id: props?.osm_id?.toString() || `${lat}-${lng}`,
+            display_name,
+            lat,
+            lng,
+            address: {
+              house_number: props?.housenumber,
+              road: props?.street,
+              neighbourhood: props?.district,
+              city: props?.city,
+              state: props?.state,
+              postcode: props?.postcode,
+              country: props?.country
+            },
+            type: props?.osm_value || props?.type || 'place',
+            importance: confidence, // Usar nossa confiança calculada
+            distance,
+            confidence
+          };
+        })
+        .filter((result: SearchResult) => {
+          // Se procuramos um número específico, priorizar resultados relevantes
+          if (number) {
+            // Manter resultados com número exato OU da mesma rua
+            return result.address.house_number === number ||
+                   result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+                   result.display_name.toLowerCase().includes(street.toLowerCase());
+          }
+          return true;
+        });
+
+      // Ordenar por confiança, proximidade e relevância
+      results.sort((a, b) => {
+        // Prioridade 1: Confiança
+        if (Math.abs(a.confidence - b.confidence) > 0.1) {
+          return b.confidence - a.confidence;
+        }
+        
+        // Prioridade 2: Proximidade (se temos localização)
+        if (a.distance !== undefined && b.distance !== undefined) {
+          return a.distance - b.distance;
+        }
+        
+        // Prioridade 3: Importância
+        return (b.importance || 0) - (a.importance || 0);
+      });
+
+      console.log(`✅ Photon: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
+      return results;
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.warn('⚠️ Timeout na chamada do Photon');
+        return [];
       }
       
-      // Prioridade 2: Proximidade (se temos localização)
-      if (a.distance !== undefined && b.distance !== undefined) {
-        return a.distance - b.distance;
-      }
-      
-      // Prioridade 3: Importância
-      return (b.importance || 0) - (a.importance || 0);
-    });
-
-    console.log(`✅ Photon: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
-    return results;
-
+      throw fetchError;
+    }
   } catch (error) {
-    console.error('Erro no Photon:', error);
+    console.error('❌ Erro no Photon:', error);
     return [];
   }
 }
@@ -249,9 +282,24 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
       throw new Error(`Photon cidade HTTP ${response.status}`);
     }
 
-    const data: PhotonResponse = await response.json();
+    // ✅ CORRIGIDO: Verificar se a resposta é JSON válido
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('⚠️ Photon cidade retornou resposta não-JSON:', contentType);
+      return [];
+    }
+
+    let data: PhotonResponse;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('❌ Erro ao parsear JSON do Photon cidade:', jsonError);
+      console.error('❌ Resposta recebida:', await response.text());
+      return [];
+    }
 
     if (!data.features || !Array.isArray(data.features)) {
+      console.warn('⚠️ Photon cidade retornou estrutura inválida:', data);
       return [];
     }
 
@@ -489,9 +537,24 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
       throw new Error(`Nominatim HTTP ${response.status}`);
     }
 
-    const data: NominatimItem[] = await response.json();
+    // ✅ CORRIGIDO: Verificar se a resposta é JSON válido
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('⚠️ Nominatim retornou resposta não-JSON:', contentType);
+      return [];
+    }
+
+    let data: NominatimItem[];
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      console.error('❌ Erro ao parsear JSON do Nominatim:', jsonError);
+      console.error('❌ Resposta recebida:', await response.text());
+      return [];
+    }
 
     if (!Array.isArray(data)) {
+      console.warn('⚠️ Nominatim retornou estrutura inválida:', data);
       return [];
     }
 
@@ -584,7 +647,19 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, userLocation, limit = 10, searchMode, streetOnly, numberOnly } = await request.json();
+    // ✅ CORRIGIDO: Validação mais robusta do request
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (parseError) {
+      console.error('❌ Erro ao parsear JSON do request:', parseError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Request JSON inválido' 
+      }, { status: 400 });
+    }
+
+    const { query, userLocation, limit = 10, searchMode, streetOnly, numberOnly } = requestBody;
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json({ 
@@ -602,35 +677,67 @@ export async function POST(request: NextRequest) {
     // ✅ PRIORIZAR: Se temos número, buscar por rua + número primeiro
     let results: SearchResult[] = [];
     
-    if (number && street) {
-      console.log(`🎯 Buscando por rua + número: "${street}, ${number}"`);
-      
-      // 1. Tentar Photon com número específico
-      const photonResults = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
-      results.push(...photonResults);
-      
-      // 2. Tentar Nominatim com número específico
-      const nominatimResults = await searchNominatim(`${street} ${number}`, userLocation, limit);
-      results.push(...nominatimResults);
-      
-      // 3. Se não encontrou, tentar apenas a rua
-      if (results.length === 0) {
-        console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua`);
-        const streetOnlyResults = await searchPhotonOptimized(street, userLocation, limit);
-        results.push(...streetOnlyResults);
+    try {
+      if (number && street) {
+        console.log(`🎯 Buscando por rua + número: "${street}, ${number}"`);
         
-        const streetNominatimResults = await searchNominatim(street, userLocation, limit);
-        results.push(...streetNominatimResults);
+        // 1. Tentar Photon com número específico
+        const photonResults = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
+        results.push(...photonResults);
+        
+        // 2. Tentar Nominatim com número específico
+        const nominatimResults = await searchNominatim(`${street} ${number}`, userLocation, limit);
+        results.push(...nominatimResults);
+        
+        // 3. Se não encontrou, tentar apenas a rua
+        if (results.length === 0) {
+          console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua`);
+          const streetOnlyResults = await searchPhotonOptimized(street, userLocation, limit);
+          results.push(...streetOnlyResults);
+          
+          const streetNominatimResults = await searchNominatim(street, userLocation, limit);
+          results.push(...streetNominatimResults);
+        }
+      } else if (street) {
+        console.log(`🔍 Buscando apenas por rua: "${street}"`);
+        
+        // Busca normal por rua
+        const photonResults = await searchPhotonOptimized(street, userLocation, limit);
+        results.push(...photonResults);
+        
+        const nominatimResults = await searchNominatim(street, userLocation, limit);
+        results.push(...nominatimResults);
       }
-    } else if (street) {
-      console.log(`🔍 Buscando apenas por rua: "${street}"`);
+    } catch (searchError) {
+      console.error('❌ Erro durante a busca:', searchError);
+      // ✅ NOVO: Fallback básico quando as APIs externas falham
+      console.log('🔄 Tentando fallback básico...');
       
-      // Busca normal por rua
-      const photonResults = await searchPhotonOptimized(street, userLocation, limit);
-      results.push(...photonResults);
-      
-      const nominatimResults = await searchNominatim(street, userLocation, limit);
-      results.push(...nominatimResults);
+      try {
+        // Criar resultado básico baseado na query
+        const fallbackResult: SearchResult = {
+          id: `fallback-${Date.now()}`,
+          display_name: query,
+          lat: userLocation?.lat || -18.9186, // Coordenadas padrão de Uberlândia
+          lng: userLocation?.lng || -48.2772,
+          address: {
+            road: street,
+            house_number: number,
+            city: userLocation?.city || 'Uberlândia',
+            state: userLocation?.state || 'MG',
+            country: 'Brasil'
+          },
+          type: 'place',
+          importance: 0.5,
+          confidence: 0.5,
+          distance: 0
+        };
+        
+        results.push(fallbackResult);
+        console.log('✅ Fallback básico criado:', fallbackResult.display_name);
+      } catch (fallbackError) {
+        console.error('❌ Erro no fallback:', fallbackError);
+      }
     }
 
     // ✅ NOVA LÓGICA: Priorizar resultados com número quando disponível
@@ -687,9 +794,20 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Erro na busca de endereços:', error);
+    
+    // ✅ CORRIGIDO: Log mais detalhado do erro
+    if (error instanceof Error) {
+      console.error('❌ Detalhes do erro:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
+    
     return NextResponse.json({ 
       success: false, 
-      error: 'Erro interno do servidor' 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, { status: 500 });
   }
 }
