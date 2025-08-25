@@ -224,21 +224,18 @@ export default function HomePage() {
           : stop
       ));
 
-      // Simular delay de processamento
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Fazer chamada real para a API de OCR
+      const response = await fetch('/api/ocr-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageData: base64Data,
+          userLocation: deviceOrigin || deviceLocation || undefined
+        }),
+      });
 
-      // ✅ SIMPLIFICADO: Resultado de teste fixo para Uberlândia
-      const result = {
-        success: true,
-        address: 'Rua Cruzeiro dos Peixotos, 123, Uberlândia, MG',
-        extractedText: 'Rua Cruzeiro dos Peixotos, 123\nUberlândia, MG',
-        confidence: 0.9,
-        lat: -18.9186,
-        lng: -48.2772,
-        error: undefined
-      };
-
-      console.log('✅ Resultado do processamento:', result);
+      const result = await response.json();
+      console.log('✅ Resultado do processamento OCR:', result);
 
       if (result.success) {
         setStops(prev => {
@@ -586,7 +583,39 @@ export default function HomePage() {
     }
 
     console.log('🚀 Iniciando rota com', confirmedStops.length, 'paradas');
-    setIsMapFullscreen(true);
+    
+    // Construir URL do Google Maps
+    const route = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
+    
+    // Usar origem do dispositivo se disponível e habilitada
+    const origin = useDeviceOrigin && deviceOrigin 
+      ? `${deviceOrigin.lat},${deviceOrigin.lng}`
+      : `${route[0].lat},${route[0].lng}`;
+    
+    // Destino final
+    const destination = roundtrip 
+      ? origin  // Volta ao início se for ida e volta
+      : `${route[route.length - 1].lat},${route[route.length - 1].lng}`;
+    
+    // Waypoints intermediários
+    const waypoints = route
+      .slice(roundtrip ? 0 : 1, roundtrip ? route.length : route.length - 1)
+      .map(stop => `${stop.lat},${stop.lng}`)
+      .join('|');
+    
+    // Construir URL do Google Maps
+    let googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+    
+    if (waypoints) {
+      googleMapsUrl += `&waypoints=${waypoints}`;
+    }
+    
+    googleMapsUrl += '&travelmode=driving';
+    
+    console.log('🗺️ Abrindo Google Maps:', googleMapsUrl);
+    
+    // Abrir em nova aba
+    window.open(googleMapsUrl, '_blank');
   };
 
   // Clear route list
@@ -696,6 +725,17 @@ export default function HomePage() {
       const bestResult = data.results[0];
 
       console.log('✅ Melhor resultado encontrado via voz:', bestResult);
+      
+      // Validar se o endereço está na cidade do usuário
+      if (currentLocation?.city) {
+        const resultCity = bestResult.address.city?.toLowerCase() || '';
+        const userCity = currentLocation.city.toLowerCase();
+        
+        if (!resultCity.includes(userCity) && !userCity.includes(resultCity)) {
+          alert(`❌ O endereço encontrado está em ${bestResult.address.city}, mas você está em ${currentLocation.city}. Por favor, busque por endereços locais.`);
+          return;
+        }
+      }
 
       const newStop: Stop = {
         id: Date.now(),

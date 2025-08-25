@@ -98,6 +98,9 @@ export default function CarteiroPage() {
   const [editableItems, setEditableItems] = useState<ECTItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number; lng: number} | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [processedFiles, setProcessedFiles] = useState<ProcessedECTList[]>([]);
+  const [showMultipleImagesMode, setShowMultipleImagesMode] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isClientMounted, setIsClientMounted] = useState(false);
   
@@ -292,9 +295,23 @@ export default function CarteiroPage() {
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
+    if (showMultipleImagesMode) {
+      // Modo múltiplas imagens
+      const newFiles = Array.from(files);
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      
+      // Limpar input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Modo normal (uma imagem)
+    const file = files[0];
     setIsProcessing(true);
     clearError();
     setProcessedData(null);
@@ -468,11 +485,31 @@ export default function CarteiroPage() {
             📸 Upload de Lista ECT
           </h2>
           
+          {/* Toggle para modo múltiplas imagens */}
+          <div className="mb-4 flex items-center justify-center space-x-3">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showMultipleImagesMode}
+                onChange={(e) => {
+                  setShowMultipleImagesMode(e.target.checked);
+                  setUploadedFiles([]);
+                  setProcessedFiles([]);
+                }}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">
+                📚 Modo múltiplas imagens (processar várias listas de uma vez)
+              </span>
+            </label>
+          </div>
+          
           <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center">
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple={showMultipleImagesMode}
               onChange={handleFileUpload}
               className="hidden"
             />
@@ -482,7 +519,9 @@ export default function CarteiroPage() {
                 onClick={() => fileInputRef.current?.click()}
                 className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                📁 Selecionar Imagem da Lista ECT
+                {showMultipleImagesMode 
+                  ? '📁 Adicionar Imagens de Listas ECT' 
+                  : '📁 Selecionar Imagem da Lista ECT'}
               </button>
             )}
 
