@@ -258,21 +258,36 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
     const results: SearchResult[] = data.features
       .filter((feature: PhotonFeature) => {
         const props = feature.properties;
-        // Filtrar apenas resultados do Brasil e da cidade específica
+        // ✅ CORRIGIDO: Filtro mais rigoroso por cidade e estado
         const isBrazil = props?.countrycode === 'BR' ||
                         props?.country === 'Brasil' ||
                         props?.country === 'Brazil';
         
-        const isSameCity = props?.city?.toLowerCase().includes(userLocation!.city!.toLowerCase());
+        // ✅ NOVO: Filtro rigoroso por cidade - deve conter exatamente a cidade do usuário
+        const isSameCity = props?.city && 
+                          (props.city.toLowerCase() === userLocation!.city!.toLowerCase() ||
+                           props.city.toLowerCase().includes(userLocation!.city!.toLowerCase()) ||
+                           userLocation!.city!.toLowerCase().includes(props.city.toLowerCase()));
         
-        return isBrazil && isSameCity;
+        // ✅ NOVO: Filtro por estado também
+        const isSameState = props?.state && userLocation!.state &&
+                          (props.state.toLowerCase() === userLocation!.state.toLowerCase() ||
+                           props.state.toLowerCase().includes(userLocation!.state.toLowerCase()));
+        
+        // ✅ NOVO: Log detalhado do filtro
+        if (props?.city && props?.state) {
+          console.log(`🔍 Filtro cidade: "${props.city}" vs "${userLocation!.city}" = ${isSameCity}`);
+          console.log(`🔍 Filtro estado: "${props.state}" vs "${userLocation!.state}" = ${isSameState}`);
+        }
+        
+        return isBrazil && isSameCity && isSameState;
       })
       .map((feature: PhotonFeature) => {
         const [lng, lat] = feature.geometry.coordinates;
         const props = feature.properties;
 
         // Calcular confiança baseada nos dados disponíveis
-        let confidence = 0.7; // Bonus base para cidade específica
+        let confidence = 0.8; // ✅ AUMENTADO: Bonus base para cidade específica
         let distance: number | undefined;
 
         // BONUS ESPECIAL: se tem o número exato que procuramos
@@ -289,9 +304,10 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
         // Calcular distância se temos localização do usuário
         if (userLocation?.lat && userLocation?.lng) {
           distance = haversineKm(userLocation.lat, userLocation.lng, lat, lng);
-          // Bonus para proximidade
-          if (distance < 5) confidence += 0.2;
-          else if (distance < 20) confidence += 0.1;
+          // ✅ NOVO: Bonus maior para proximidade na mesma cidade
+          if (distance < 2) confidence += 0.3; // Muito próximo
+          else if (distance < 5) confidence += 0.2; // Próximo
+          else if (distance < 10) confidence += 0.1; // Moderadamente próximo
         }
 
         // Construir display_name
@@ -319,22 +335,48 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
             country: props?.country
           },
           type: props?.osm_value || props?.type || 'place',
-          importance: confidence,
+          importance: confidence, // Usar nossa confiança calculada
           distance,
           confidence
         };
       })
       .filter((result: SearchResult) => {
-        // Se procuramos um número específico, priorizar resultados relevantes
+        // ✅ NOVO: Filtro adicional para garantir que está na cidade correta
+        if (userLocation?.city && result.address.city) {
+          const cityMatch = result.address.city.toLowerCase().includes(userLocation.city.toLowerCase()) ||
+                           userLocation.city.toLowerCase().includes(result.address.city.toLowerCase());
+          
+          if (!cityMatch) {
+            console.log(`❌ Filtro adicional: "${result.address.city}" não corresponde a "${userLocation.city}"`);
+            return false;
+          }
+        }
+        
+        // Se procuramos um número específico, priorizar resultados com números
         if (number) {
-          // Manter resultados com número exato OU da mesma rua
+          // Manter resultados com número exato OU resultados da mesma rua
           return result.address.house_number === number ||
                  result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
                  result.display_name.toLowerCase().includes(street.toLowerCase());
         }
         return true;
-      })
-      .slice(0, limit); // Limitar após filtrar
+      });
+
+    // ✅ NOVO: Ordenar por confiança, proximidade e relevância
+    results.sort((a, b) => {
+      // Prioridade 1: Confiança
+      if (Math.abs(a.confidence - b.confidence) > 0.1) {
+        return b.confidence - a.confidence;
+      }
+      
+      // Prioridade 2: Proximidade (se temos localização)
+      if (a.distance !== undefined && b.distance !== undefined) {
+        return a.distance - b.distance;
+      }
+      
+      // Prioridade 3: Importância
+      return (b.importance || 0) - (a.importance || 0);
+    });
 
     console.log(`✅ Photon cidade: ${results.length} resultados encontrados (${results.filter(r => r.address.house_number === number).length} com número exato)`);
     return results;

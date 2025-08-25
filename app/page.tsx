@@ -192,7 +192,7 @@ export default function HomePage() {
     }
   }, [stops]);
 
-  // Função para capturar imagem
+  // Capturar imagem e processar
   const handleImageCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -211,11 +211,8 @@ export default function HomePage() {
     setStops(prev => [...prev, newStop]);
 
     try {
-      // ✅ SIMPLIFICADO: Sempre usar modo teste por enquanto
-      console.log('🧪 MODO TESTE: Simulando processamento de imagem');
-
-      // Simular delay de upload
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ CORRIGIDO: Implementar OCR real para extrair endereço da imagem
+      console.log('🔍 Processando imagem com OCR para extrair endereço...');
 
       // Atualizar status para processando
       setStops(prev => prev.map(stop =>
@@ -224,55 +221,110 @@ export default function HomePage() {
           : stop
       ));
 
-      // Simular delay de processamento
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // ✅ SIMPLIFICADO: Resultado de teste fixo para Uberlândia
-      const result = {
-        success: true,
-        address: 'Rua Cruzeiro dos Peixotos, 123, Uberlândia, MG',
-        extractedText: 'Rua Cruzeiro dos Peixotos, 123\nUberlândia, MG',
-        confidence: 0.9,
-        lat: -18.9186,
-        lng: -48.2772,
-        error: undefined
-      };
-
-      console.log('✅ Resultado do processamento:', result);
-
-      if (result.success) {
-        setStops(prev => {
-          const updatedStops = prev.map(stop =>
-            stop.id === newStop.id
-              ? {
-                  ...stop,
-                  status: 'confirmed' as const,
-                  address: result.address,
-                  lat: result.lat,
-                  lng: result.lng
-                }
-              : stop
-          );
-
-          console.log('✅ Parada confirmada com sucesso:', result.address);
-          return updatedStops;
-        });
-      } else {
-        throw new Error(result.error || 'Erro ao processar imagem');
+      // ✅ NOVO: Enviar imagem para API de OCR
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      // Adicionar localização do usuário para contexto
+      if (deviceOrigin || deviceLocation) {
+        formData.append('userLocation', JSON.stringify(deviceOrigin || deviceLocation));
       }
+
+      const ocrResponse = await fetch('/api/ocr/extract-address', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!ocrResponse.ok) {
+        throw new Error(`Erro na API de OCR: ${ocrResponse.status}`);
+      }
+
+      const ocrResult = await ocrResponse.json();
+      console.log('✅ Resultado do OCR:', ocrResult);
+
+      if (!ocrResult.success) {
+        throw new Error(ocrResult.error || 'Falha na extração do endereço');
+      }
+
+      // ✅ NOVO: Validar se o endereço está na cidade correta
+      const extractedAddress = ocrResult.address;
+      const userCity = (deviceOrigin || deviceLocation)?.city;
+      
+      if (userCity && !extractedAddress.toLowerCase().includes(userCity.toLowerCase())) {
+        // Endereço não está na cidade do usuário
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? {
+                ...stop,
+                status: 'error',
+                address: `❌ Endereço fora da cidade: "${extractedAddress}" não está em ${userCity}. Tire uma foto de um endereço local.`
+              }
+            : stop
+        ));
+        return;
+      }
+
+      // ✅ NOVO: Buscar coordenadas do endereço extraído
+      const geocodeResponse = await fetch('/api/address-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: extractedAddress,
+          userLocation: deviceOrigin || deviceLocation,
+          limit: 1
+        })
+      });
+
+      const geocodeResult = await geocodeResponse.json();
+      
+      if (geocodeResult.success && geocodeResult.results.length > 0) {
+        const bestResult = geocodeResult.results[0];
+        
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? {
+                ...stop,
+                status: 'confirmed',
+                address: extractedAddress,
+                lat: bestResult.lat,
+                lng: bestResult.lng
+              }
+            : stop
+        ));
+        
+        console.log('✅ Endereço confirmado com coordenadas:', extractedAddress);
+      } else {
+        // Endereço extraído mas sem coordenadas - marcar como confirmado sem lat/lng
+        setStops(prev => prev.map(stop =>
+          stop.id === newStop.id
+            ? {
+                ...stop,
+                status: 'confirmed',
+                address: extractedAddress
+              }
+            : stop
+        ));
+        
+        console.log('⚠️ Endereço extraído mas sem coordenadas:', extractedAddress);
+      }
+
     } catch (error) {
       console.error('❌ Erro no processamento:', error);
 
-      // Mostrar erro específico se for problema de URL blob
+      // Mostrar erro específico
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
       if (errorMessage.includes('blob')) {
         alert('❌ Problema no upload da imagem. Por favor, tire uma nova foto.');
-        // Remover a parada com problema
         setStops(prev => prev.filter(stop => stop.id !== newStop.id));
       } else {
         setStops(prev => prev.map(stop =>
           stop.id === newStop.id
-            ? { ...stop, status: 'error' }
+            ? { 
+                ...stop, 
+                status: 'error',
+                address: `❌ Erro na extração: ${errorMessage}`
+              }
             : stop
         ));
       }
@@ -578,15 +630,102 @@ export default function HomePage() {
     rec.start();
   };
 
-  // Função para iniciar rota
+  // Função para iniciar rota no Google Maps
   const handleStartRoute = () => {
     if (confirmedStops.length < 2) {
       alert('Adicione pelo menos 2 paradas para iniciar uma rota.');
       return;
     }
 
-    console.log('🚀 Iniciando rota com', confirmedStops.length, 'paradas');
-    setIsMapFullscreen(true);
+    console.log('🚀 Iniciando rota no Google Maps com', confirmedStops.length, 'paradas');
+
+    try {
+      // ✅ CORRIGIDO: Construir URL do Google Maps com todas as paradas
+      const origin = useDeviceOrigin && deviceOrigin 
+        ? `${deviceOrigin.lat},${deviceOrigin.lng}` 
+        : confirmedStops[0].lat && confirmedStops[0].lng 
+          ? `${confirmedStops[0].lat},${confirmedStops[0].lng}` 
+          : '';
+
+      // Filtrar paradas com coordenadas válidas
+      const stopsWithCoords = confirmedStops.filter(stop => stop.lat && stop.lng);
+      
+      if (stopsWithCoords.length < 2) {
+        alert('❌ Pelo menos 2 paradas precisam ter coordenadas válidas para iniciar a rota.');
+        return;
+      }
+
+      // Construir waypoints (paradas intermediárias)
+      const waypoints = stopsWithCoords.slice(1, -1).map(stop => 
+        `${stop.lat},${stop.lng}`
+      ).join('|');
+
+      // Destino (última parada)
+      const destination = stopsWithCoords[stopsWithCoords.length - 1];
+      const destinationCoords = `${destination.lat},${destination.lng}`;
+
+      // Construir URL do Google Maps
+      let googleMapsUrl = 'https://www.google.com/maps/dir/';
+      
+      if (origin) {
+        googleMapsUrl += `${origin}/`;
+      }
+      
+      if (waypoints) {
+        googleMapsUrl += `${waypoints}/`;
+      }
+      
+      googleMapsUrl += `${destinationCoords}/`;
+
+      // Adicionar parâmetros para otimização de rota
+      googleMapsUrl += '?optimize=true';
+      
+      // Adicionar parâmetro para evitar pedágios se configurado
+      if (typeof window !== 'undefined' && window.localStorage.getItem('rotafacil:avoidTolls') === 'true') {
+        googleMapsUrl += '&avoid=tolls';
+      }
+
+      console.log('🗺️ URL do Google Maps:', googleMapsUrl);
+
+      // ✅ NOVO: Abrir Google Maps em nova aba
+      const newWindow = window.open(googleMapsUrl, '_blank');
+      
+      if (newWindow) {
+        // ✅ NOVO: Feedback visual e de voz
+        voiceCommands.speak({
+          text: `Rota iniciada no Google Maps com ${stopsWithCoords.length} paradas.`,
+          priority: 'high'
+        });
+
+        // ✅ NOVO: Mostrar confirmação
+        alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${stopsWithCoords.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
+
+        // ✅ NOVO: Registrar no analytics
+        if (typeof window !== 'undefined' && window.gtag) {
+          window.gtag('event', 'route_started', {
+            event_category: 'navigation',
+            event_label: 'google_maps',
+            value: stopsWithCoords.length
+          });
+        }
+      } else {
+        // Fallback se popup for bloqueado
+        alert('❌ Popup bloqueado! Copie e cole este link no seu navegador:\n\n' + googleMapsUrl);
+        
+        // Tentar copiar para clipboard
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(googleMapsUrl).then(() => {
+            console.log('✅ URL copiada para clipboard');
+          }).catch(err => {
+            console.error('❌ Erro ao copiar URL:', err);
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao iniciar rota:', error);
+      alert('❌ Erro ao iniciar rota no Google Maps. Tente novamente.');
+    }
   };
 
   // Clear route list
@@ -671,31 +810,59 @@ export default function HomePage() {
     try {
       console.log('🎤 Buscando endereço por voz:', address);
 
-      // 🚀 USAR A NOVA API DE BUSCA PHOTON (mesma do campo de busca)
+      // ✅ CORRIGIDO: Usar localização atual para filtro rigoroso por cidade
       const currentLocation = deviceOrigin || deviceLocation;
+      
+      if (!currentLocation?.city) {
+        alert('❌ Não foi possível determinar sua cidade. Ative a localização e tente novamente.');
+        return;
+      }
 
-      // 🚀 USAR A NOVA API DE BUSCA PHOTON (mesma do campo de busca)
+      console.log(`🎯 Buscando endereço em: ${currentLocation.city}, ${currentLocation.state}`);
+
+      // ✅ NOVO: Busca com filtro rigoroso por cidade
       const res = await fetch('/api/address-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: voiceText.trim(), // Usar texto original sem modificações
+          query: voiceText.trim(),
           userLocation: currentLocation,
-          limit: 5 // Pegar apenas os 5 melhores resultados
+          limit: 5,
+          searchMode: 'voice',
+          strictCityFilter: true // ✅ NOVO: Flag para filtro rigoroso
         }),
       });
 
       const data = await res.json();
 
       if (!data.success || !data.results || data.results.length === 0) {
-        alert(`Não foi possível encontrar "${voiceText}". Tente ser mais específico ou verificar a ortografia.`);
+        alert(`❌ Não foi possível encontrar "${voiceText}" em ${currentLocation.city}.\n\n💡 Tente ser mais específico ou verificar se o endereço está na cidade correta.`);
         return;
       }
 
-      // Pegar o melhor resultado (primeiro da lista já ordenada por confiança e proximidade)
-      const bestResult = data.results[0];
+      // ✅ NOVO: Filtrar apenas resultados da cidade correta
+      const cityFilteredResults = data.results.filter(result => {
+        if (!result.address.city) return false;
+        
+        const cityMatch = result.address.city.toLowerCase().includes(currentLocation.city.toLowerCase()) ||
+                         currentLocation.city.toLowerCase().includes(result.address.city.toLowerCase());
+        
+        const stateMatch = result.address.state && currentLocation.state &&
+                          (result.address.state.toLowerCase().includes(currentLocation.state.toLowerCase()) ||
+                           currentLocation.state.toLowerCase().includes(result.address.state.toLowerCase()));
+        
+        return cityMatch && stateMatch;
+      });
 
-      console.log('✅ Melhor resultado encontrado via voz:', bestResult);
+      if (cityFilteredResults.length === 0) {
+        alert(`❌ Nenhum endereço encontrado em ${currentLocation.city}.\n\n💡 O endereço "${voiceText}" pode estar em outra cidade.`);
+        return;
+      }
+
+      // Pegar o melhor resultado da cidade correta
+      const bestResult = cityFilteredResults[0];
+
+      console.log('✅ Melhor resultado encontrado via voz (filtrado por cidade):', bestResult);
 
       const newStop: Stop = {
         id: Date.now(),
@@ -710,18 +877,24 @@ export default function HomePage() {
       setIsVoiceDialogOpen(false);
       setVoiceText('');
 
-      // Feedback de sucesso com informações do resultado
+      // ✅ NOVO: Feedback de sucesso com confirmação da cidade
       const distanceInfo = bestResult.distance ? ` (${bestResult.distance.toFixed(1)}km de distância)` : '';
-      console.log(`✅ Endereço adicionado via voz: ${bestResult.display_name}${distanceInfo}`);
+      const cityInfo = bestResult.address.city ? ` em ${bestResult.address.city}` : '';
+      
+      console.log(`✅ Endereço adicionado via voz${cityInfo}: ${bestResult.display_name}${distanceInfo}`);
 
-      // Aviso se confiança baixa
+      // ✅ NOVO: Aviso se confiança baixa
       if (bestResult.confidence < 0.7) {
         console.warn('⚠️ Resultado com baixa confiança, verifique se está correto');
+        alert(`⚠️ Endereço encontrado com baixa confiança.\n\n📍 Endereço: ${bestResult.display_name}\n🎯 Cidade: ${bestResult.address.city}\n\nVerifique se está correto antes de prosseguir.`);
+      } else {
+        // ✅ NOVO: Confirmação de sucesso
+        alert(`✅ Endereço adicionado com sucesso!\n\n📍 ${bestResult.display_name}\n🎯 ${bestResult.address.city}, ${bestResult.address.state}${distanceInfo}`);
       }
 
     } catch (err) {
       console.error('Erro ao buscar endereço via voz:', err);
-      alert('Erro ao buscar o endereço. Verifique sua conexão.');
+      alert('❌ Erro ao buscar o endereço. Verifique sua conexão e tente novamente.');
     }
   };
 
