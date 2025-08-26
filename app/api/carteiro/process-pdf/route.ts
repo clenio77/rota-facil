@@ -225,10 +225,7 @@ async function processPDFWithOCR(base64Data: string, method: 'complete' | 'parts
 
   const ocrData = await ocrResponse.json();
   
-  if (ocrData.IsErroredOnProcessing) {
-    throw new Error(`OCR.space retornou erro: ${ocrData.ErrorMessage}`);
-  }
-
+  // ✅ IMPORTANTE: Mesmo com erro de limite de páginas, o texto pode estar disponível
   let extractedText = '';
   if (ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
     extractedText = ocrData.ParsedResults[0].ParsedText;
@@ -236,6 +233,17 @@ async function processPDFWithOCR(base64Data: string, method: 'complete' | 'parts
 
   if (!extractedText) {
     throw new Error('Nenhum texto foi extraído do PDF');
+  }
+
+  // ✅ SE HOUVER ERRO MAS TEXTO FOI EXTRAÍDO, RETORNAR O TEXTO
+  if (ocrData.IsErroredOnProcessing) {
+    // ✅ VERIFICAR SE É APENAS AVISO DE LIMITE DE PÁGINAS
+    if (ocrData.ErrorMessage.includes('maximum page limit')) {
+      console.log('⚠️ Limite de páginas atingido, mas texto foi extraído das primeiras páginas');
+      return extractedText; // ✅ RETORNAR O TEXTO DISPONÍVEL
+    } else {
+      throw new Error(`OCR.space retornou erro: ${ocrData.ErrorMessage}`);
+    }
   }
 
   return extractedText;
