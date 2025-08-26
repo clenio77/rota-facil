@@ -51,25 +51,35 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ PADRÕES MELHORADOS PARA LISTA ECT
   const patterns = {
-    // ✅ CÓDIGO DO OBJETO (ex: OY 587 499 872, TJ 348 128 914)
-    objectCode: /([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
+    // ✅ CÓDIGO DO OBJETO (ex: OY 587 499 872, TJ 348 128 914, AM 711 792 548)
+    objectCode: /(\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
     
-    // ✅ ORDEM (ex: 45-221, 46-227, 49-228)
+    // ✅ ORDEM (ex: 15-149, 16-149, 17-158)
     order: /(\d{2}-\d{3})/g,
     
-    // ✅ ENDEREÇO COMPLETO (ex: Rua Ipiranga - até 142/143, 446)
-    address: /(?:Endereço\s+)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
+    // ✅ ENDEREÇO COMPLETO (ex: Rua Quinze de Novembro, 327)
+    address: /(?:Endereço\s*:\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
     
-    // ✅ CEP (ex: 38400036, 38400011)
+    // ✅ CEP (ex: 38400214, 38400228)
     cep: /CEP\s+(\d{8})/gi,
     
     // ✅ DESTINATÁRIO (ex: BR, X)
     recipient: /(?:BR|X)(?=\s+Destinatário|\s+Endereço|\s+$)/gi
   };
   
-  // ✅ PROCESSAMENTO INTELIGENTE POR LINHAS
-  const lines = cleanedText.split('\n').filter((line: string) => line.trim().length > 0);
+  // ✅ DIVIDIR TEXTO EM LINHAS CORRETAMENTE
+  // Usar múltiplos separadores para garantir quebra de linha
+  const lines = text
+    .split(/\r?\n|\r/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+  
   console.log(`🔍 Analisando ${lines.length} linhas do texto...`);
+  
+  // ✅ DEBUG: Mostrar as primeiras linhas
+  lines.slice(0, 5).forEach((line, index) => {
+    console.log(`🔍 Linha ${index + 1}: "${line}"`);
+  });
   
   const addresses: CarteiroAddress[] = [];
   let currentAddress: Partial<CarteiroAddress> = {};
@@ -77,10 +87,9 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ PROCESSAR CADA LINHA COM CONTEXTO
   for (let i = 0; i < lines.length; i++) {
-    const line: string = lines[i].trim();
-    console.log(`🔍 Linha ${i + 1}: "${line}"`);
+    const line = lines[i];
     
-    // ✅ BUSCAR CÓDIGO DO OBJETO
+    // ✅ BUSCAR CÓDIGO DO OBJETO (formato: 016 A 711 041711)
     const objectMatch = line.match(patterns.objectCode);
     if (objectMatch) {
       // ✅ SE JÁ TEM UM ENDEREÇO EM PROCESSAMENTO, SALVAR
@@ -94,31 +103,31 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       console.log(`✅ Código do objeto encontrado: ${currentAddress.objeto}`);
     }
     
-    // ✅ BUSCAR ORDEM
+    // ✅ BUSCAR ORDEM (formato: 15-149)
     const orderMatch = line.match(patterns.order);
     if (orderMatch && currentAddress.objeto) {
       currentAddress.ordem = orderMatch[0];
       console.log(`✅ Ordem encontrada: ${currentAddress.ordem}`);
     }
     
-    // ✅ BUSCAR ENDEREÇO
+    // ✅ BUSCAR ENDEREÇO (formato: Endereço: Rua Quinze de Novembro, 327)
     const addressMatch = line.match(patterns.address);
     if (addressMatch && currentAddress.objeto) {
-      const addressText = addressMatch[0].replace(/^Endereço\s+/i, '').trim();
+      const addressText = addressMatch[0].replace(/^Endereço\s*:\s*/i, '').trim();
       if (addressText.length > 5) { // Endereço deve ter pelo menos 5 caracteres
         currentAddress.endereco = addressText;
         console.log(`✅ Endereço encontrado: ${currentAddress.endereco}`);
       }
     }
     
-    // ✅ BUSCAR CEP
+    // ✅ BUSCAR CEP (formato: CEP 38400214)
     const cepMatch = line.match(patterns.cep);
     if (cepMatch && currentAddress.objeto) {
       currentAddress.cep = cepMatch[1];
       console.log(`✅ CEP encontrado: ${currentAddress.cep}`);
     }
     
-    // ✅ BUSCAR DESTINATÁRIO
+    // ✅ BUSCAR DESTINATÁRIO (formato: BR, X)
     const recipientMatch = line.match(patterns.recipient);
     if (recipientMatch && currentAddress.objeto) {
       currentAddress.destinatario = recipientMatch[0];
