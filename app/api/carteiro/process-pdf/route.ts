@@ -246,55 +246,78 @@ async function processPDFInParts(base64Data: string) {
   console.log('🔄 Iniciando processamento em partes...');
   
   let allAddresses = [];
-  let currentPage = 1;
-  let maxPages = 10; // Limite máximo de páginas para evitar loop infinito
   
-  // ✅ DIVIDIR O PDF EM PARTES MENORES
-  const chunkSize = Math.floor(base64Data.length / 3); // Dividir em 3 partes
-  console.log(`📊 PDF dividido em partes de ${chunkSize} caracteres`);
-  
-  for (let i = 0; i < 3; i++) {
-    try {
-      console.log(`📄 Processando parte ${i + 1}/3...`);
-      
-      // ✅ EXTRAIR PARTE DO PDF
-      const startIndex = i * chunkSize;
-      const endIndex = i === 2 ? base64Data.length : (i + 1) * chunkSize;
-      const pdfPart = base64Data.substring(startIndex, endIndex);
-      
-      // ✅ PROCESSAR PARTE DO PDF
-      const pageText = await processPDFWithOCR(pdfPart, 'parts');
-      
-      if (!pageText || pageText.trim().length === 0) {
-        console.log(`⚠️ Parte ${i + 1} vazia, continuando...`);
-        continue;
-      }
-      
-      // ✅ EXTRAIR ENDEREÇOS DA PARTE
-      const pageAddresses = extractAddressesFromText(pageText);
-      console.log(`✅ Parte ${i + 1}: ${pageAddresses.length} endereços encontrados`);
-      
-      // ✅ ADICIONAR ENDEREÇOS À LISTA TOTAL
-      allAddresses.push(...pageAddresses);
-      
-      // ✅ PAUSA ENTRE REQUISIÇÕES PARA NÃO SOBRECARREGAR A API
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-    } catch (pageError: unknown) {
-      const pageErrorMessage = pageError instanceof Error ? pageError.message : 'Erro desconhecido';
-      console.log(`⚠️ Erro ao processar parte ${i + 1}:`, pageErrorMessage);
-      
-      // ✅ SE FOR LIMITE DE PÁGINAS, CONTINUAR COM PRÓXIMA PARTE
-      if (pageErrorMessage.includes('maximum page limit')) {
-        console.log(`🔄 Limite de páginas atingido, continuando com próxima parte...`);
-        continue;
-      }
-      
-      // ✅ OUTROS ERROS, CONTINUAR COM PRÓXIMA PARTE
-      console.log('⚠️ Erro não crítico, continuando...');
-      continue;
+  try {
+    // ✅ PROCESSAR PDF COMPLETO (OCR.space retornará as primeiras 3 páginas)
+    console.log('📄 Processando PDF completo (OCR.space retornará primeiras 3 páginas)...');
+    
+    const pageText = await processPDFWithOCR(base64Data, 'parts');
+    
+    if (!pageText || pageText.trim().length === 0) {
+      console.log('⚠️ PDF não retornou texto, tentando abordagem alternativa...');
+      throw new Error('PDF não retornou texto');
     }
-  }
+    
+    console.log(`✅ PDF processado: ${pageText.length} caracteres extraídos`);
+    console.log('📝 Primeiras 200 caracteres:', pageText.substring(0, 200) + '...');
+    
+    // ✅ EXTRAIR ENDEREÇOS DO TEXTO DAS PRIMEIRAS 3 PÁGINAS
+    const pageAddresses = extractAddressesFromText(pageText);
+    console.log(`✅ Endereços extraídos das primeiras 3 páginas: ${pageAddresses.length}`);
+    
+    // ✅ ADICIONAR ENDEREÇOS À LISTA TOTAL
+    allAddresses.push(...pageAddresses);
+    
+    // ✅ SE HÁ POUCOS ENDEREÇOS, TENTAR PROCESSAR MAIS PÁGINAS
+    if (pageAddresses.length < 5) {
+      console.log('⚠️ Poucos endereços encontrados, tentando processar mais páginas...');
+      
+      // ✅ TENTAR PROCESSAR COM DIFERENTES CONFIGURAÇÕES
+      try {
+        const additionalText = await processPDFWithAlternativeSettings(base64Data);
+        if (additionalText && additionalText.length > pageText.length) {
+          console.log('✅ Texto adicional extraído com configurações alternativas');
+          
+          const additionalAddresses = extractAddressesFromText(additionalText);
+          console.log(`✅ Endereços adicionais encontrados: ${additionalAddresses.length}`);
+          
+          // ✅ COMBINAR ENDEREÇOS, REMOVENDO DUPLICATAS
+          const combinedAddresses = [...allAddresses, ...additionalAddresses];
+          const uniqueAddresses = combinedAddresses.filter((addr, index, self) => 
+            index === self.findIndex(a => a.objeto === addr.objeto)
+          );
+          
+          console.log(`✅ Total de endereços únicos: ${uniqueAddresses.length}`);
+          return uniqueAddresses;
+        }
+             } catch (altError: unknown) {
+         const altErrorMessage = altError instanceof Error ? altError.message : 'Erro desconhecido';
+         console.log('⚠️ Configurações alternativas falharam:', altErrorMessage);
+       }
+    }
+    
+     } catch (pageError: unknown) {
+     const pageErrorMessage = pageError instanceof Error ? pageError.message : 'Erro desconhecido';
+     console.log(`⚠️ Erro ao processar PDF:`, pageErrorMessage);
+     
+     // ✅ SE FOR LIMITE DE PÁGINAS, USAR O TEXTO DISPONÍVEL
+     if (pageErrorMessage.includes('maximum page limit')) {
+       console.log('🔄 Limite de páginas atingido, usando texto disponível...');
+       
+       try {
+         // ✅ TENTAR EXTRAIR TEXTO PARCIAL
+         const partialText = await extractPartialTextFromPDF(base64Data);
+         if (partialText) {
+           const partialAddresses = extractAddressesFromText(partialText);
+           console.log(`✅ Endereços extraídos do texto parcial: ${partialAddresses.length}`);
+           allAddresses.push(...partialAddresses);
+         }
+       } catch (partialError: unknown) {
+         const partialErrorMessage = partialError instanceof Error ? partialError.message : 'Erro desconhecido';
+         console.log('⚠️ Extração parcial falhou:', partialErrorMessage);
+       }
+     }
+   }
   
   console.log(`✅ Processamento em partes concluído: ${allAddresses.length} endereços totais`);
   
@@ -306,6 +329,78 @@ async function processPDFInParts(base64Data: string) {
   console.log(`✅ Endereços únicos após remoção de duplicatas: ${uniqueAddresses.length}`);
   
   return uniqueAddresses;
+}
+
+// ✅ NOVA FUNÇÃO: Processar PDF com configurações alternativas
+async function processPDFWithAlternativeSettings(base64Data: string) {
+  const formData = new FormData();
+  formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
+  formData.append('language', 'por');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('detectOrientation', 'true');
+  formData.append('scale', 'true');
+  formData.append('OCREngine', '1'); // ✅ MUDAR PARA ENGINE 1
+  formData.append('filetype', 'pdf');
+  formData.append('isTable', 'false'); // ✅ DESABILITAR TABELA
+  
+  const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
+    },
+    signal: AbortSignal.timeout(90000) // 90 segundos
+  });
+
+  if (!ocrResponse.ok) {
+    throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
+  }
+
+  const ocrData = await ocrResponse.json();
+  
+  if (ocrData.IsErroredOnProcessing) {
+    throw new Error(`OCR.space retornou erro: ${ocrData.ErrorMessage}`);
+  }
+
+  let extractedText = '';
+  if (ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
+    extractedText = ocrData.ParsedResults[0].ParsedText;
+  }
+
+  return extractedText;
+}
+
+// ✅ NOVA FUNÇÃO: Extrair texto parcial do PDF
+async function extractPartialTextFromPDF(base64Data: string) {
+  try {
+    // ✅ TENTAR COM CONFIGURAÇÕES MÍNIMAS
+    const formData = new FormData();
+    formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
+    formData.append('language', 'por');
+    formData.append('OCREngine', '1');
+    formData.append('filetype', 'pdf');
+    
+    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
+      },
+      signal: AbortSignal.timeout(30000) // 30 segundos
+    });
+
+    if (ocrResponse.ok) {
+      const ocrData = await ocrResponse.json();
+      if (!ocrData.IsErroredOnProcessing && ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
+        return ocrData.ParsedResults[0].ParsedText;
+      }
+    }
+     } catch (error: unknown) {
+     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+     console.log('⚠️ Extração parcial falhou:', errorMessage);
+   }
+  
+  return null;
 }
 
 // ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto
