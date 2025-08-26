@@ -23,6 +23,160 @@ interface OCRResponse {
   };
 }
 
+interface CarteiroAddress {
+  id: string;
+  ordem: string;
+  objeto: string;
+  endereco: string;
+  cep: string;
+  destinatario: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+    formatted_address: string;
+  };
+  geocoded: boolean;
+}
+
+// ✅ FUNÇÃO PRINCIPAL: Extrair endereços do texto OCR
+function extractAddressesFromText(text: string): CarteiroAddress[] {
+  console.log('🔍 Extraindo endereços do texto:', text.substring(0, 200) + '...');
+  
+  // ✅ LIMPEZA INTELIGENTE DO TEXTO
+  const cleanedText = text
+    .replace(/[^\w\s\-.,/()]/g, ' ') // Remove caracteres especiais
+    .replace(/\s+/g, ' ') // Normaliza espaços
+    .trim();
+  console.log('🧹 Texto limpo:', cleanedText.substring(0, 300) + '...');
+  
+  // ✅ PADRÕES MELHORADOS PARA LISTA ECT
+  const patterns = {
+    // ✅ CÓDIGO DO OBJETO (ex: OY 587 499 872, TJ 348 128 914)
+    objectCode: /([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
+    
+    // ✅ ORDEM (ex: 45-221, 46-227, 49-228)
+    order: /(\d{2}-\d{3})/g,
+    
+    // ✅ ENDEREÇO COMPLETO (ex: Rua Ipiranga - até 142/143, 446)
+    address: /(?:Endereço\s+)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
+    
+    // ✅ CEP (ex: 38400036, 38400011)
+    cep: /CEP\s+(\d{8})/gi,
+    
+    // ✅ DESTINATÁRIO (ex: BR, X)
+    recipient: /(?:BR|X)(?=\s+Destinatário|\s+Endereço|\s+$)/gi
+  };
+  
+  // ✅ PROCESSAMENTO INTELIGENTE POR LINHAS
+  const lines = cleanedText.split('\n').filter((line: string) => line.trim().length > 0);
+  console.log(`🔍 Analisando ${lines.length} linhas do texto...`);
+  
+  const addresses: CarteiroAddress[] = [];
+  let currentAddress: Partial<CarteiroAddress> = {};
+  let sequence = 1;
+  
+  // ✅ PROCESSAR CADA LINHA COM CONTEXTO
+  for (let i = 0; i < lines.length; i++) {
+    const line: string = lines[i].trim();
+    console.log(`🔍 Linha ${i + 1}: "${line}"`);
+    
+    // ✅ BUSCAR CÓDIGO DO OBJETO
+    const objectMatch = line.match(patterns.objectCode);
+    if (objectMatch) {
+      // ✅ SE JÁ TEM UM ENDEREÇO EM PROCESSAMENTO, SALVAR
+      if (currentAddress.objeto && currentAddress.endereco) {
+        addresses.push(createAddressFromCurrent(currentAddress, sequence++));
+        currentAddress = {};
+      }
+      
+      // ✅ INICIAR NOVO ENDEREÇO
+      currentAddress.objeto = objectMatch[0].replace(/\s+/g, '');
+      console.log(`✅ Código do objeto encontrado: ${currentAddress.objeto}`);
+    }
+    
+    // ✅ BUSCAR ORDEM
+    const orderMatch = line.match(patterns.order);
+    if (orderMatch && currentAddress.objeto) {
+      currentAddress.ordem = orderMatch[0];
+      console.log(`✅ Ordem encontrada: ${currentAddress.ordem}`);
+    }
+    
+    // ✅ BUSCAR ENDEREÇO
+    const addressMatch = line.match(patterns.address);
+    if (addressMatch && currentAddress.objeto) {
+      const addressText = addressMatch[0].replace(/^Endereço\s+/i, '').trim();
+      if (addressText.length > 5) { // Endereço deve ter pelo menos 5 caracteres
+        currentAddress.endereco = addressText;
+        console.log(`✅ Endereço encontrado: ${currentAddress.endereco}`);
+      }
+    }
+    
+    // ✅ BUSCAR CEP
+    const cepMatch = line.match(patterns.cep);
+    if (cepMatch && currentAddress.objeto) {
+      currentAddress.cep = cepMatch[1];
+      console.log(`✅ CEP encontrado: ${currentAddress.cep}`);
+    }
+    
+    // ✅ BUSCAR DESTINATÁRIO
+    const recipientMatch = line.match(patterns.recipient);
+    if (recipientMatch && currentAddress.objeto) {
+      currentAddress.destinatario = recipientMatch[0];
+      console.log(`✅ Destinatário encontrado: ${currentAddress.destinatario}`);
+    }
+    
+    // ✅ VERIFICAR SE A LINHA CONTÉM "Continua na próxima página"
+    if (line.includes('Continua na próxima página') && currentAddress.objeto) {
+      console.log(`⚠️ Página continua, salvando endereço parcial...`);
+      if (currentAddress.endereco) {
+        addresses.push(createAddressFromCurrent(currentAddress, sequence++));
+        currentAddress = {};
+      }
+    }
+  }
+  
+  // ✅ SALVAR ÚLTIMO ENDEREÇO SE COMPLETO
+  if (currentAddress.objeto && currentAddress.endereco) {
+    addresses.push(createAddressFromCurrent(currentAddress, sequence++));
+  }
+  
+  // ✅ VALIDAÇÃO E CORREÇÃO PÓS-PROCESSAMENTO
+  const validatedAddresses = addresses.map((addr, index) => {
+    // ✅ CORRIGIR CAMPOS VAZIOS
+    if (!addr.cep || addr.cep === 'undefined') {
+      addr.cep = 'CEP não encontrado';
+    }
+    if (!addr.ordem || addr.ordem === 'undefined') {
+      addr.ordem = `${index + 1}-000`;
+    }
+    if (!addr.destinatario || addr.destinatario === 'undefined') {
+      addr.destinatario = 'Não informado';
+    }
+    
+    return addr;
+  });
+  
+  console.log(`✅ NOVO ITEM ECT: ${validatedAddresses.length} endereços válidos encontrados`);
+  
+  return validatedAddresses;
+}
+
+// ✅ FUNÇÃO AUXILIAR: Criar endereço a partir do objeto atual
+function createAddressFromCurrent(current: Partial<CarteiroAddress>, sequence: number): CarteiroAddress {
+  const address: CarteiroAddress = {
+    id: `ect_${sequence}`,
+    ordem: current.ordem || `${sequence}-000`,
+    objeto: current.objeto || `OBJ_${sequence}`,
+    endereco: current.endereco || `Endereço ${sequence} (requer edição)`,
+    cep: current.cep || 'CEP não encontrado',
+    destinatario: current.destinatario || 'Não informado',
+    geocoded: false
+  };
+  
+  console.log(`💾 ÚLTIMO ENDEREÇO SALVO: ${address.objeto} ${address.ordem}`);
+  return address;
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Iniciando processamento OCR para múltiplas imagens...');
@@ -78,7 +232,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Tentando APIs externas de OCR...');
     
     let extractedText = '';
-    let addresses: AddressResult[] = [];
+    let addresses: CarteiroAddress[] = [];
 
     try {
       // Usar OCR.space com base64

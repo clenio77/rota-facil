@@ -134,62 +134,56 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
   try {
     console.log('🔍 Processando PDF diretamente do buffer...');
     
-    // ✅ USAR OCR.space COM BASE64
-    const formData = new FormData();
-    formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
-    formData.append('language', 'por');
-    formData.append('isOverlayRequired', 'false');
-    formData.append('detectOrientation', 'true');
-    formData.append('scale', 'true');
-    formData.append('OCREngine', '2');
-    formData.append('filetype', 'pdf');
-    formData.append('isTable', 'true');
-
-    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
-      },
-      signal: AbortSignal.timeout(60000) // 60 segundos para PDFs
-    });
-
-    if (!ocrResponse.ok) {
-      throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
-    }
-
-    const ocrData = await ocrResponse.json();
-    
-    if (ocrData.IsErroredOnProcessing) {
-      throw new Error(`OCR.space retornou erro: ${ocrData.ErrorMessage}`);
-    }
-
+    // ✅ TENTAR PROCESSAMENTO COMPLETO PRIMEIRO
     let extractedText = '';
-    if (ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
-      extractedText = ocrData.ParsedResults[0].ParsedText;
-      console.log('✅ OCR.space funcionou para PDF:', extractedText.substring(0, 200) + '...');
-    }
-
-    if (!extractedText) {
-      throw new Error('Nenhum texto foi extraído do PDF');
-    }
-
-    // ✅ PROCESSAR TEXTO EXTRAÍDO
-    const addresses = extractAddressesFromText(extractedText);
+    let allAddresses = [];
     
-    console.log(`✅ PDF processado: ${addresses.length} endereços encontrados`);
+    try {
+      // ✅ PRIMEIRA TENTATIVA: PDF completo
+      extractedText = await processPDFWithOCR(base64Data, 'complete');
+      console.log('✅ PDF processado completamente:', extractedText.substring(0, 200) + '...');
+      
+      // ✅ EXTRAIR ENDEREÇOS DO TEXTO COMPLETO
+      allAddresses = extractAddressesFromText(extractedText);
+      console.log(`✅ Endereços extraídos do PDF completo: ${allAddresses.length}`);
+      
+    } catch (ocrError) {
+      console.log('⚠️ Processamento completo falhou:', ocrError.message);
+      
+      // ✅ SEGUNDA TENTATIVA: PROCESSAMENTO EM PARTES
+      if (ocrError.message.includes('maximum page limit')) {
+        console.log('🔄 Tentando processamento em partes...');
+        
+        try {
+          allAddresses = await processPDFInParts(base64Data);
+          console.log(`✅ Processamento em partes bem-sucedido: ${allAddresses.length} endereços`);
+        } catch (partsError) {
+          console.error('❌ Processamento em partes também falhou:', partsError);
+          throw new Error(`Falha no processamento do PDF: ${partsError.message}`);
+        }
+      } else {
+        throw ocrError;
+      }
+    }
+    
+    if (allAddresses.length === 0) {
+      throw new Error('Nenhum endereço foi extraído do PDF');
+    }
+    
+    console.log(`✅ PDF processado com sucesso: ${allAddresses.length} endereços encontrados`);
 
     return {
       success: true,
-      total: addresses.length,
+      total: allAddresses.length,
       geocoded: 0, // Será geocodificado depois
-      addresses: addresses,
+      addresses: allAddresses,
       fileType: 'pdf',
       metadata: {
         extractedAt: new Date().toISOString(),
         fileName,
         ocrEngine: 'OCR.space',
-        textLength: extractedText.length
+        textLength: extractedText.length,
+        processingMethod: extractedText ? 'complete' : 'parts'
       }
     };
 
@@ -197,6 +191,119 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     console.error('❌ Erro no processamento do PDF:', error);
     throw error;
   }
+}
+
+// ✅ NOVA FUNÇÃO: Processar PDF com OCR
+async function processPDFWithOCR(base64Data: string, method: 'complete' | 'parts' = 'complete') {
+  const formData = new FormData();
+  formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
+  formData.append('language', 'por');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('detectOrientation', 'true');
+  formData.append('scale', 'true');
+  formData.append('OCREngine', '2');
+  formData.append('filetype', 'pdf');
+  formData.append('isTable', 'true');
+  
+  // ✅ CONFIGURAÇÕES ESPECÍFICAS PARA MÉTODO
+  if (method === 'parts') {
+    formData.append('pages', '1-3'); // Limitar a 3 páginas por vez
+  }
+
+  const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
+    },
+    signal: AbortSignal.timeout(60000) // 60 segundos
+  });
+
+  if (!ocrResponse.ok) {
+    throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
+  }
+
+  const ocrData = await ocrResponse.json();
+  
+  if (ocrData.IsErroredOnProcessing) {
+    throw new Error(`OCR.space retornou erro: ${ocrData.ErrorMessage}`);
+  }
+
+  let extractedText = '';
+  if (ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
+    extractedText = ocrData.ParsedResults[0].ParsedText;
+  }
+
+  if (!extractedText) {
+    throw new Error('Nenhum texto foi extraído do PDF');
+  }
+
+  return extractedText;
+}
+
+// ✅ NOVA FUNÇÃO: Processar PDF em partes
+async function processPDFInParts(base64Data: string) {
+  console.log('🔄 Iniciando processamento em partes...');
+  
+  let allAddresses = [];
+  let currentPage = 1;
+  let maxPages = 10; // Limite máximo de páginas para evitar loop infinito
+  
+  while (currentPage <= maxPages) {
+    try {
+      console.log(`📄 Processando página ${currentPage}...`);
+      
+      // ✅ PROCESSAR PÁGINA ATUAL
+      const pageText = await processPDFWithOCR(base64Data, 'parts');
+      
+      if (!pageText || pageText.trim().length === 0) {
+        console.log(`⚠️ Página ${currentPage} vazia, parando...`);
+        break;
+      }
+      
+      // ✅ EXTRAIR ENDEREÇOS DA PÁGINA
+      const pageAddresses = extractAddressesFromText(pageText);
+      console.log(`✅ Página ${currentPage}: ${pageAddresses.length} endereços encontrados`);
+      
+      // ✅ ADICIONAR ENDEREÇOS À LISTA TOTAL
+      allAddresses.push(...pageAddresses);
+      
+      // ✅ VERIFICAR SE AINDA HÁ MAIS CONTEÚDO
+      if (pageAddresses.length === 0 && pageText.length < 100) {
+        console.log(`⚠️ Página ${currentPage} parece ser a última, parando...`);
+        break;
+      }
+      
+      currentPage++;
+      
+      // ✅ PAUSA ENTRE REQUISIÇÕES PARA NÃO SOBRECARREGAR A API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+    } catch (pageError) {
+      console.log(`⚠️ Erro ao processar página ${currentPage}:`, pageError.message);
+      
+      // ✅ SE FOR LIMITE DE PÁGINAS, TENTAR PRÓXIMA
+      if (pageError.message.includes('maximum page limit')) {
+        currentPage++;
+        continue;
+      }
+      
+      // ✅ OUTROS ERROS, PARAR PROCESSAMENTO
+      console.log('❌ Erro não relacionado ao limite de páginas, parando...');
+      break;
+    }
+  }
+  
+  console.log(`✅ Processamento em partes concluído: ${allAddresses.length} endereços totais`);
+  
+  // ✅ REMOVER DUPLICATAS BASEADO NO OBJETO
+  const uniqueAddresses = allAddresses.filter((addr, index, self) => 
+    index === self.findIndex(a => a.objeto === addr.objeto)
+  );
+  
+  console.log(`✅ Endereços únicos após remoção de duplicatas: ${uniqueAddresses.length}`);
+  
+  return uniqueAddresses;
 }
 
 // ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto
