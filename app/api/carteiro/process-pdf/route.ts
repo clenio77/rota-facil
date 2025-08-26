@@ -207,10 +207,8 @@ async function processPDFWithOCR(base64Data: string, method: 'complete' | 'parts
   formData.append('filetype', 'pdf');
   formData.append('isTable', 'true');
   
-  // ✅ CONFIGURAÇÕES ESPECÍFICAS PARA MÉTODO
-  if (method === 'parts') {
-    formData.append('pages', '1-3'); // Limitar a 3 páginas por vez
-  }
+  // ✅ REMOVER COMPLETAMENTE O PARÂMETRO 'pages' INVÁLIDO
+  // O OCR.space processará automaticamente as primeiras páginas
 
   const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
     method: 'POST',
