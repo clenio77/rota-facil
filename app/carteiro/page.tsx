@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import CarteiroAutomation from '../../components/CarteiroAutomation';
+import CarteiroUpload from '../../components/CarteiroUpload';
 
 // ✅ INTERFACES TIPADAS ESPECÍFICAS
 interface ECTItem {
@@ -14,6 +15,40 @@ interface ECTItem {
   lng?: number;
   correctedAddress?: string;
   id?: string; // ✅ ADICIONAR ID para compatibilidade
+}
+
+// ✅ INTERFACE: Endereço do CarteiroUpload
+interface CarteiroAddress {
+  id?: string;
+  ordem: string;
+  objeto: string;
+  endereco: string;
+  cep: string;
+  destinatario?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+    display_name: string;
+    confidence: number;
+  };
+  geocoded: boolean;
+}
+
+// ✅ INTERFACE: Dados do mapa
+interface MapData {
+  center: { lat: number; lng: number };
+  zoom: number;
+  points: Array<{
+    id: string;
+    position: { lat: number; lng: number };
+    title: string;
+    description: string;
+    type: string;
+    order: number;
+    trackingCode: string;
+    confidence: number;
+  }>;
+  bounds: unknown;
 }
 
 interface ProcessedECTList {
@@ -490,43 +525,17 @@ export default function CarteiroPage() {
           </div>
         )}
 
-        {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            📸 Upload de Lista ECT
-          </h2>
-          
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            
-            {!isProcessing && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                📁 Selecionar Imagem da Lista ECT
-              </button>
-            )}
-
-            {isProcessing && (
-              <div className="text-blue-600">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <div className="text-sm font-medium">Processando imagem...</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  ⏱️ Pode demorar alguns minutos para listas grandes
-                </div>
-                <div className="text-xs text-gray-500">
-                  🔄 Não feche esta página durante o processamento
-                </div>
-              </div>
-            )}
-          </div>
+        {/* ✅ NOVA SEÇÃO: Upload Inteligente com CarteiroUpload */}
+        <div className="mb-6">
+          <CarteiroUpload
+            onAddressesLoaded={handleAddressesLoaded}
+            userLocation={userLocation ? {
+              lat: userLocation.lat,
+              lng: userLocation.lng,
+              city: 'Cidade atual',
+              state: 'Estado atual'
+            } : undefined}
+          />
         </div>
 
         {/* Error Display */}
