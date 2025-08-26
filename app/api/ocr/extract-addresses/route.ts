@@ -51,16 +51,16 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ PADRÕES MELHORADOS PARA LISTA ECT
   const patterns = {
-    // ✅ CÓDIGO DO OBJETO (ex: OY 587 499 872, TJ 348 128 914, AM 711 792 548)
+    // ✅ CÓDIGO DO OBJETO (ex: 050 OY 587 499 872, 051 AM 715 527 089)
     objectCode: /(\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
     
-    // ✅ ORDEM (ex: 15-149, 16-149, 17-158)
+    // ✅ ORDEM (ex: 45-221, 46-227, 49-228)
     order: /(\d{2}-\d{3})/g,
     
-    // ✅ ENDEREÇO COMPLETO (ex: Rua Quinze de Novembro, 327)
-    address: /(?:Endereço\s*:\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
+    // ✅ ENDEREÇO COMPLETO (ex: Rua Ipiranga - até 142/143, 446)
+    address: /(?:Endereço\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
     
-    // ✅ CEP (ex: 38400214, 38400228)
+    // ✅ CEP (ex: 38400036, 38400011)
     cep: /CEP\s+(\d{8})/gi,
     
     // ✅ DESTINATÁRIO (ex: BR, X)
@@ -69,10 +69,52 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ DIVIDIR TEXTO EM LINHAS CORRETAMENTE
   // Usar múltiplos separadores para garantir quebra de linha
-  const lines = text
+  let lines = text
     .split(/\r?\n|\r/)
     .map(line => line.trim())
     .filter(line => line.length > 0);
+  
+  // ✅ SE NÃO HOUVER QUEBRAS DE LINHA, DIVIDIR POR PADRÕES ECT
+  if (lines.length <= 1) {
+    console.log('⚠️ Nenhuma quebra de linha detectada, dividindo por padrões ECT...');
+    
+    // ✅ DIVIDIR O TEXTO POR PADRÕES DE OBJETO ECT
+    const objectMatches = [...cleanedText.matchAll(patterns.objectCode)];
+    console.log(`🔍 Encontrados ${objectMatches.length} padrões de objeto ECT`);
+    
+    if (objectMatches.length > 0) {
+      lines = [];
+      let lastIndex = 0;
+      
+      for (let i = 0; i < objectMatches.length; i++) {
+        const match = objectMatches[i];
+        const startIndex = match.index || 0;
+        
+        // ✅ EXTRAIR TEXTO ENTRE OBJETOS
+        if (i === 0) {
+          // ✅ PRIMEIRA PARTE: Do início até o primeiro objeto
+          const firstPart = cleanedText.substring(0, startIndex).trim();
+          if (firstPart.length > 10) {
+            lines.push(firstPart);
+          }
+        }
+        
+        // ✅ PARTE COM O OBJETO ATUAL
+        const endIndex = i < objectMatches.length - 1 ? 
+          (objectMatches[i + 1].index || cleanedText.length) : 
+          cleanedText.length;
+        
+        const objectPart = cleanedText.substring(startIndex, endIndex).trim();
+        if (objectPart.length > 5) {
+          lines.push(objectPart);
+        }
+        
+        lastIndex = endIndex;
+      }
+      
+      console.log(`✅ Texto dividido em ${lines.length} partes por padrões ECT`);
+    }
+  }
   
   console.log(`🔍 Analisando ${lines.length} linhas do texto...`);
   
@@ -89,7 +131,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // ✅ BUSCAR CÓDIGO DO OBJETO (formato: 016 A 711 041711)
+    // ✅ BUSCAR CÓDIGO DO OBJETO (formato: 050 OY 587 499 872)
     const objectMatch = line.match(patterns.objectCode);
     if (objectMatch) {
       // ✅ SE JÁ TEM UM ENDEREÇO EM PROCESSAMENTO, SALVAR
@@ -103,24 +145,24 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       console.log(`✅ Código do objeto encontrado: ${currentAddress.objeto}`);
     }
     
-    // ✅ BUSCAR ORDEM (formato: 15-149)
+    // ✅ BUSCAR ORDEM (formato: 45-221)
     const orderMatch = line.match(patterns.order);
     if (orderMatch && currentAddress.objeto) {
       currentAddress.ordem = orderMatch[0];
       console.log(`✅ Ordem encontrada: ${currentAddress.ordem}`);
     }
     
-    // ✅ BUSCAR ENDEREÇO (formato: Endereço: Rua Quinze de Novembro, 327)
+    // ✅ BUSCAR ENDEREÇO (formato: Endereço Rua Ipiranga - até 142/143, 446)
     const addressMatch = line.match(patterns.address);
     if (addressMatch && currentAddress.objeto) {
-      const addressText = addressMatch[0].replace(/^Endereço\s*:\s*/i, '').trim();
+      const addressText = addressMatch[0].replace(/^Endereço\s*/i, '').trim();
       if (addressText.length > 5) { // Endereço deve ter pelo menos 5 caracteres
         currentAddress.endereco = addressText;
         console.log(`✅ Endereço encontrado: ${currentAddress.endereco}`);
       }
     }
     
-    // ✅ BUSCAR CEP (formato: CEP 38400214)
+    // ✅ BUSCAR CEP (formato: CEP 38400036)
     const cepMatch = line.match(patterns.cep);
     if (cepMatch && currentAddress.objeto) {
       currentAddress.cep = cepMatch[1];
