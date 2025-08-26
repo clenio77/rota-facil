@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { autoOptimizeRoute } from '../../../lib/routeOptimizer';
+import { autoOptimizeRoute } from '../../../../lib/routeOptimizer';
 
 interface ECTItem {
   sequence: number;
