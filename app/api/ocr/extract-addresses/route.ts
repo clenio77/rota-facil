@@ -49,26 +49,26 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
     .trim();
   console.log('🧹 Texto limpo:', cleanedText.substring(0, 300) + '...');
   
-  // ✅ PADRÕES MELHORADOS PARA LISTA ECT
+  // ✅ PADRÕES SIMPLES E EFICAZES (como estava funcionando antes)
   const patterns = {
-    // ✅ CÓDIGO DO OBJETO (formato real: 001 OY 533 450 955, 002 TJ 348 127 511)
+    // ✅ CÓDIGO DO OBJETO (formato: 001 OY 533 450 955, 002 TJ 348 127 511)
     objectCode: /(\d{3}\s+[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
     
-    // ✅ ORDEM (formato real: 1-103, 2-118, 3-119)
+    // ✅ ORDEM (formato: 1-103, 2-118, 3-119)
     order: /(\d{1,2}-\d{3})/g,
     
-    // ✅ ENDEREÇO COMPLETO (formato real: Endereço Avenida Princesa Izabel, 654)
+    // ✅ ENDEREÇO (formato: Endereço Avenida Princesa Izabel, 654)
     address: /(?:Endereço\s*:?\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
     
-    // ✅ CEP (formato real: 38400192, 38400062)
+    // ✅ CEP (formato: 38400192, 38400062)
     cep: /CEP\s+(\d{8})/gi,
     
-    // ✅ DESTINATÁRIO (formato real: BR, X)
+    // ✅ DESTINATÁRIO (formato: BR, X)
     recipient: /(?:BR|X)(?=\s+Destinatário|\s+Endereço|\s+$)/gi
   };
   
-  // ✅ NOVA ABORDAGEM: EXTRAÇÃO DIRETA POR PADRÕES
-  console.log('🔄 Iniciando extração direta por padrões...');
+  // ✅ ABORDAGEM SIMPLES: PROCESSAR IMAGEM POR IMAGEM
+  console.log('🔄 Processando imagem individualmente...');
   
   // ✅ ENCONTRAR TODOS OS OBJETOS ECT NO TEXTO
   const objectMatches = [...cleanedText.matchAll(patterns.objectCode)];
