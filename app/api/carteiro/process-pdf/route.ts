@@ -290,34 +290,39 @@ async function processPDFInParts(base64Data: string) {
           console.log(`✅ Total de endereços únicos: ${uniqueAddresses.length}`);
           return uniqueAddresses;
         }
-             } catch (altError: unknown) {
-         const altErrorMessage = altError instanceof Error ? altError.message : 'Erro desconhecido';
-         console.log('⚠️ Configurações alternativas falharam:', altErrorMessage);
-       }
+      } catch (altError: unknown) {
+        const altErrorMessage = altError instanceof Error ? altError.message : 'Erro desconhecido';
+        console.log('⚠️ Configurações alternativas falharam:', altErrorMessage);
+      }
     }
     
-     } catch (pageError: unknown) {
-     const pageErrorMessage = pageError instanceof Error ? pageError.message : 'Erro desconhecido';
-     console.log(`⚠️ Erro ao processar PDF:`, pageErrorMessage);
-     
-     // ✅ SE FOR LIMITE DE PÁGINAS, USAR O TEXTO DISPONÍVEL
-     if (pageErrorMessage.includes('maximum page limit')) {
-       console.log('🔄 Limite de páginas atingido, usando texto disponível...');
-       
-       try {
-         // ✅ TENTAR EXTRAIR TEXTO PARCIAL
-         const partialText = await extractPartialTextFromPDF(base64Data);
-         if (partialText) {
-           const partialAddresses = extractAddressesFromText(partialText);
-           console.log(`✅ Endereços extraídos do texto parcial: ${partialAddresses.length}`);
-           allAddresses.push(...partialAddresses);
-         }
-       } catch (partialError: unknown) {
-         const partialErrorMessage = partialError instanceof Error ? partialError.message : 'Erro desconhecido';
-         console.log('⚠️ Extração parcial falhou:', partialErrorMessage);
-       }
-     }
-   }
+  } catch (pageError: unknown) {
+    const pageErrorMessage = pageError instanceof Error ? pageError.message : 'Erro desconhecido';
+    console.log(`⚠️ Erro ao processar PDF:`, pageErrorMessage);
+    
+    // ✅ SE FOR LIMITE DE PÁGINAS, TENTAR EXTRAIR TEXTO PARCIAL
+    if (pageErrorMessage.includes('maximum page limit')) {
+      console.log('🔄 Limite de páginas atingido, tentando extrair texto parcial...');
+      
+      try {
+        // ✅ TENTAR EXTRAIR TEXTO PARCIAL COM CONFIGURAÇÕES MÍNIMAS
+        const partialText = await extractPartialTextFromPDF(base64Data);
+        if (partialText) {
+          console.log(`✅ Texto parcial extraído: ${partialText.length} caracteres`);
+          console.log('📝 Primeiras 200 caracteres do texto parcial:', partialText.substring(0, 200) + '...');
+          
+          const partialAddresses = extractAddressesFromText(partialText);
+          console.log(`✅ Endereços extraídos do texto parcial: ${partialAddresses.length}`);
+          allAddresses.push(...partialAddresses);
+        } else {
+          console.log('⚠️ Nenhum texto parcial foi extraído');
+        }
+      } catch (partialError: unknown) {
+        const partialErrorMessage = partialError instanceof Error ? partialError.message : 'Erro desconhecido';
+        console.log('⚠️ Extração parcial falhou:', partialErrorMessage);
+      }
+    }
+  }
   
   console.log(`✅ Processamento em partes concluído: ${allAddresses.length} endereços totais`);
   
