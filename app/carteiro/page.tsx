@@ -280,16 +280,44 @@ export default function CarteiroPage() {
     });
   }, []);
 
-  if (!isClientMounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+  // ✅ NOVA FUNÇÃO: Processar endereços carregados do CarteiroUpload
+  const handleAddressesLoaded = useCallback((addresses: CarteiroAddress[], mapData: MapData) => {
+    console.log('📍 Endereços carregados:', addresses.length);
+    
+    if (!addresses || addresses.length === 0) {
+      setError('Nenhum endereço foi extraído das imagens.');
+      return;
+    }
+
+    // Converter para formato ECTItem
+    const ectItems: ECTItem[] = addresses.map((addr, index) => ({
+      id: addr.id || `ect-${Date.now()}-${index}`,
+      sequence: index + 1,
+      objectCode: addr.objeto || `OBJ-${index + 1}`,
+      address: addr.endereco || 'Endereço não disponível',
+      cep: addr.cep || '',
+      lat: addr.coordinates?.lat || 0,
+      lng: addr.coordinates?.lng || 0,
+      correctedAddress: addr.endereco
+    }));
+
+    // Criar dados processados
+    const normalizedData: ProcessedECTList = {
+      success: true,
+      totalItems: ectItems.length,
+      city: userLocation ? 'Cidade atual' : 'Uberlândia',
+      state: userLocation ? 'Estado atual' : 'MG',
+      items: ectItems,
+      googleMapsUrl: undefined
+    };
+
+    setProcessedData(normalizedData);
+    setEditableItems([...ectItems]);
+    setShowAddressEditor(true);
+    clearError();
+    
+    console.log('✅ Lista ECT criada com sucesso:', ectItems.length, 'itens');
+  }, [userLocation]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

@@ -35,7 +35,7 @@ interface ScheduledRoute {
   status: 'pending' | 'processing' | 'ready' | 'delivered';
 }
 
-// ✅ INTERFACE: Item da Rota
+// ✅ INTERFACE: Item da Rota (usando ECTItem para compatibilidade)
 interface RouteItem {
   id: string;
   sequence: number;
@@ -44,6 +44,7 @@ interface RouteItem {
   cep?: string;
   lat?: number;
   lng?: number;
+  correctedAddress?: string;
 }
 
 interface CarteiroAutomationProps {
