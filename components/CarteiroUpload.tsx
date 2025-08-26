@@ -53,7 +53,7 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ success?: boolean; data?: unknown } | null>(null);
   
   // ✅ NOVO: Estado para múltiplas imagens
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([]);
@@ -348,11 +348,11 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         throw new Error(data.error || 'Erro ao processar PDF');
       }
 
-      setResult(data.data);
+      setResult(data);
       setUploadProgress('Concluído!');
 
       // Notificar componente pai
-      onAddressesLoaded(data.data.addresses, data.data.mapData);
+      onAddressesLoaded(data.addresses, data.mapData);
 
     } catch (error) {
       console.error('Erro no upload:', error);
