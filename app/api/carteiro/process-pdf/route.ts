@@ -3,7 +3,7 @@ import { writeFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 
-const { processCarteiroFile, generateMapData, detectFileType } = require('../../../../utils/pdfExtractor');
+import { processCarteiroFile, generateMapData, detectFileType } from '../../../../utils/pdfExtractor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,19 +147,21 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       allAddresses = extractAddressesFromText(extractedText);
       console.log(`✅ Endereços extraídos do PDF completo: ${allAddresses.length}`);
       
-    } catch (ocrError) {
-      console.log('⚠️ Processamento completo falhou:', ocrError.message);
+    } catch (ocrError: unknown) {
+      const errorMessage = ocrError instanceof Error ? ocrError.message : 'Erro desconhecido';
+      console.log('⚠️ Processamento completo falhou:', errorMessage);
       
       // ✅ SEGUNDA TENTATIVA: PROCESSAMENTO EM PARTES
-      if (ocrError.message.includes('maximum page limit')) {
+      if (errorMessage.includes('maximum page limit')) {
         console.log('🔄 Tentando processamento em partes...');
         
         try {
           allAddresses = await processPDFInParts(base64Data);
           console.log(`✅ Processamento em partes bem-sucedido: ${allAddresses.length} endereços`);
-        } catch (partsError) {
-          console.error('❌ Processamento em partes também falhou:', partsError);
-          throw new Error(`Falha no processamento do PDF: ${partsError.message}`);
+        } catch (partsError: unknown) {
+          const partsErrorMessage = partsError instanceof Error ? partsError.message : 'Erro desconhecido';
+          console.error('❌ Processamento em partes também falhou:', partsErrorMessage);
+          throw new Error(`Falha no processamento do PDF: ${partsErrorMessage}`);
         }
       } else {
         throw ocrError;
@@ -249,48 +251,50 @@ async function processPDFInParts(base64Data: string) {
   let currentPage = 1;
   let maxPages = 10; // Limite máximo de páginas para evitar loop infinito
   
-  while (currentPage <= maxPages) {
+  // ✅ DIVIDIR O PDF EM PARTES MENORES
+  const chunkSize = Math.floor(base64Data.length / 3); // Dividir em 3 partes
+  console.log(`📊 PDF dividido em partes de ${chunkSize} caracteres`);
+  
+  for (let i = 0; i < 3; i++) {
     try {
-      console.log(`📄 Processando página ${currentPage}...`);
+      console.log(`📄 Processando parte ${i + 1}/3...`);
       
-      // ✅ PROCESSAR PÁGINA ATUAL
-      const pageText = await processPDFWithOCR(base64Data, 'parts');
+      // ✅ EXTRAIR PARTE DO PDF
+      const startIndex = i * chunkSize;
+      const endIndex = i === 2 ? base64Data.length : (i + 1) * chunkSize;
+      const pdfPart = base64Data.substring(startIndex, endIndex);
+      
+      // ✅ PROCESSAR PARTE DO PDF
+      const pageText = await processPDFWithOCR(pdfPart, 'parts');
       
       if (!pageText || pageText.trim().length === 0) {
-        console.log(`⚠️ Página ${currentPage} vazia, parando...`);
-        break;
+        console.log(`⚠️ Parte ${i + 1} vazia, continuando...`);
+        continue;
       }
       
-      // ✅ EXTRAIR ENDEREÇOS DA PÁGINA
+      // ✅ EXTRAIR ENDEREÇOS DA PARTE
       const pageAddresses = extractAddressesFromText(pageText);
-      console.log(`✅ Página ${currentPage}: ${pageAddresses.length} endereços encontrados`);
+      console.log(`✅ Parte ${i + 1}: ${pageAddresses.length} endereços encontrados`);
       
       // ✅ ADICIONAR ENDEREÇOS À LISTA TOTAL
       allAddresses.push(...pageAddresses);
       
-      // ✅ VERIFICAR SE AINDA HÁ MAIS CONTEÚDO
-      if (pageAddresses.length === 0 && pageText.length < 100) {
-        console.log(`⚠️ Página ${currentPage} parece ser a última, parando...`);
-        break;
-      }
-      
-      currentPage++;
-      
       // ✅ PAUSA ENTRE REQUISIÇÕES PARA NÃO SOBRECARREGAR A API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-    } catch (pageError) {
-      console.log(`⚠️ Erro ao processar página ${currentPage}:`, pageError.message);
+    } catch (pageError: unknown) {
+      const pageErrorMessage = pageError instanceof Error ? pageError.message : 'Erro desconhecido';
+      console.log(`⚠️ Erro ao processar parte ${i + 1}:`, pageErrorMessage);
       
-      // ✅ SE FOR LIMITE DE PÁGINAS, TENTAR PRÓXIMA
-      if (pageError.message.includes('maximum page limit')) {
-        currentPage++;
+      // ✅ SE FOR LIMITE DE PÁGINAS, CONTINUAR COM PRÓXIMA PARTE
+      if (pageErrorMessage.includes('maximum page limit')) {
+        console.log(`🔄 Limite de páginas atingido, continuando com próxima parte...`);
         continue;
       }
       
-      // ✅ OUTROS ERROS, PARAR PROCESSAMENTO
-      console.log('❌ Erro não relacionado ao limite de páginas, parando...');
-      break;
+      // ✅ OUTROS ERROS, CONTINUAR COM PRÓXIMA PARTE
+      console.log('⚠️ Erro não crítico, continuando...');
+      continue;
     }
   }
   
