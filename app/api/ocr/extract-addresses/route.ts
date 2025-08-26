@@ -51,16 +51,16 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ PADRÕES MELHORADOS PARA LISTA ECT
   const patterns = {
-    // ✅ CÓDIGO DO OBJETO (formato real: 007 AC 844 636 835, 008 OY 561 852 195)
-    objectCode: /(\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
+    // ✅ CÓDIGO DO OBJETO (formato real: 001 OY 533 450 955, 002 TJ 348 127 511)
+    objectCode: /(\d{3}\s+[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
     
-    // ✅ ORDEM (formato real: 8-130, 10-131, 12-143)
+    // ✅ ORDEM (formato real: 1-103, 2-118, 3-119)
     order: /(\d{1,2}-\d{3})/g,
     
-    // ✅ ENDEREÇO COMPLETO (formato real: Endereço Rua Rio Preto - até 272/273, 188)
+    // ✅ ENDEREÇO COMPLETO (formato real: Endereço Avenida Princesa Izabel, 654)
     address: /(?:Endereço\s*:?\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
     
-    // ✅ CEP (formato real: 38400090, 38400134)
+    // ✅ CEP (formato real: 38400192, 38400062)
     cep: /CEP\s+(\d{8})/gi,
     
     // ✅ DESTINATÁRIO (formato real: BR, X)
