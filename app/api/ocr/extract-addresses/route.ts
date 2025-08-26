@@ -51,19 +51,19 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   
   // ✅ PADRÕES MELHORADOS PARA LISTA ECT
   const patterns = {
-    // ✅ CÓDIGO DO OBJETO (ex: 050 OY 587 499 872, 051 AM 715 527 089)
+    // ✅ CÓDIGO DO OBJETO (formato real: 007 AC 844 636 835, 008 OY 561 852 195)
     objectCode: /(\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
     
-    // ✅ ORDEM (ex: 45-221, 46-227, 49-228)
-    order: /(\d{2}-\d{3})/g,
+    // ✅ ORDEM (formato real: 8-130, 10-131, 12-143)
+    order: /(\d{1,2}-\d{3})/g,
     
-    // ✅ ENDEREÇO COMPLETO (ex: Rua Ipiranga - até 142/143, 446)
-    address: /(?:Endereço\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
+    // ✅ ENDEREÇO COMPLETO (formato real: Endereço Rua Rio Preto - até 272/273, 188)
+    address: /(?:Endereço\s*:?\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
     
-    // ✅ CEP (ex: 38400036, 38400011)
+    // ✅ CEP (formato real: 38400090, 38400134)
     cep: /CEP\s+(\d{8})/gi,
     
-    // ✅ DESTINATÁRIO (ex: BR, X)
+    // ✅ DESTINATÁRIO (formato real: BR, X)
     recipient: /(?:BR|X)(?=\s+Destinatário|\s+Endereço|\s+$)/gi
   };
   
