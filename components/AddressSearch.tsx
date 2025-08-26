@@ -113,39 +113,42 @@ export default function AddressSearch({
     }
   };
 
-  // Inicializar reconhecimento de voz
+  // ✅ NOVA FUNÇÃO: Inicializar reconhecimento de voz
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setSpeechSupported(true);
-        recognitionRef.current = new SpeechRecognition();
+    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      
+      if (recognitionRef.current) {
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = false;
         recognitionRef.current.lang = 'pt-BR';
-
+        
         recognitionRef.current.onstart = () => {
           setIsListening(true);
           console.log('🎤 Reconhecimento de voz iniciado');
         };
-
+        
         recognitionRef.current.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           console.log('🎤 Texto reconhecido:', transcript);
           
-          // ✅ INTELIGENTE: Tentar separar rua e número automaticamente
           const addressParts = extractAddressParts(transcript);
           setStreetQuery(addressParts.street);
           setNumberQuery(addressParts.number);
           
-          setIsListening(false);
+          // Buscar automaticamente
+          if (addressParts.street.length >= 2) {
+            const searchQuery = addressParts.number ? `${addressParts.street}, ${addressParts.number}` : addressParts.street;
+            searchAddresses(searchQuery, addressParts.number ? 'combined' : 'street');
+          }
         };
-
+        
         recognitionRef.current.onerror = (event: any) => {
-          console.error('🎤 Erro no reconhecimento:', event.error);
+          console.error('Erro no reconhecimento:', event.error);
           setIsListening(false);
         };
-
+        
         recognitionRef.current.onend = () => {
           setIsListening(false);
           console.log('🎤 Reconhecimento de voz finalizado');

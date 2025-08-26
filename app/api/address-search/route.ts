@@ -762,6 +762,78 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // ✅ NOVA LÓGICA: FILTRAR APENAS RESULTADOS DA CIDADE DO USUÁRIO
+    if (userLocation?.city) {
+      const userCity = userLocation.city.toLowerCase();
+      const userState = userLocation.state?.toLowerCase();
+      
+      console.log(`🏙️ Filtrando por cidade: "${userCity}" e estado: "${userState}"`);
+      
+      const cityFilteredResults = results.filter(result => {
+        const resultCity = result.address.city?.toLowerCase();
+        const resultState = result.address.state?.toLowerCase();
+        
+        // ✅ VALIDAÇÃO: Deve estar na mesma cidade OU no mesmo estado se cidade não especificada
+        const sameCity = resultCity && resultCity.includes(userCity);
+        const sameState = resultState && userState && resultState.includes(userState);
+        
+        // ✅ BONUS: Se tem número exato, ser mais flexível com cidade
+        const hasExactNumber = number && result.address.house_number === number;
+        
+        if (sameCity) {
+          console.log(`✅ ${result.display_name} - MESMA CIDADE: ${resultCity}`);
+          return true;
+        }
+        
+        if (sameState && hasExactNumber) {
+          console.log(`⚠️ ${result.display_name} - MESMO ESTADO + NÚMERO EXATO: ${resultState}`);
+          return true;
+        }
+        
+        if (hasExactNumber && !resultCity) {
+          console.log(`⚠️ ${result.display_name} - NÚMERO EXATO sem cidade especificada`);
+          return true;
+        }
+        
+        console.log(`❌ ${result.display_name} - CIDADE DIFERENTE: ${resultCity} vs ${userCity}`);
+        return false;
+      });
+      
+      console.log(`🏙️ Filtro por cidade: ${results.length} → ${cityFilteredResults.length} resultados`);
+      results = cityFilteredResults;
+    }
+
+    // ✅ NOVA LÓGICA: VALIDAR NÚMEROS REAIS
+    if (number) {
+      const validatedResults = results.filter(result => {
+        const resultNumber = result.address.house_number;
+        
+        if (!resultNumber) {
+          console.log(`❌ ${result.display_name} - SEM NÚMERO`);
+          return false;
+        }
+        
+        // ✅ VALIDAÇÃO: Número deve ser real (não vazio, não apenas texto)
+        const isValidNumber = /^\d+$/.test(resultNumber) && resultNumber.length <= 5;
+        
+        if (!isValidNumber) {
+          console.log(`❌ ${result.display_name} - NÚMERO INVÁLIDO: ${resultNumber}`);
+          return false;
+        }
+        
+        // ✅ BONUS: Se é o número exato que procuramos, priorizar
+        if (resultNumber === number) {
+          console.log(`🎯 ${result.display_name} - NÚMERO EXATO: ${resultNumber}`);
+          result.confidence += 0.2; // Bonus de confiança
+        }
+        
+        return true;
+      });
+      
+      console.log(`🔢 Validação de números: ${results.length} → ${validatedResults.length} resultados válidos`);
+      results = validatedResults;
+    }
+
     // Remover duplicatas baseado em coordenadas
     const uniqueResults = results.filter((result, index, self) => {
       const firstIndex = self.findIndex(r => 
