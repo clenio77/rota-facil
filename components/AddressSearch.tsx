@@ -50,7 +50,7 @@ export default function AddressSearch({
   const streetInputRef = useRef<HTMLInputElement>(null);
   const numberInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<unknown>(null);
   
   // Debounce da query para evitar muitas requisições
   const debouncedStreetQuery = useDebounce(streetQuery, 300);
@@ -58,49 +58,66 @@ export default function AddressSearch({
 
   // ✅ INICIALIZAR RECONHECIMENTO DE VOZ
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechSupported(true);
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = 'pt-BR';
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.maxAlternatives = 1;
+    console.log('🔍 Verificando suporte ao reconhecimento de voz...');
+    
+    // ✅ VERIFICAR SE O NAVEGADOR SUPORTA
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      console.log('🎤 SpeechRecognition disponível:', !!SpeechRecognition);
+      
+      if (SpeechRecognition) {
+        setSpeechSupported(true);
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.lang = 'pt-BR';
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.maxAlternatives = 1;
 
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-        console.log('🎤 Reconhecimento de voz iniciado');
-      };
+        recognitionRef.current.onstart = () => {
+          setIsListening(true);
+          console.log('🎤 Reconhecimento de voz iniciado');
+        };
 
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('🎤 Voz capturada:', transcript);
+        recognitionRef.current.onresult = (event: unknown) => {
+          const speechEvent = event as { results: { [key: number]: { [key: number]: { transcript: string } } } };
+          const transcript = speechEvent.results[0][0].transcript;
+          console.log('🎤 Voz capturada:', transcript);
+          
+          // ✅ PROCESSAR TRANSCRITO E SEPARAR RUA/NÚMERO
+          const { street, number } = parseVoiceInput(transcript);
+          console.log('🎤 Rua extraída:', street, 'Número:', number);
+          
+          setStreetQuery(street);
+          if (number) {
+            setNumberQuery(number);
+          }
+          
+          // ✅ BUSCAR AUTOMATICAMENTE
+          if (street.length >= 2) {
+            const searchQuery = number ? `${street}, ${number}` : street;
+            console.log('🎤 Buscando automaticamente:', searchQuery);
+            searchAddresses(searchQuery, number ? 'combined' : 'street');
+          }
+        };
+
+        recognitionRef.current.onerror = (event: unknown) => {
+          const errorEvent = event as { error: string };
+          console.error('❌ Erro no reconhecimento de voz:', errorEvent.error);
+          setIsListening(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false);
+          console.log('🎤 Reconhecimento de voz finalizado');
+        };
         
-        // ✅ PROCESSAR TRANSCRITO E SEPARAR RUA/NÚMERO
-        const { street, number } = parseVoiceInput(transcript);
-        
-        setStreetQuery(street);
-        if (number) {
-          setNumberQuery(number);
-        }
-        
-        // ✅ BUSCAR AUTOMATICAMENTE
-        if (street.length >= 2) {
-          const searchQuery = number ? `${street}, ${number}` : street;
-          searchAddresses(searchQuery, number ? 'combined' : 'street');
-        }
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('❌ Erro no reconhecimento de voz:', event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        console.log('🎤 Reconhecimento de voz finalizado');
-      };
+        console.log('✅ Reconhecimento de voz configurado com sucesso');
+      } else {
+        console.log('⚠️ Reconhecimento de voz não suportado neste navegador');
+        setSpeechSupported(false);
+      }
     } else {
-      console.log('⚠️ Reconhecimento de voz não suportado');
+      console.log('⚠️ Executando no servidor, reconhecimento de voz não disponível');
+      setSpeechSupported(false);
     }
   }, []);
 
@@ -190,12 +207,30 @@ export default function AddressSearch({
   };
 
   const startListening = () => {
+    console.log('🎤 Tentando iniciar reconhecimento de voz...');
+    console.log('🎤 speechSupported:', speechSupported);
+    console.log('🎤 recognitionRef.current:', !!recognitionRef.current);
+    
     if (recognitionRef.current && speechSupported) {
       try {
+        console.log('🎤 Iniciando reconhecimento...');
         recognitionRef.current.start();
       } catch (error) {
-        console.error('Erro ao iniciar reconhecimento:', error);
+        console.error('❌ Erro ao iniciar reconhecimento:', error);
         setIsListening(false);
+        
+        // ✅ VERIFICAR SE É PROBLEMA DE PERMISSÃO
+        if (error instanceof Error && error.message.includes('permission')) {
+          console.error('❌ Problema de permissão de microfone');
+        }
+      }
+    } else {
+      console.error('❌ Reconhecimento de voz não disponível');
+      if (!speechSupported) {
+        console.error('❌ Navegador não suporta reconhecimento de voz');
+      }
+      if (!recognitionRef.current) {
+        console.error('❌ SpeechRecognition não foi inicializado');
       }
     }
   };
