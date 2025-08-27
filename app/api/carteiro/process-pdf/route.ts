@@ -273,9 +273,15 @@ function extractAddressesFromText(text: string) {
       continue;
     }
 
-    // ✅ DETECTAR ENDEREÇO
+    // ✅ DETECTAR ENDEREÇO (padrões mais flexíveis)
     if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
-      if (trimmedLine.includes('RUA') || trimmedLine.includes('AVENIDA') || trimmedLine.includes('AV.')) {
+      if (trimmedLine.includes('RUA') || trimmedLine.includes('AVENIDA') || trimmedLine.includes('AV.') ||
+          trimmedLine.includes('Rua') || trimmedLine.includes('Avenida') || trimmedLine.includes('rua') ||
+          trimmedLine.includes('avenida') || trimmedLine.includes('Virgílio') || trimmedLine.includes('Botafogo') ||
+          trimmedLine.includes('Carioca') || trimmedLine.includes('Municípios') || trimmedLine.includes('Rondon') ||
+          trimmedLine.includes('Olegário') || trimmedLine.includes('Machado') || trimmedLine.includes('ndereço')) {
+        
+        console.log(`🏠 Endereço encontrado no PDF: ${trimmedLine}`);
         currentAddress.endereco = trimmedLine;
       }
     }
