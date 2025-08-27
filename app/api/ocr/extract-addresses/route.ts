@@ -245,15 +245,31 @@ CEP: 38400-200`;
       
       console.log(`✅ Endereços extraídos: ${carteiroAddresses.length}`);
       
-      // ✅ CONVERTER PARA FORMATO AddressResult
+      // ✅ CONVERTER PARA FORMATO AddressResult (compatível com o frontend)
       addresses = carteiroAddresses.map((addr, index) => {
+        // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários)
+        let cleanAddress = addr.endereco;
+        if (cleanAddress.includes('ndereço:')) {
+          cleanAddress = cleanAddress.replace('ndereço:', '').trim();
+        }
+        if (cleanAddress.includes('Endereço:')) {
+          cleanAddress = cleanAddress.replace('Endereço:', '').trim();
+        }
+        if (cleanAddress.includes('ndereç')) {
+          cleanAddress = cleanAddress.replace('ndereç', '').trim();
+        }
+        
+        // ✅ CRIAR ENDEREÇO COMPLETO PARA O MAPA
+        const fullAddress = `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
+        
         const addressResult: AddressResult = {
-          address: `${addr.objeto} - ${addr.endereco}`,
-          confidence: 0.8,
-          extractedText: `${addr.objeto} - ${addr.endereco} - ${addr.cep} - ${addr.destinatario}`
+          address: fullAddress, // ✅ ENDEREÇO COMPLETO PARA O MAPA
+          confidence: 0.9,
+          extractedText: `${addr.objeto} - ${cleanAddress} - CEP: ${addr.cep}`
         };
         
-        console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${addr.endereco}`);
+        console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${cleanAddress}`);
+        console.log(`🗺️ Endereço para mapa: ${fullAddress}`);
         return addressResult;
       });
     }
