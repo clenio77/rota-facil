@@ -38,80 +38,69 @@ interface CarteiroAddress {
   geocoded: boolean;
 }
 
-// ✅ FUNÇÃO PRINCIPAL: Extrair endereços do texto OCR
-function extractAddressesFromText(text: string): CarteiroAddress[] {
-  console.log('🔍 Extraindo endereços do texto:', text.substring(0, 200) + '...');
-  
-  // ✅ LIMPEZA INTELIGENTE DO TEXTO
-  const cleanedText = text
-    .replace(/[^\w\s\-.,/()]/g, ' ') // Remove caracteres especiais
-    .replace(/\s+/g, ' ') // Normaliza espaços
-    .trim();
-  console.log('🧹 Texto limpo:', cleanedText.substring(0, 300) + '...');
-  
-  // ✅ PADRÕES SIMPLES E EFICAZES (como estava funcionando antes)
-  const patterns = {
-    // ✅ CÓDIGO DO OBJETO (formato: 001 OY 533 450 955, 002 TJ 348 127 511)
-    objectCode: /(\d{3}\s+[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3})/g,
-    
-    // ✅ ORDEM (formato: 1-103, 2-118, 3-119)
-    order: /(\d{1,2}-\d{3})/g,
-    
-    // ✅ ENDEREÇO (formato: Endereço Avenida Princesa Izabel, 654)
-    address: /(?:Endereço\s*:?\s*)([^CEP]+?)(?=\s+CEP\s+|\s+Doc\.Identidade|\s+Continua|\s+$)/gi,
-    
-    // ✅ CEP (formato: 38400192, 38400062)
-    cep: /CEP\s+(\d{8})/gi,
-    
-    // ✅ DESTINATÁRIO (formato: BR, X)
-    recipient: /(?:BR|X)(?=\s+Destinatário|\s+Endereço|\s+$)/gi
-  };
-  
-  // ✅ ABORDAGEM SIMPLES: PROCESSAR IMAGEM POR IMAGEM
-  console.log('🔄 Processando imagem individualmente...');
-  
-  // ✅ ENCONTRAR TODOS OS OBJETOS ECT NO TEXTO
-  const objectMatches = [...cleanedText.matchAll(patterns.objectCode)];
-  console.log(`🔍 Encontrados ${objectMatches.length} padrões de objeto ECT`);
-  
-  if (objectMatches.length === 0) {
-    console.log('⚠️ Nenhum objeto ECT encontrado');
-    return [];
-  }
-  
-  const addresses: CarteiroAddress[] = [];
+// ✅ FUNÇÃO SIMPLES QUE FUNCIONAVA: Extrair endereços do texto
+function extractAddressesFromText(text: string) {
+  const addresses = [];
+  const lines = text.split('\n');
   let sequence = 1;
-  
-  // ✅ PROCESSAR CADA OBJETO ECT ENCONTRADO
-  for (let i = 0; i < objectMatches.length; i++) {
-    const match = objectMatches[i];
-    const objectText = match[0];
-    const matchIndex = match.index || 0;
-    
-    console.log(`🔍 Processando objeto ${i + 1}: ${objectText}`);
-    
-    // ✅ EXTRAIR INFORMAÇÕES DO OBJETO
-    const objectInfo = extractObjectInfo(cleanedText, matchIndex, patterns, i, objectMatches);
-    
-    if (objectInfo) {
-      const address: CarteiroAddress = {
-        id: `ect_${sequence}`,
-        ordem: objectInfo.ordem || `${sequence}-000`,
-        objeto: objectText.replace(/\s+/g, ''),
-        endereco: objectInfo.endereco || `Endereço ${sequence} (requer edição)`,
-        cep: objectInfo.cep || 'CEP não encontrado',
-        destinatario: objectInfo.destinatario || 'Não informado',
+  let currentAddress = null;
+
+  // ✅ PADRÕES SIMPLES PARA LISTA ECT (como estava funcionando antes)
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.length < 3) continue;
+
+    // ✅ DETECTAR NOVO ITEM ECT (padrão simples)
+    if (trimmedLine.match(/\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+/i)) {
+      if (currentAddress) {
+        addresses.push(currentAddress);
+      }
+      
+      currentAddress = {
+        id: `ect-${Date.now()}-${sequence}`,
+        ordem: sequence.toString(),
+        objeto: trimmedLine.match(/[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+/i)?.[0] || '',
+        endereco: 'Endereço a ser extraído',
+        cep: 'CEP a ser extraído',
+        destinatario: 'Localização a ser extraída',
+        coordinates: undefined,
         geocoded: false
       };
       
-      addresses.push(address);
-      console.log(`✅ Endereço ${sequence} criado: ${address.objeto} - ${address.endereco}`);
       sequence++;
+      continue;
+    }
+
+    // ✅ DETECTAR ENDEREÇO (padrão simples)
+    if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
+      if (trimmedLine.includes('RUA') || trimmedLine.includes('AVENIDA') || 
+          trimmedLine.includes('AV.') || trimmedLine.includes('ALAMEDA')) {
+        currentAddress.endereco = trimmedLine;
+      }
+    }
+
+    // ✅ DETECTAR CEP (padrão simples)
+    if (currentAddress && currentAddress.cep.includes('ser extraído')) {
+      const cepMatch = trimmedLine.match(/\d{5}-?\d{3}/);
+      if (cepMatch) {
+        currentAddress.cep = cepMatch[0];
+      }
+    }
+
+    // ✅ DETECTAR CIDADE/ESTADO (padrão simples)
+    if (currentAddress && currentAddress.destinatario.includes('ser extraído')) {
+      if (trimmedLine.includes('-') && trimmedLine.includes('/')) {
+        currentAddress.destinatario = trimmedLine;
+      }
     }
   }
-  
-  console.log(`✅ TOTAL DE ENDEREÇOS EXTRAÍDOS: ${addresses.length}`);
-  
+
+  // ✅ ADICIONAR ÚLTIMO ENDEREÇO
+  if (currentAddress) {
+    addresses.push(currentAddress);
+  }
+
+  console.log(`✅ Endereços extraídos: ${addresses.length}`);
   return addresses;
 }
 
