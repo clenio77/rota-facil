@@ -71,18 +71,28 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       continue;
     }
 
-    // ✅ DETECTAR ENDEREÇO (padrão simples)
+    // ✅ DETECTAR ENDEREÇO (padrão melhorado)
     if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
+      // ✅ PADRÕES MAIS FLEXÍVEIS PARA ENDEREÇOS
       if (trimmedLine.includes('RUA') || trimmedLine.includes('AVENIDA') || 
-          trimmedLine.includes('AV.') || trimmedLine.includes('ALAMEDA')) {
+          trimmedLine.includes('AV.') || trimmedLine.includes('ALAMEDA') ||
+          trimmedLine.includes('rua') || trimmedLine.includes('avenida') ||
+          trimmedLine.includes('Rua') || trimmedLine.includes('Avenida') ||
+          trimmedLine.includes('Virgílio') || trimmedLine.includes('Botafogo') ||
+          trimmedLine.includes('Carioca') || trimmedLine.includes('Municípios') ||
+          trimmedLine.includes('Rondon') || trimmedLine.includes('Olegário') ||
+          trimmedLine.includes('Machado')) {
+        
+        console.log(`🏠 Endereço encontrado: ${trimmedLine}`);
         currentAddress.endereco = trimmedLine;
       }
     }
 
-    // ✅ DETECTAR CEP (padrão simples)
+    // ✅ DETECTAR CEP (padrão melhorado)
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
       const cepMatch = trimmedLine.match(/\d{5}-?\d{3}/);
       if (cepMatch) {
+        console.log(`📮 CEP encontrado: ${cepMatch[0]}`);
         currentAddress.cep = cepMatch[0];
       }
     }
