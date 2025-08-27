@@ -252,18 +252,21 @@ CEP: 38400-200`;
         // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
         let cleanAddress = addr.endereco;
         
-        // ✅ REMOVER PREFIXOS COMPLETOS (incluindo tabulações)
-        if (cleanAddress.includes('ndereço:\t')) {
-          cleanAddress = cleanAddress.replace('ndereço:\t', '').trim();
-        }
-        if (cleanAddress.includes('Endereço:\t')) {
-          cleanAddress = cleanAddress.replace('Endereço:\t', '').trim();
-        }
-        if (cleanAddress.includes('ndereç\t')) {
-          cleanAddress = cleanAddress.replace('ndereç\t', '').trim();
-        }
-        if (cleanAddress.includes('ndereçc\t')) {
-          cleanAddress = cleanAddress.replace('ndereçc\t', '').trim();
+        // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
+        const addressPrefixes = [
+          'ndereço:\t', 'ndereço:', 'ndereço',
+          'Endereço:\t', 'Endereço:', 'Endereço',
+          'ndereç\t', 'ndereç',
+          'ndereçc\t', 'ndereçc'
+        ];
+        
+        // ✅ REMOVER CADA PREFIXO ENCONTRADO
+        for (const prefix of addressPrefixes) {
+          if (cleanAddress.includes(prefix)) {
+            cleanAddress = cleanAddress.replace(prefix, '').trim();
+            console.log(`🧹 Prefixo removido: "${prefix}" → "${cleanAddress}"`);
+            break; // Remove apenas o primeiro prefixo encontrado
+          }
         }
         
         // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
