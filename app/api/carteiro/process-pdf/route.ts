@@ -315,41 +315,49 @@ function extractAddressesFromText(text: string) {
     addresses.push(currentAddress);
   }
 
-  // ✅ VALIDAR E LIMPAR ENDEREÇOS (mesma lógica das imagens)
-  return addresses.map((addr, index) => {
-    // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários)
-    let cleanAddress = addr.endereco;
-    if (cleanAddress.includes('ndereço:')) {
-      cleanAddress = cleanAddress.replace('ndereço:', '').trim();
-    }
-    if (cleanAddress.includes('Endereço:')) {
-      cleanAddress = cleanAddress.replace('Endereço:', '').trim();
-    }
-    if (cleanAddress.includes('ndereç')) {
-      cleanAddress = cleanAddress.replace('ndereç', '').trim();
-    }
-    
-    // ✅ SE AINDA TEM "ser extraído", usar fallback
-    if (cleanAddress.includes('ser extraído')) {
-      cleanAddress = `Endereço ${index + 1} (requer edição)`;
-    }
-    
-    // ✅ VALIDAR CEP
-    if (addr.cep.includes('ser extraído')) {
-      addr.cep = 'CEP não encontrado';
-    }
-    
-    // ✅ VALIDAR DESTINATÁRIO
-    if (addr.destinatario.includes('ser extraído')) {
-      addr.destinatario = 'Localização não especificada';
-    }
-    
-    // ✅ ATUALIZAR ENDEREÇO LIMPO
-    addr.endereco = cleanAddress;
-    
-    console.log(`✅ Endereço ${index + 1} limpo: ${addr.objeto} - ${cleanAddress}`);
-    return addr;
-  });
+      // ✅ VALIDAR E LIMPAR ENDEREÇOS (mesma lógica das imagens)
+    return addresses.map((addr, index) => {
+      // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
+      let cleanAddress = addr.endereco;
+      
+      // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
+      const addressPrefixes = [
+        'ndereço:\t', 'ndereço:', 'ndereço',
+        'Endereço:\t', 'Endereço:', 'Endereço',
+        'ndereç\t', 'ndereç',
+        'ndereçc\t', 'ndereçc'
+      ];
+      
+      // ✅ REMOVER CADA PREFIXO ENCONTRADO
+      for (const prefix of addressPrefixes) {
+        if (cleanAddress.includes(prefix)) {
+          cleanAddress = cleanAddress.replace(prefix, '').trim();
+          console.log(`🧹 Prefixo removido do PDF: "${prefix}" → "${cleanAddress}"`);
+          break; // Remove apenas o primeiro prefixo encontrado
+        }
+      }
+      
+      // ✅ SE AINDA TEM "ser extraído", usar fallback
+      if (cleanAddress.includes('ser extraído')) {
+        cleanAddress = `Endereço ${index + 1} (requer edição)`;
+      }
+      
+      // ✅ VALIDAR CEP
+      if (addr.cep.includes('ser extraído')) {
+        addr.cep = 'CEP não encontrado';
+      }
+      
+      // ✅ VALIDAR DESTINATÁRIO
+      if (addr.destinatario.includes('ser extraído')) {
+        addr.destinatario = 'Localização não especificada';
+      }
+      
+      // ✅ ATUALIZAR ENDEREÇO LIMPO
+      addr.endereco = cleanAddress;
+      
+      console.log(`✅ Endereço ${index + 1} limpo: ${addr.objeto} - ${cleanAddress}`);
+      return addr;
+    });
 }
 
 // Configuração para aceitar uploads
