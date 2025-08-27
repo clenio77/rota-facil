@@ -302,17 +302,39 @@ function extractAddressesFromText(text: string) {
     addresses.push(currentAddress);
   }
 
-  // ✅ VALIDAR ENDEREÇOS
+  // ✅ VALIDAR E LIMPAR ENDEREÇOS (mesma lógica das imagens)
   return addresses.map((addr, index) => {
-    if (addr.endereco.includes('ser extraído')) {
-      addr.endereco = `Endereço ${index + 1} (requer edição)`;
+    // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários)
+    let cleanAddress = addr.endereco;
+    if (cleanAddress.includes('ndereço:')) {
+      cleanAddress = cleanAddress.replace('ndereço:', '').trim();
     }
+    if (cleanAddress.includes('Endereço:')) {
+      cleanAddress = cleanAddress.replace('Endereço:', '').trim();
+    }
+    if (cleanAddress.includes('ndereç')) {
+      cleanAddress = cleanAddress.replace('ndereç', '').trim();
+    }
+    
+    // ✅ SE AINDA TEM "ser extraído", usar fallback
+    if (cleanAddress.includes('ser extraído')) {
+      cleanAddress = `Endereço ${index + 1} (requer edição)`;
+    }
+    
+    // ✅ VALIDAR CEP
     if (addr.cep.includes('ser extraído')) {
       addr.cep = 'CEP não encontrado';
     }
+    
+    // ✅ VALIDAR DESTINATÁRIO
     if (addr.destinatario.includes('ser extraído')) {
       addr.destinatario = 'Localização não especificada';
     }
+    
+    // ✅ ATUALIZAR ENDEREÇO LIMPO
+    addr.endereco = cleanAddress;
+    
+    console.log(`✅ Endereço ${index + 1} limpo: ${addr.objeto} - ${cleanAddress}`);
     return addr;
   });
 }
