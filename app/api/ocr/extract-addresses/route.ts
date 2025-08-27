@@ -38,31 +38,34 @@ interface CarteiroAddress {
   geocoded: boolean;
 }
 
-// ✅ FUNÇÃO BÁSICA QUE FUNCIONAVA: Extrair endereços do texto
+// ✅ FUNÇÃO ROBUSTA: Extrair endereços do texto com padrões flexíveis
 function extractAddressesFromText(text: string): CarteiroAddress[] {
   const addresses: CarteiroAddress[] = [];
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n|\r/);
   let sequence = 1;
   let currentAddress = null;
 
   console.log(`🔍 Processando ${lines.length} linhas do texto...`);
 
-  // ✅ PROCESSAMENTO SIMPLES LINHA POR LINHA
+  // ✅ PROCESSAMENTO INTELIGENTE LINHA POR LINHA
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (!trimmedLine || trimmedLine.length < 3) continue;
 
     console.log(`🔍 Linha: "${trimmedLine}"`);
 
-    // ✅ DETECTAR QUALQUER OBJETO ECT (padrão super simples)
-    if (trimmedLine.includes('MI') || trimmedLine.includes('OY') || 
+    // ✅ DETECTAR QUALQUER OBJETO ECT (padrão mais flexível)
+    if (trimmedLine.match(/[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d{1,2}-\d{3}/) ||
+        trimmedLine.includes('MI') || trimmedLine.includes('OY') || 
         trimmedLine.includes('MJ') || trimmedLine.includes('MT') || 
-        trimmedLine.includes('TJ') || trimmedLine.includes('BR')) {
+        trimmedLine.includes('TJ') || trimmedLine.includes('BR') ||
+        trimmedLine.match(/[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}/) ||
+        trimmedLine.match(/^\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}/)) {
       
-      // ✅ SE JÁ TEM ENDEREÇO, SALVAR E CRIAR NOVO
-      if (currentAddress) {
+      // ✅ SE JÁ TEM ENDEREÇO COMPLETO, SALVAR E CRIAR NOVO
+      if (currentAddress && currentAddress.endereco !== 'Endereço a ser extraído') {
         addresses.push(currentAddress);
-        console.log(`💾 Endereço salvo: ${currentAddress.objeto}`);
+        console.log(`💾 Endereço completo salvo: ${currentAddress.objeto} - ${currentAddress.endereco}`);
       }
       
       // ✅ CRIAR NOVO ENDEREÇO
@@ -82,25 +85,42 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       continue;
     }
 
-    // ✅ DETECTAR ENDEREÇO (qualquer linha com RUA, AVENIDA, etc.)
+    // ✅ DETECTAR ENDEREÇO (padrões mais flexíveis)
     if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
-      if (trimmedLine.includes('Rua') || trimmedLine.includes('AVENIDA') || 
-          trimmedLine.includes('Avenida') || trimmedLine.includes('Municípios') ||
-          trimmedLine.includes('Machado') || trimmedLine.includes('Olegário') ||
-          trimmedLine.includes('Rondon') || trimmedLine.includes('Botafogo') ||
-          trimmedLine.includes('Carioca') || trimmedLine.includes('Virgílio')) {
+      // ✅ QUALQUER LINHA QUE PARECE ENDEREÇO
+      if (trimmedLine.match(/^(Rua|Avenida|Av\.|R\.|Travessa|Alameda|Praça|Vila|Condomínio)/i) ||
+          trimmedLine.match(/[A-Za-z\s]+,\s*\d+/i) ||
+          trimmedLine.match(/CEP:\s*\d{8}/i) ||
+          trimmedLine.includes('Uberlândia') ||
+          trimmedLine.includes('MG') ||
+          trimmedLine.match(/\d{5}-\d{3}/) ||
+          // ✅ NOVO: Capturar linhas que começam com "Endereço:"
+          trimmedLine.match(/^Endereço:/i) ||
+          // ✅ NOVO: Capturar qualquer linha com padrão de endereço
+          trimmedLine.match(/[A-Za-z\s]+,\s*\d+.*CEP:\s*\d{8}/i)) {
         
         currentAddress.endereco = trimmedLine;
         console.log(`🏠 Endereço encontrado: ${trimmedLine}`);
       }
     }
 
-    // ✅ DETECTAR CEP (qualquer linha com 8 dígitos)
+    // ✅ DETECTAR CEP (padrões mais flexíveis)
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
-      const cepMatch = trimmedLine.match(/\d{8}/);
+      const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
       if (cepMatch) {
-        currentAddress.cep = cepMatch[0];
-        console.log(`📮 CEP encontrado: ${cepMatch[0]}`);
+        const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
+        if (cep) {
+          currentAddress.cep = cep;
+          console.log(`📮 CEP encontrado: ${cep}`);
+        }
+      }
+    }
+
+    // ✅ DETECTAR CIDADE/ESTADO
+    if (currentAddress && currentAddress.destinatario.includes('ser extraída')) {
+      if (trimmedLine.includes('Uberlândia') || trimmedLine.includes('MG')) {
+        currentAddress.destinatario = 'Uberlândia - MG';
+        console.log(`🏙️ Localização encontrada: Uberlândia - MG`);
       }
     }
   }
