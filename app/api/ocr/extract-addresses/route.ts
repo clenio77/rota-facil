@@ -50,8 +50,9 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
     const trimmedLine = line.trim();
     if (!trimmedLine || trimmedLine.length < 3) continue;
 
-    // ✅ DETECTAR NOVO ITEM ECT (padrão simples)
-    if (trimmedLine.match(/\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+/i)) {
+    // ✅ DETECTAR NOVO ITEM ECT (padrão mais flexível)
+    const ectMatch = trimmedLine.match(/(\d{3})\s+([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+)/i);
+    if (ectMatch) {
       if (currentAddress) {
         addresses.push(currentAddress);
       }
@@ -59,7 +60,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       currentAddress = {
         id: `ect-${Date.now()}-${sequence}`,
         ordem: sequence.toString(),
-        objeto: trimmedLine.match(/[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+/i)?.[0] || '',
+        objeto: ectMatch[2].trim(),
         endereco: 'Endereço a ser extraído',
         cep: 'CEP a ser extraído',
         destinatario: 'Localização a ser extraída',
@@ -67,6 +68,26 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         geocoded: false
       };
       
+      console.log(`✅ NOVO ITEM ECT DETECTADO: ${ectMatch[2]} (sequência ${sequence})`);
+      sequence++;
+      continue;
+    }
+    
+    // ✅ DETECTAR PADRÕES ALTERNATIVOS DE OBJETOS
+    const altMatch = trimmedLine.match(/(\d{3})\s+([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3})/i);
+    if (altMatch && !currentAddress) {
+      currentAddress = {
+        id: `ect-${Date.now()}-${sequence}`,
+        ordem: sequence.toString(),
+        objeto: altMatch[2].trim(),
+        endereco: 'Endereço a ser extraído',
+        cep: 'CEP a ser extraído',
+        destinatario: 'Localização a ser extraída',
+        coordinates: undefined,
+        geocoded: false
+      };
+      
+      console.log(`✅ ITEM ECT ALTERNATIVO: ${altMatch[2]} (sequência ${sequence})`);
       sequence++;
       continue;
     }
