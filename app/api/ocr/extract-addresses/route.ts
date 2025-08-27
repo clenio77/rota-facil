@@ -252,12 +252,12 @@ CEP: 38400-200`;
         // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
         let cleanAddress = addr.endereco;
         
-        // ✅ REMOVER PREFIXOS COMPLETOS
-        if (cleanAddress.includes('ndereço:')) {
-          cleanAddress = cleanAddress.replace('ndereço:', '').trim();
+        // ✅ REMOVER PREFIXOS COMPLETOS (incluindo tabulações)
+        if (cleanAddress.includes('ndereço:\t')) {
+          cleanAddress = cleanAddress.replace('ndereço:\t', '').trim();
         }
-        if (cleanAddress.includes('Endereço:')) {
-          cleanAddress = cleanAddress.replace('Endereço:', '').trim();
+        if (cleanAddress.includes('Endereço:\t')) {
+          cleanAddress = cleanAddress.replace('Endereço:\t', '').trim();
         }
         if (cleanAddress.includes('ndereç\t')) {
           cleanAddress = cleanAddress.replace('ndereç\t', '').trim();
