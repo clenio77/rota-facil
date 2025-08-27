@@ -320,22 +320,25 @@ function extractAddressesFromText(text: string) {
       // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
       let cleanAddress = addr.endereco;
       
-      // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
-      const addressPrefixes = [
-        'ndereço:\t', 'ndereço:', 'ndereço',
-        'Endereço:\t', 'Endereço:', 'Endereço',
-        'ndereç\t', 'ndereç',
-        'ndereçc\t', 'ndereçc'
-      ];
-      
-      // ✅ REMOVER CADA PREFIXO ENCONTRADO
-      for (const prefix of addressPrefixes) {
-        if (cleanAddress.includes(prefix)) {
-          cleanAddress = cleanAddress.replace(prefix, '').trim();
-          console.log(`🧹 Prefixo removido do PDF: "${prefix}" → "${cleanAddress}"`);
-          break; // Remove apenas o primeiro prefixo encontrado
+              // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
+        const addressPrefixes = [
+          'ndereço:\t', 'ndereço:', 'ndereço',
+          'Endereço:\t', 'Endereço:', 'Endereço',
+          'ndereç\t', 'ndereç',
+          'ndereçc\t', 'ndereçc'
+        ];
+        
+        // ✅ REMOVER CADA PREFIXO ENCONTRADO
+        for (const prefix of addressPrefixes) {
+          if (cleanAddress.includes(prefix)) {
+            cleanAddress = cleanAddress.replace(prefix, '').trim();
+            console.log(`🧹 Prefixo removido do PDF: "${prefix}" → "${cleanAddress}"`);
+            break; // Remove apenas o primeiro prefixo encontrado
+          }
         }
-      }
+        
+        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
+        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
       
       // ✅ SE AINDA TEM "ser extraído", usar fallback
       if (cleanAddress.includes('ser extraído')) {
