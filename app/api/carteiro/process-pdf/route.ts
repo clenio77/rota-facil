@@ -5,6 +5,18 @@ import { existsSync } from 'fs';
 
 import { processCarteiroFile, generateMapData, detectFileType } from '../../../../utils/pdfExtractor';
 
+// ✅ INTERFACE LOCAL PARA ENDEREÇOS DO CARTEIRO
+interface CarteiroAddress {
+  id: string;
+  ordem: string;
+  objeto: string;
+  endereco: string;
+  cep: string;
+  destinatario: string;
+  coordinates?: { lat: number; lng: number };
+  geocoded?: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -169,31 +181,42 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     let geocodedCount = 0;
     
     for (let i = 0; i < addresses.length; i++) {
-      const address = addresses[i];
+      const address = addresses[i] as CarteiroAddress;
       try {
         // ✅ CONSTRUIR ENDEREÇO COMPLETO PARA GEOCODIFICAÇÃO
         const fullAddress = `${address.endereco}, Uberlândia - MG, ${address.cep}`;
         console.log(`🔍 Geocodificando endereço ${i + 1}: ${fullAddress}`);
         
-        // ✅ CHAMAR API DE GEOCODING
-        const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/geocode`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: fullAddress })
-        });
-        
-        if (geocodeResponse.ok) {
-          const geocodeData = await geocodeResponse.json();
-          if (geocodeData.success && geocodeData.coordinates) {
-            address.coordinates = geocodeData.coordinates;
-            address.geocoded = true;
-            geocodedCount++;
-            console.log(`✅ Endereço ${i + 1} geocodificado: ${geocodeData.coordinates.lat}, ${geocodeData.coordinates.lng}`);
+        // ✅ CHAMAR API EXTERNA DE GEOCODING (Nominatim)
+        try {
+          const encodedAddress = encodeURIComponent(fullAddress);
+          const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=br`;
+          
+          const geocodeResponse = await fetch(geocodeUrl, {
+            headers: {
+              'User-Agent': 'RotaFacil/1.0'
+            }
+          });
+          
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData && geocodeData.length > 0 && geocodeData[0].lat && geocodeData[0].lon) {
+              const coordinates = {
+                lat: parseFloat(geocodeData[0].lat),
+                lng: parseFloat(geocodeData[0].lon)
+              };
+              address.coordinates = coordinates;
+              address.geocoded = true;
+              geocodedCount++;
+              console.log(`✅ Endereço ${i + 1} geocodificado: ${coordinates.lat}, ${coordinates.lng}`);
+            } else {
+              console.log(`⚠️ Endereço ${i + 1} não geocodificado: Sem coordenadas na resposta`);
+            }
           } else {
-            console.log(`⚠️ Endereço ${i + 1} não geocodificado: ${geocodeData.error || 'Sem coordenadas'}`);
+            console.log(`⚠️ Erro na API de geocoding para endereço ${i + 1}: ${geocodeResponse.status}`);
           }
-        } else {
-          console.log(`⚠️ Erro na API de geocoding para endereço ${i + 1}: ${geocodeResponse.status}`);
+        } catch (geocodeError) {
+          console.log(`⚠️ Erro ao geocodificar endereço ${i + 1}:`, geocodeError);
         }
       } catch (geocodeError) {
         console.log(`⚠️ Erro ao geocodificar endereço ${i + 1}:`, geocodeError);
