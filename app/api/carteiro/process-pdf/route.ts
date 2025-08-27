@@ -92,8 +92,15 @@ export async function POST(request: NextRequest) {
       if (!result.success) {
         return NextResponse.json({
           success: false,
-          error: result.error || 'Erro ao processar arquivo'
+          error: 'Erro ao processar arquivo'
         }, { status: 500 });
+      }
+      
+      // ✅ VALIDAR SE RESULT.ADDRESSES EXISTE ANTES DE GERAR MAPA
+      if (!result.addresses || !Array.isArray(result.addresses)) {
+        console.error('❌ Erro: result.addresses é undefined ou não é um array');
+        console.log('🔍 Result:', result);
+        throw new Error('Endereços não foram processados corretamente');
       }
       
       // Gerar dados para o mapa
@@ -130,7 +137,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ✅ NOVA FUNÇÃO: Processar PDF diretamente do buffer
-async function processCarteiroFileFromBuffer(base64Data: string, fileName: string, userLocation: any) {
+async function processCarteiroFileFromBuffer(base64Data: string, fileName: string, userLocation: unknown) {
   try {
     console.log('🔍 Processando PDF diretamente do buffer...');
     
