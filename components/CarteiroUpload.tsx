@@ -214,15 +214,33 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     let sequence = 1;
 
     completedImages.forEach(image => {
+      console.log(`🔍 Processando imagem ${image.file.name}:`, image);
+      
       if (image.addresses) {
-        image.addresses.forEach(address => {
-          allAddresses.push({
-            ...address,
-            ordem: sequence.toString(),
-            id: `addr-${Date.now()}-${sequence}`
-          });
+        console.log(`📍 Endereços da imagem ${image.file.name}:`, image.addresses);
+        
+        image.addresses.forEach((address, index) => {
+          console.log(`🔍 Endereço ${index + 1} da imagem ${image.file.name}:`, address);
+          
+                  // ✅ CONVERTER AddressResult para CarteiroAddress
+        const carteiroAddress: CarteiroAddress = {
+          id: `addr-${Date.now()}-${sequence}`,
+          ordem: sequence.toString(),
+          objeto: address.extractedText || `Endereço ${sequence}`,
+          endereco: address.address,
+          cep: address.extractedText.match(/CEP:\s*(\d{8})/)?.[1] || 'CEP não encontrado',
+          destinatario: 'Endereço extraído da imagem',
+          coordinates: address.coordinates,
+          geocoded: !!address.coordinates
+        };
+          
+          console.log(`✅ CarteiroAddress criado:`, carteiroAddress);
+          
+          allAddresses.push(carteiroAddress);
           sequence++;
         });
+      } else {
+        console.log(`⚠️ Imagem ${image.file.name} não tem endereços:`, image);
       }
     });
 
