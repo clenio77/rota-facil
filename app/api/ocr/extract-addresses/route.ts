@@ -272,6 +272,9 @@ CEP: 38400-200`;
         // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
         cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
         
+        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
+        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
+        
         // ✅ VERIFICAR SE O ENDEREÇO FOI EXTRAÍDO CORRETAMENTE
         if (cleanAddress.includes('ser extraído')) {
           console.log(`⚠️ Endereço ${index + 1} ainda não foi extraído corretamente`);
