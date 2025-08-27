@@ -247,6 +247,8 @@ CEP: 38400-200`;
       
       // ✅ CONVERTER PARA FORMATO AddressResult (compatível com o frontend)
       addresses = carteiroAddresses.map((addr, index) => {
+        console.log(`🔍 Processando endereço ${index + 1}:`, addr);
+        
         // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários)
         let cleanAddress = addr.endereco;
         if (cleanAddress.includes('ndereço:')) {
@@ -259,8 +261,16 @@ CEP: 38400-200`;
           cleanAddress = cleanAddress.replace('ndereç', '').trim();
         }
         
+        // ✅ VERIFICAR SE O ENDEREÇO FOI EXTRAÍDO CORRETAMENTE
+        if (cleanAddress.includes('ser extraído')) {
+          console.log(`⚠️ Endereço ${index + 1} ainda não foi extraído corretamente`);
+          cleanAddress = `Endereço ${index + 1} (requer edição)`;
+        }
+        
         // ✅ CRIAR ENDEREÇO COMPLETO PARA O MAPA
-        const fullAddress = `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
+        const fullAddress = cleanAddress.includes('(requer edição)') 
+          ? cleanAddress 
+          : `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
         
         const addressResult: AddressResult = {
           address: fullAddress, // ✅ ENDEREÇO COMPLETO PARA O MAPA
@@ -270,6 +280,7 @@ CEP: 38400-200`;
         
         console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${cleanAddress}`);
         console.log(`🗺️ Endereço para mapa: ${fullAddress}`);
+        console.log(`📋 AddressResult criado:`, addressResult);
         return addressResult;
       });
     }
