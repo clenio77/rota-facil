@@ -56,6 +56,54 @@ export default function AddressSearch({
   const debouncedStreetQuery = useDebounce(streetQuery, 300);
   const debouncedNumberQuery = useDebounce(numberQuery, 300);
 
+  // ✅ INICIALIZAR RECONHECIMENTO DE VOZ
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setSpeechSupported(true);
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = 'pt-BR';
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.maxAlternatives = 1;
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+        console.log('🎤 Reconhecimento de voz iniciado');
+      };
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('🎤 Voz capturada:', transcript);
+        
+        // ✅ PROCESSAR TRANSCRITO E SEPARAR RUA/NÚMERO
+        const { street, number } = parseVoiceInput(transcript);
+        
+        setStreetQuery(street);
+        if (number) {
+          setNumberQuery(number);
+        }
+        
+        // ✅ BUSCAR AUTOMATICAMENTE
+        if (street.length >= 2) {
+          const searchQuery = number ? `${street}, ${number}` : street;
+          searchAddresses(searchQuery, number ? 'combined' : 'street');
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('❌ Erro no reconhecimento de voz:', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+        console.log('🎤 Reconhecimento de voz finalizado');
+      };
+    } else {
+      console.log('⚠️ Reconhecimento de voz não suportado');
+    }
+  }, []);
+
   // Buscar endereços quando a query mudar - BUSCA INTELIGENTE!
   useEffect(() => {
     if (debouncedStreetQuery.length >= 2) {
@@ -70,6 +118,8 @@ export default function AddressSearch({
   const searchAddresses = async (searchQuery: string, mode: 'street' | 'number' | 'combined') => {
     setIsLoading(true);
     try {
+      console.log('🔍 Buscando endereços:', { searchQuery, userLocation, mode });
+      
       const response = await fetch('/api/address-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,6 +134,7 @@ export default function AddressSearch({
       });
 
       const data = await response.json();
+      console.log('📥 Resposta da API:', data);
       
       if (data.success && data.results) {
         // ✅ PRIORIZAR resultados com número quando disponível
@@ -113,52 +164,8 @@ export default function AddressSearch({
     }
   };
 
-  // ✅ NOVA FUNÇÃO: Inicializar reconhecimento de voz
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'pt-BR';
-        
-        recognitionRef.current.onstart = () => {
-          setIsListening(true);
-          console.log('🎤 Reconhecimento de voz iniciado');
-        };
-        
-        recognitionRef.current.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          console.log('🎤 Texto reconhecido:', transcript);
-          
-          const addressParts = extractAddressParts(transcript);
-          setStreetQuery(addressParts.street);
-          setNumberQuery(addressParts.number);
-          
-          // Buscar automaticamente
-          if (addressParts.street.length >= 2) {
-            const searchQuery = addressParts.number ? `${addressParts.street}, ${addressParts.number}` : addressParts.street;
-            searchAddresses(searchQuery, addressParts.number ? 'combined' : 'street');
-          }
-        };
-        
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Erro no reconhecimento:', event.error);
-          setIsListening(false);
-        };
-        
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-          console.log('🎤 Reconhecimento de voz finalizado');
-        };
-      }
-    }
-  }, []);
-
   // ✅ NOVA FUNÇÃO: Extrair rua e número do texto falado
-  const extractAddressParts = (text: string): { street: string; number: string } => {
+  const parseVoiceInput = (text: string): { street: string; number: string } => {
     const patterns = [
       /^(.+?)\s*,?\s*(\d+)$/i,           // "Rua ABC, 123"
       /^(.+?)\s+(\d+)$/i,                // "Rua ABC 123"
