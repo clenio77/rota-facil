@@ -795,6 +795,12 @@ export async function POST(request: NextRequest) {
           return true;
         }
         
+        // ✅ MELHORIA: Ser mais flexível com cidades similares
+        if (resultCity && (resultCity.includes('uberlandia') || resultCity.includes('uberlândia'))) {
+          console.log(`✅ ${result.display_name} - CIDADE SIMILAR: ${resultCity}`);
+          return true;
+        }
+        
         console.log(`❌ ${result.display_name} - CIDADE DIFERENTE: ${resultCity} vs ${userCity}`);
         return false;
       });
@@ -832,6 +838,27 @@ export async function POST(request: NextRequest) {
       
       console.log(`🔢 Validação de números: ${results.length} → ${validatedResults.length} resultados válidos`);
       results = validatedResults;
+    }
+    
+    // ✅ NOVA LÓGICA: PRIORIZAR RESULTADOS DA CIDADE DO USUÁRIO
+    if (userLocation?.city) {
+      const userCity = userLocation.city.toLowerCase();
+      
+      results.forEach(result => {
+        const resultCity = result.address.city?.toLowerCase();
+        
+        // ✅ BONUS para mesma cidade
+        if (resultCity && resultCity.includes(userCity)) {
+          result.confidence += 0.3;
+          console.log(`🏙️ BONUS CIDADE: ${result.display_name} +0.3 confiança`);
+        }
+        
+        // ✅ BONUS para cidades similares
+        if (resultCity && (resultCity.includes('uberlandia') || resultCity.includes('uberlândia'))) {
+          result.confidence += 0.2;
+          console.log(`🏙️ BONUS CIDADE SIMILAR: ${result.display_name} +0.2 confiança`);
+        }
+      });
     }
 
     // Remover duplicatas baseado em coordenadas
