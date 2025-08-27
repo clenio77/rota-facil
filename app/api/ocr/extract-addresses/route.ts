@@ -54,16 +54,16 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
 
     console.log(`🔍 Linha: "${trimmedLine}"`);
 
-    // ✅ DETECTAR QUALQUER OBJETO ECT (padrão mais flexível)
-    if (trimmedLine.match(/[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d{1,2}-\d{3}/) ||
-        trimmedLine.includes('MI') || trimmedLine.includes('OY') || 
-        trimmedLine.includes('MJ') || trimmedLine.includes('MT') || 
-        trimmedLine.includes('TJ') || trimmedLine.includes('BR') ||
-        trimmedLine.match(/[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}/) ||
-        trimmedLine.match(/^\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}/)) {
+    // ✅ DETECTAR OBJETO ECT (padrão mais preciso)
+    if (trimmedLine.match(/^\d{3}\s+[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d{1,2}-\d{3}/) ||
+        trimmedLine.match(/^\d{3}\s+[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}/) ||
+        trimmedLine.match(/^[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d{1,2}-\d{3}/) ||
+        trimmedLine.match(/^[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}/)) {
       
       // ✅ SE JÁ TEM ENDEREÇO COMPLETO, SALVAR E CRIAR NOVO
-      if (currentAddress && currentAddress.endereco !== 'Endereço a ser extraído') {
+      if (currentAddress && 
+          currentAddress.endereco !== 'Endereço a ser extraído' && 
+          currentAddress.cep !== 'CEP a ser extraído') {
         addresses.push(currentAddress);
         console.log(`💾 Endereço completo salvo: ${currentAddress.objeto} - ${currentAddress.endereco}`);
       }
@@ -85,34 +85,29 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       continue;
     }
 
-    // ✅ DETECTAR ENDEREÇO (padrões mais flexíveis)
+    // ✅ DETECTAR ENDEREÇO (padrão mais preciso)
     if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
-      // ✅ QUALQUER LINHA QUE PARECE ENDEREÇO
-      if (trimmedLine.match(/^(Rua|Avenida|Av\.|R\.|Travessa|Alameda|Praça|Vila|Condomínio)/i) ||
-          trimmedLine.match(/[A-Za-z\s]+,\s*\d+/i) ||
-          trimmedLine.match(/CEP:\s*\d{8}/i) ||
-          trimmedLine.includes('Uberlândia') ||
-          trimmedLine.includes('MG') ||
-          trimmedLine.match(/\d{5}-\d{3}/) ||
-          // ✅ NOVO: Capturar linhas que começam com "Endereço:"
-          trimmedLine.match(/^Endereço:/i) ||
-          // ✅ NOVO: Capturar qualquer linha com padrão de endereço
-          trimmedLine.match(/[A-Za-z\s]+,\s*\d+.*CEP:\s*\d{8}/i)) {
-        
+      // ✅ LINHAS QUE COMEÇAM COM "Endereço:" (mais confiável)
+      if (trimmedLine.match(/^Endereço:/i)) {
+        currentAddress.endereco = trimmedLine;
+        console.log(`🏠 Endereço encontrado: ${trimmedLine}`);
+      }
+      // ✅ LINHAS QUE PARECEM ENDEREÇO COMPLETO (com CEP)
+      else if (trimmedLine.match(/^(Rua|Avenida|Av\.|R\.|Travessa|Alameda|Praça|Vila|Condomínio)/i) &&
+               trimmedLine.includes('CEP:')) {
         currentAddress.endereco = trimmedLine;
         console.log(`🏠 Endereço encontrado: ${trimmedLine}`);
       }
     }
 
-    // ✅ DETECTAR CEP (padrões mais flexíveis)
+    // ✅ DETECTAR CEP (padrão mais preciso)
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
-      const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
+      // ✅ CEP no formato 8 dígitos
+      const cepMatch = trimmedLine.match(/(\d{8})/);
       if (cepMatch) {
-        const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
-        if (cep) {
-          currentAddress.cep = cep;
-          console.log(`📮 CEP encontrado: ${cep}`);
-        }
+        const cep = cepMatch[1];
+        currentAddress.cep = cep;
+        console.log(`📮 CEP encontrado: ${cep}`);
       }
     }
 
@@ -125,10 +120,12 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
     }
   }
 
-  // ✅ SALVAR ÚLTIMO ENDEREÇO
-  if (currentAddress) {
+  // ✅ SALVAR ÚLTIMO ENDEREÇO (só se estiver completo)
+  if (currentAddress && 
+      currentAddress.endereco !== 'Endereço a ser extraído' && 
+      currentAddress.cep !== 'CEP a ser extraído') {
     addresses.push(currentAddress);
-    console.log(`💾 ÚLTIMO ENDEREÇO SALVO: ${currentAddress.objeto}`);
+    console.log(`💾 ÚLTIMO ENDEREÇO SALVO: ${currentAddress.objeto} - ${currentAddress.endereco}`);
   }
 
   console.log(`✅ TOTAL DE ENDEREÇOS ENCONTRADOS: ${addresses.length}`);
