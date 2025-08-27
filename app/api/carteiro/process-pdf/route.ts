@@ -339,6 +339,9 @@ function extractAddressesFromText(text: string) {
         
         // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
         cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
+        
+        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
+        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
       
       // ✅ SE AINDA TEM "ser extraído", usar fallback
       if (cleanAddress.includes('ser extraído')) {
