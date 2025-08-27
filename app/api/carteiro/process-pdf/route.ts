@@ -164,10 +164,48 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     
     console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados`);
 
+    // ✅ NOVO: GEOCODIFICAR ENDEREÇOS
+    console.log('🗺️ Iniciando geocodificação dos endereços...');
+    let geocodedCount = 0;
+    
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      try {
+        // ✅ CONSTRUIR ENDEREÇO COMPLETO PARA GEOCODIFICAÇÃO
+        const fullAddress = `${address.endereco}, Uberlândia - MG, ${address.cep}`;
+        console.log(`🔍 Geocodificando endereço ${i + 1}: ${fullAddress}`);
+        
+        // ✅ CHAMAR API DE GEOCODING
+        const geocodeResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/geocode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: fullAddress })
+        });
+        
+        if (geocodeResponse.ok) {
+          const geocodeData = await geocodeResponse.json();
+          if (geocodeData.success && geocodeData.coordinates) {
+            address.coordinates = geocodeData.coordinates;
+            address.geocoded = true;
+            geocodedCount++;
+            console.log(`✅ Endereço ${i + 1} geocodificado: ${geocodeData.coordinates.lat}, ${geocodeData.coordinates.lng}`);
+          } else {
+            console.log(`⚠️ Endereço ${i + 1} não geocodificado: ${geocodeData.error || 'Sem coordenadas'}`);
+          }
+        } else {
+          console.log(`⚠️ Erro na API de geocoding para endereço ${i + 1}: ${geocodeResponse.status}`);
+        }
+      } catch (geocodeError) {
+        console.log(`⚠️ Erro ao geocodificar endereço ${i + 1}:`, geocodeError);
+      }
+    }
+    
+    console.log(`✅ Geocodificação concluída: ${geocodedCount}/${addresses.length} endereços geocodificados`);
+
     return {
       success: true,
       total: addresses.length,
-      geocoded: 0, // Será geocodificado depois
+      geocoded: geocodedCount,
       addresses: addresses,
       fileType: 'pdf',
       metadata: {
@@ -175,7 +213,8 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
         fileName,
         ocrEngine: 'OCR.space',
         textLength: extractedText.length,
-        processingMethod: 'simple'
+        processingMethod: 'simple',
+        geocodedCount
       }
     };
 
