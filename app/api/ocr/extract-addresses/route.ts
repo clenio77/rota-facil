@@ -39,8 +39,8 @@ interface CarteiroAddress {
 }
 
 // ✅ FUNÇÃO SIMPLES QUE FUNCIONAVA: Extrair endereços do texto
-function extractAddressesFromText(text: string) {
-  const addresses = [];
+function extractAddressesFromText(text: string): CarteiroAddress[] {
+  const addresses: CarteiroAddress[] = [];
   const lines = text.split('\n');
   let sequence = 1;
   let currentAddress = null;
@@ -104,77 +104,6 @@ function extractAddressesFromText(text: string) {
   return addresses;
 }
 
-// ✅ NOVA FUNÇÃO: Extrair informações de um objeto ECT específico
-function extractObjectInfo(
-  text: string, 
-  objectIndex: number, 
-  patterns: any, 
-  currentIndex: number, 
-  allMatches: RegExpMatchArray[]
-): { ordem?: string; endereco?: string; cep?: string; destinatario?: string } | null {
-  
-  // ✅ DEFINIR ÁREA DE BUSCA PARA ESTE OBJETO
-  const nextObjectIndex = currentIndex < allMatches.length - 1 ? 
-    (allMatches[currentIndex + 1].index || text.length) : 
-    text.length;
-  
-  const searchArea = text.substring(objectIndex, nextObjectIndex);
-  console.log(`🔍 Área de busca para objeto ${currentIndex + 1}: "${searchArea.substring(0, 100)}..."`);
-  
-  const info: { ordem?: string; endereco?: string; cep?: string; destinatario?: string } = {};
-  
-  // ✅ BUSCAR ORDEM
-  const orderMatch = searchArea.match(patterns.order);
-  if (orderMatch) {
-    info.ordem = orderMatch[0];
-    console.log(`  ✅ Ordem encontrada: ${info.ordem}`);
-  }
-  
-  // ✅ BUSCAR ENDEREÇO
-  const addressMatch = searchArea.match(patterns.address);
-  if (addressMatch) {
-    info.endereco = addressMatch[0].replace(/^Endereço\s*/i, '').trim();
-    console.log(`  ✅ Endereço encontrado: ${info.endereco}`);
-  }
-  
-  // ✅ BUSCAR CEP
-  const cepMatch = searchArea.match(patterns.cep);
-  if (cepMatch) {
-    info.cep = cepMatch[1];
-    console.log(`  ✅ CEP encontrado: ${info.cep}`);
-  }
-  
-  // ✅ BUSCAR DESTINATÁRIO
-  const recipientMatch = searchArea.match(patterns.recipient);
-  if (recipientMatch) {
-    info.destinatario = recipientMatch[0];
-    console.log(`  ✅ Destinatário encontrado: ${info.destinatario}`);
-  }
-  
-  // ✅ RETORNAR APENAS SE TIVER ENDEREÇO OU ORDEM
-  if (info.endereco || info.ordem) {
-    return info;
-  }
-  
-  return null;
-}
-
-// ✅ FUNÇÃO AUXILIAR: Criar endereço a partir do objeto atual
-function createAddressFromCurrent(current: Partial<CarteiroAddress>, sequence: number): CarteiroAddress {
-  const address: CarteiroAddress = {
-    id: `ect_${sequence}`,
-    ordem: current.ordem || `${sequence}-000`,
-    objeto: current.objeto || `OBJ_${sequence}`,
-    endereco: current.endereco || `Endereço ${sequence} (requer edição)`,
-    cep: current.cep || 'CEP não encontrado',
-    destinatario: current.destinatario || 'Não informado',
-    geocoded: false
-  };
-  
-  console.log(`💾 ÚLTIMO ENDEREÇO SALVO: ${address.objeto} ${address.ordem}`);
-  return address;
-}
-
 export async function POST(request: NextRequest) {
   try {
     console.log('🔍 Iniciando processamento OCR para múltiplas imagens...');
@@ -216,7 +145,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('🔍 Processando imagem:', {
+    console.log('�� Processando imagem:', {
       name: image.name,
       type: image.type,
       size: image.size
@@ -230,7 +159,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Tentando APIs externas de OCR...');
     
     let extractedText = '';
-    let addresses: CarteiroAddress[] = [];
+    let addresses: AddressResult[] = [];
 
     try {
       // Usar OCR.space com base64
@@ -296,226 +225,25 @@ CEP: 38400-200`;
       }
     }
 
-    // Extrair endereços do texto
+    // ✅ EXTRAIR ENDEREÇOS DO TEXTO (usando a função simples que funciona)
     if (extractedText) {
-      console.log('🔍 Extraindo endereços do texto:', extractedText.substring(0, 200) + '...');
+      console.log('🔍 Extraindo endereços do texto...');
       
-      // ✅ LIMPEZA INTELIGENTE DO TEXTO OCR
-      let cleanText = extractedText
-        .replace(/[^\w\s\-.,/()áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]/g, ' ') // Remover caracteres especiais
-        .replace(/\s+/g, ' ') // Normalizar espaços
-        .replace(/\n+/g, '\n') // Normalizar quebras de linha
-        .trim();
+      // ✅ USAR A FUNÇÃO SIMPLES QUE FUNCIONA
+      const carteiroAddresses = extractAddressesFromText(extractedText);
       
-      console.log('🧹 Texto limpo:', cleanText.substring(0, 200) + '...');
+      console.log(`✅ Endereços extraídos: ${carteiroAddresses.length}`);
       
-      const lines = cleanText.split('\n');
-      let sequence = 1;
-      
-      // ✅ PADRÕES MELHORADOS PARA LISTA ECT
-      const patterns = {
-        // Padrão ECT completo: "001 MG 054 429 022 BR 1-7"
-        ect: /(\d{3})\s+([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+)/i,
+      // ✅ CONVERTER PARA FORMATO AddressResult
+      addresses = carteiroAddresses.map((addr, index) => {
+        const addressResult: AddressResult = {
+          address: `${addr.objeto} - ${addr.endereco}`,
+          confidence: 0.8,
+          extractedText: `${addr.objeto} - ${addr.endereco} - ${addr.cep} - ${addr.destinatario}`
+        };
         
-        // Padrão objeto simples: "12345678901"
-        objeto: /(\d{11,13})/,
-        
-        // Padrão endereço: "RUA DAS FLORES, 123"
-        endereco: /(RUA|AVENIDA|AV\.|R\.|TRAVESSA|TRAV\.|ALAMEDA|AL\.)\s+([^,]+),\s*(\d+)/i,
-        
-        // Padrão endereço alternativo: "RUA DAS FLORES 123"
-        enderecoAlt: /(RUA|AVENIDA|AV\.|R\.|TRAVESSA|TRAV\.|ALAMEDA|AL\.)\s+([^0-9]+)\s+(\d+)/i,
-        
-        // Padrão CEP: "38400-123" ou "38400123"
-        cep: /(\d{5}-?\d{3})/,
-        
-        // Padrão cidade/estado: "UBERLANDIA - MG"
-        cidade: /([A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][a-záàâãéêíóôõúç\s]+)\s*-\s*([A-Z]{2})/i,
-        
-        // Padrão número de endereço: ", 123" ou " 123"
-        numero: /[,]?\s*(\d+)/,
-        
-        // Padrão bairro: "CENTRO", "JARDIM", etc.
-        bairro: /(CENTRO|JARDIM|VILA|SANTA|SÃO|NOSSA|NOSSO|SANTO|SANTA)\s*[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][a-záàâãéêíóôõúç\s]*/i
-      };
-      
-      let foundAddresses = [];
-      let currentAddress = null;
-      
-      console.log(`🔍 Analisando ${lines.length} linhas do texto...`);
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line || line.length < 3) continue;
-        
-        console.log(`🔍 Linha ${i + 1}: "${line}"`);
-        
-        // ✅ DETECTAR NOVO ITEM ECT
-        const ectMatch = line.match(patterns.ect);
-        if (ectMatch) {
-          // Salvar endereço anterior se existir
-          if (currentAddress && currentAddress.objeto) {
-            foundAddresses.push(currentAddress);
-            console.log(`💾 Endereço salvo: ${currentAddress.objeto}`);
-          }
-          
-          // Criar novo endereço
-          currentAddress = {
-            id: `ect-${Date.now()}-${sequence}`,
-            ordem: sequence.toString(),
-            objeto: ectMatch[2].trim(),
-            endereco: 'Endereço a ser extraído',
-            cep: 'CEP a ser extraído',
-            destinatario: 'Localização a ser extraída',
-            coordinates: undefined,
-            geocoded: false
-          };
-          
-          console.log(`✅ NOVO ITEM ECT: ${ectMatch[2]} (sequência ${sequence})`);
-          sequence++;
-          continue;
-        }
-        
-        // ✅ DETECTAR OBJETO SIMPLES (se não tiver endereço ECT)
-        if (!currentAddress) {
-          const objectMatch = line.match(patterns.objeto);
-          if (objectMatch && line.length < 20) { // Linha curta = provavelmente só o objeto
-            currentAddress = {
-              id: `obj-${Date.now()}-${sequence}`,
-              ordem: sequence.toString(),
-              objeto: objectMatch[1].trim(),
-              endereco: 'Endereço a ser extraído',
-              cep: 'CEP a ser extraído',
-              destinatario: 'Localização a ser extraída',
-              coordinates: undefined,
-              geocoded: false
-            };
-            
-            console.log(`✅ OBJETO SIMPLES: ${objectMatch[1]} (sequência ${sequence})`);
-            sequence++;
-            continue;
-          }
-        }
-        
-        // ✅ DETECTAR ENDEREÇO (se tiver endereço ECT)
-        if (currentAddress && currentAddress.endereco.includes('ser extraído')) {
-          // Tentar padrões de endereço
-          let addressFound = false;
-          
-          // Padrão: "RUA DAS FLORES, 123"
-          const addressMatch = line.match(patterns.endereco);
-          if (addressMatch) {
-            const street = addressMatch[2];
-            const number = addressMatch[3];
-            currentAddress.endereco = `${street.trim()}, ${number.trim()}`;
-            console.log(`✅ ENDEREÇO ENCONTRADO: ${currentAddress.endereco}`);
-            addressFound = true;
-          }
-          
-          // Padrão alternativo: "RUA DAS FLORES 123"
-          if (!addressFound) {
-            const addressAltMatch = line.match(patterns.enderecoAlt);
-            if (addressAltMatch) {
-              const street = addressAltMatch[2];
-              const number = addressAltMatch[3];
-              currentAddress.endereco = `${street.trim()}, ${number.trim()}`;
-              console.log(`✅ ENDEREÇO ALT ENCONTRADO: ${currentAddress.endereco}`);
-              addressFound = true;
-            }
-          }
-          
-          // Padrão simples: linha que contém "RUA" ou "AVENIDA"
-          if (!addressFound && (line.includes('RUA') || line.includes('AVENIDA') || line.includes('AV.'))) {
-            // Procurar número no final da linha
-            const numeroMatch = line.match(patterns.numero);
-            if (numeroMatch) {
-              const numero = numeroMatch[1];
-              const rua = line.replace(numeroMatch[0], '').trim();
-              currentAddress.endereco = `${rua}, ${numero}`;
-              console.log(`✅ ENDEREÇO SIMPLES: ${currentAddress.endereco}`);
-              addressFound = true;
-            } else {
-              currentAddress.endereco = line.trim();
-              console.log(`✅ ENDEREÇO SEM NÚMERO: ${currentAddress.endereco}`);
-              addressFound = true;
-            }
-          }
-        }
-        
-        // ✅ DETECTAR CEP
-        if (currentAddress && currentAddress.cep.includes('ser extraído')) {
-          const cepMatch = line.match(patterns.cep);
-          if (cepMatch) {
-            currentAddress.cep = cepMatch[1];
-            console.log(`✅ CEP ENCONTRADO: ${currentAddress.cep}`);
-          }
-        }
-        
-        // ✅ DETECTAR CIDADE/ESTADO
-        if (currentAddress && currentAddress.destinatario.includes('ser extraído')) {
-          const cityMatch = line.match(patterns.cidade);
-          if (cityMatch) {
-            currentAddress.destinatario = `${cityMatch[1].trim()}, ${cityMatch[2].trim()}`;
-            console.log(`✅ CIDADE/ESTADO: ${currentAddress.destinatario}`);
-          }
-        }
-        
-        // ✅ DETECTAR BAIRRO
-        if (currentAddress && currentAddress.destinatario.includes('ser extraído')) {
-          const bairroMatch = line.match(patterns.bairro);
-          if (bairroMatch) {
-            currentAddress.destinatario = bairroMatch[0].trim();
-            console.log(`✅ BAIRRO: ${currentAddress.destinatario}`);
-          }
-        }
-      }
-      
-      // ✅ ADICIONAR ÚLTIMO ENDEREÇO
-      if (currentAddress && currentAddress.objeto) {
-        foundAddresses.push(currentAddress);
-        console.log(`💾 ÚLTIMO ENDEREÇO SALVO: ${currentAddress.objeto}`);
-      }
-      
-      console.log(`📊 TOTAL DE ENDEREÇOS ENCONTRADOS: ${foundAddresses.length}`);
-      
-      // ✅ PROCESSAR E VALIDAR ENDEREÇOS
-      foundAddresses.forEach((addr, index) => {
-        // ✅ CORRIGIR CAMPOS VAZIOS
-        if (addr.endereco.includes('ser extraído')) {
-          addr.endereco = `Endereço ${index + 1} (requer edição)`;
-        }
-        if (addr.cep.includes('ser extraído')) {
-          addr.cep = 'CEP não encontrado';
-        }
-        if (addr.destinatario.includes('ser extraído')) {
-          addr.destinatario = 'Localização não especificada';
-        }
-        
-        // ✅ VALIDAR OBJETO
-        if (!addr.objeto || addr.objeto.length < 5) {
-          addr.objeto = `OBJ-${(index + 1).toString().padStart(3, '0')}`;
-        }
-        
-        addresses.push(addr);
         console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${addr.endereco}`);
-      });
-      
-      console.log(`🎯 ENDEREÇOS FINAIS: ${addresses.length}`);
-    }
-
-    // ✅ SE NÃO ENCONTROU ENDEREÇOS ESPECÍFICOS, CRIAR EXEMPLOS
-    if (addresses.length === 0 && extractedText) {
-      console.log('⚠️ Nenhum endereço encontrado, criando exemplos...');
-      
-      addresses.push({
-        id: `example-${Date.now()}-1`,
-        ordem: '1',
-        objeto: 'EXEMPLO-001',
-        endereco: 'Endereço extraído da imagem (requer edição)',
-        cep: 'CEP não encontrado',
-        destinatario: 'Destinatário não especificado',
-        coordinates: undefined,
-        geocoded: false
+        return addressResult;
       });
     }
 
