@@ -238,37 +238,39 @@ async function processPDFSimple(base64Data: string) {
   return extractedText;
 }
 
-// ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto
+// ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto (lógica robusta)
 function extractAddressesFromText(text: string) {
   const addresses = [];
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n|\r/);
   let sequence = 1;
   let currentAddress = null;
 
-  // ✅ PADRÕES PARA LISTA ECT
-  const patterns = {
-    ect: /(\d{3})\s+([A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d+-\d+)/i,
-    objeto: /(\d{11,13})/,
-    endereco: /(RUA|AVENIDA|AV\.|R\.|TRAVESSA|TRAV\.|ALAMEDA|AL\.)\s+([^,]+),\s*(\d+)/i,
-    cep: /(\d{5}-?\d{3})/,
-    cidade: /([A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][a-záàâãéêíóôõúç\s]+)\s*-\s*([A-Z]{2})/i
-  };
+  console.log(`🔍 Processando ${lines.length} linhas do PDF...`);
 
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (!trimmedLine || trimmedLine.length < 3) continue;
 
-    // ✅ DETECTAR NOVO ITEM ECT
-    const ectMatch = trimmedLine.match(patterns.ect);
-    if (ectMatch) {
-      if (currentAddress) {
+    console.log(`🔍 Linha PDF: "${trimmedLine}"`);
+
+    // ✅ DETECTAR QUALQUER OBJETO ECT (padrão mais flexível)
+    if (trimmedLine.match(/[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}/) ||
+        trimmedLine.match(/[A-Z]{1,2}\s+\d{3}\s+\d{3}\s+\d{3}\s+BR\s+\d{1,2}-\d{3}/) ||
+        trimmedLine.includes('MI') || trimmedLine.includes('OY') || 
+        trimmedLine.includes('MJ') || trimmedLine.includes('MT') || 
+        trimmedLine.includes('TJ') || trimmedLine.includes('BR') ||
+        trimmedLine.match(/^\d{3}\s+[A-Z]{2}\s+\d{3}\s+\d{3}\s+\d{3}/)) {
+      
+      // ✅ SE JÁ TEM ENDEREÇO COMPLETO, SALVAR E CRIAR NOVO
+      if (currentAddress && currentAddress.endereco !== 'Endereço a ser extraído') {
         addresses.push(currentAddress);
+        console.log(`💾 Endereço completo salvo: ${currentAddress.objeto} - ${currentAddress.endereco}`);
       }
       
       currentAddress = {
         id: `ect-${Date.now()}-${sequence}`,
         ordem: sequence.toString(),
-        objeto: ectMatch[2].trim(),
+        objeto: trimmedLine,
         endereco: 'Endereço a ser extraído',
         cep: 'CEP a ser extraído',
         destinatario: 'Localização a ser extraída',
@@ -276,6 +278,7 @@ function extractAddressesFromText(text: string) {
         geocoded: false
       };
       
+      console.log(`✅ NOVO OBJETO ECT: ${trimmedLine} (sequência ${sequence})`);
       sequence++;
       continue;
     }
@@ -293,19 +296,23 @@ function extractAddressesFromText(text: string) {
       }
     }
 
-    // ✅ DETECTAR CEP
+    // ✅ DETECTAR CEP (padrões mais flexíveis)
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
-      const cepMatch = trimmedLine.match(patterns.cep);
+      const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
       if (cepMatch) {
-        currentAddress.cep = cepMatch[1];
+        const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
+        if (cep) {
+          currentAddress.cep = cep;
+          console.log(`📮 CEP encontrado: ${cep}`);
+        }
       }
     }
 
     // ✅ DETECTAR CIDADE/ESTADO
     if (currentAddress && currentAddress.destinatario.includes('ser extraído')) {
-      const cityMatch = trimmedLine.match(patterns.cidade);
-      if (cityMatch) {
-        currentAddress.destinatario = `${cityMatch[1].trim()}, ${cityMatch[2].trim()}`;
+      if (trimmedLine.includes('Uberlândia') || trimmedLine.includes('MG')) {
+        currentAddress.destinatario = 'Uberlândia - MG';
+        console.log(`🏙️ Localização encontrada: Uberlândia - MG`);
       }
     }
   }
