@@ -249,17 +249,25 @@ CEP: 38400-200`;
       addresses = carteiroAddresses.map((addr, index) => {
         console.log(`🔍 Processando endereço ${index + 1}:`, addr);
         
-        // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários)
+        // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
         let cleanAddress = addr.endereco;
+        
+        // ✅ REMOVER PREFIXOS COMPLETOS
         if (cleanAddress.includes('ndereço:')) {
           cleanAddress = cleanAddress.replace('ndereço:', '').trim();
         }
         if (cleanAddress.includes('Endereço:')) {
           cleanAddress = cleanAddress.replace('Endereço:', '').trim();
         }
-        if (cleanAddress.includes('ndereç')) {
-          cleanAddress = cleanAddress.replace('ndereç', '').trim();
+        if (cleanAddress.includes('ndereç\t')) {
+          cleanAddress = cleanAddress.replace('ndereç\t', '').trim();
         }
+        if (cleanAddress.includes('ndereçc\t')) {
+          cleanAddress = cleanAddress.replace('ndereçc\t', '').trim();
+        }
+        
+        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
+        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
         
         // ✅ VERIFICAR SE O ENDEREÇO FOI EXTRAÍDO CORRETAMENTE
         if (cleanAddress.includes('ser extraído')) {
