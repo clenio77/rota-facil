@@ -476,21 +476,43 @@ async function processCarteiroPDF(pdfPath, userLocation = null) {
  * Gera dados para visualização no mapa
  */
 function generateMapData(geocodedAddresses) {
-  const validAddresses = geocodedAddresses.filter(addr => addr.geocoded);
+  // ✅ INCLUIR TODOS OS ENDEREÇOS, mesmo sem geocodificação
+  const allAddresses = geocodedAddresses || [];
   
-  const mapPoints = validAddresses.map((addr, index) => ({
-    id: `carteiro-${addr.ordem}`,
-    position: {
-      lat: addr.coordinates.lat,
-      lng: addr.coordinates.lng
-    },
-    title: `${addr.ordem}. ${addr.endereco}`,
-    description: `CEP: ${addr.cep}${addr.destinatario ? `\nDestinatário: ${addr.destinatario}` : ''}`,
-    type: 'delivery',
-    order: parseInt(addr.ordem),
-    trackingCode: addr.objeto,
-    confidence: addr.coordinates.confidence
-  }));
+  const mapPoints = allAddresses.map((addr, index) => {
+    // ✅ SE TEM COORDENADAS, usar elas
+    if (addr.coordinates && addr.coordinates.lat && addr.coordinates.lng) {
+      return {
+        id: `carteiro-${addr.ordem}`,
+        position: {
+          lat: addr.coordinates.lat,
+          lng: addr.coordinates.lng
+        },
+        title: `${addr.ordem}. ${addr.endereco}`,
+        description: `CEP: ${addr.cep}${addr.destinatario ? `\nDestinatário: ${addr.destinatario}` : ''}`,
+        type: 'delivery',
+        order: parseInt(addr.ordem),
+        trackingCode: addr.objeto,
+        confidence: addr.coordinates.confidence || 0.8
+      };
+    }
+    
+    // ✅ SE NÃO TEM COORDENADAS, criar ponto temporário no centro
+    return {
+      id: `carteiro-${addr.ordem}`,
+      position: {
+        lat: -18.9186, // Centro de Uberlândia
+        lng: -48.2772
+      },
+      title: `${addr.ordem}. ${addr.endereco}`,
+      description: `CEP: ${addr.cep}${addr.destinatario ? `\nDestinatário: ${addr.destinatario}` : ''}\n⚠️ Coordenadas não disponíveis`,
+      type: 'delivery',
+      order: parseInt(addr.ordem),
+      trackingCode: addr.objeto,
+      confidence: 0.5,
+      needsGeocoding: true // ✅ INDICAR que precisa de geocodificação
+    };
+  });
   
   // Calcular centro do mapa
   if (mapPoints.length > 0) {

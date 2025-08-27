@@ -340,11 +340,11 @@ function extractAddressesFromText(text: string) {
         // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
         cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
         
-        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
-        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
-        
-        // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
-        cleanAddress = cleanAddress.replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
+        // ✅ CORREÇÃO: Remover qualquer "E" que sobrou no início
+        if (cleanAddress.startsWith('E') && !cleanAddress.startsWith('Endereço')) {
+          cleanAddress = cleanAddress.substring(1).trim();
+          console.log(`🔧 "E" inicial removido: "${cleanAddress}"`);
+        }
       
       // ✅ SE AINDA TEM "ser extraído", usar fallback
       if (cleanAddress.includes('ser extraído')) {

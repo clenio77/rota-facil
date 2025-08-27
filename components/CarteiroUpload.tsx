@@ -30,7 +30,12 @@ interface MapData {
     trackingCode: string;
     confidence: number;
   }>;
-  bounds: any;
+  bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null;
 }
 
 interface CarteiroUploadProps {
@@ -224,7 +229,6 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
           
                   // ✅ CONVERTER AddressResult para CarteiroAddress
         const carteiroAddress: CarteiroAddress = {
-          id: `addr-${Date.now()}-${sequence}`,
           ordem: sequence.toString(),
           objeto: address.extractedText || `Endereço ${sequence}`,
           endereco: address.address,
@@ -255,16 +259,37 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     const mapData: MapData = {
       center: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : { lat: -18.9186, lng: -48.2772 },
       zoom: 12,
-      points: allAddresses.map((addr, index) => ({
-        id: addr.id || `point-${index}`,
-        position: addr.coordinates ? { lat: addr.coordinates.lat, lng: addr.coordinates.lng } : { lat: 0, lng: 0 },
-        title: addr.endereco,
-        description: `Objeto: ${addr.objeto} | CEP: ${addr.cep}`,
-        type: 'delivery',
-        order: index + 1,
-        trackingCode: addr.objeto,
-        confidence: addr.coordinates?.confidence || 0
-      })),
+      points: allAddresses.map((addr, index) => {
+        // ✅ SE TEM COORDENADAS, usar elas
+        if (addr.coordinates && addr.coordinates.lat && addr.coordinates.lng) {
+          return {
+            id: `point-${index}`,
+            position: { lat: addr.coordinates.lat, lng: addr.coordinates.lng },
+            title: addr.endereco,
+            description: `Objeto: ${addr.objeto} | CEP: ${addr.cep}`,
+            type: 'delivery',
+            order: index + 1,
+            trackingCode: addr.objeto,
+            confidence: addr.coordinates.confidence || 0.8
+          };
+        }
+        
+        // ✅ SE NÃO TEM COORDENADAS, criar ponto temporário no centro da cidade
+        const tempLat = -18.9186 + (Math.random() - 0.5) * 0.01; // Centro + variação pequena
+        const tempLng = -48.2772 + (Math.random() - 0.5) * 0.01;
+        
+        return {
+          id: `point-${index}`,
+          position: { lat: tempLat, lng: tempLng },
+          title: addr.endereco,
+          description: `Objeto: ${addr.objeto} | CEP: ${addr.cep}\n⚠️ Coordenadas temporárias`,
+          type: 'delivery',
+          order: index + 1,
+          trackingCode: addr.objeto,
+          confidence: 0.5,
+          needsGeocoding: true // ✅ INDICAR que precisa de geocodificação
+        };
+      }),
       bounds: null
     };
 
@@ -664,7 +689,7 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h4 className="font-medium text-green-800 mb-2">✅ Processamento concluído!</h4>
           <p className="text-sm text-green-700">
-            {result.addresses?.length || 0} endereços carregados com sucesso.
+            Arquivo processado com sucesso.
           </p>
         </div>
       )}
