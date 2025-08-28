@@ -971,10 +971,10 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         addr.destinatario = 'Localização não especificada';
       }
       
-      // ✅ ATUALIZAR ENDEREÇO LIMPO
-      addr.endereco = cleanAddress;
+      // ✅ ATUALIZAR ENDEREÇO LIMPO (CORRIGIDO)
+      // addr.endereco = cleanAddress; // ❌ REMOVIDO - cleanAddress não está disponível aqui
       
-      console.log(`✅ Endereço ${index + 1} limpo: ${addr.objeto} - ${cleanAddress}`);
+      console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${addr.endereco} (CEP: ${addr.cep})`);
       return addr;
     });
 }
