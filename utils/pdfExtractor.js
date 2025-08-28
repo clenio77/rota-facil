@@ -488,8 +488,8 @@ function generateMapData(geocodedAddresses) {
           lat: addr.coordinates.lat,
           lng: addr.coordinates.lng
         },
-        title: `${addr.ordem}. ${addr.endereco}`,
-        description: `CEP: ${addr.cep}${addr.destinatario ? `\nDestinatário: ${addr.destinatario}` : ''}`,
+        title: `${addr.ordem}. ${addr.objeto} - ${addr.endereco}`,
+        description: `📦 Objeto: ${addr.objeto}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}`,
         type: 'delivery',
         order: parseInt(addr.ordem),
         trackingCode: addr.objeto,
@@ -504,8 +504,8 @@ function generateMapData(geocodedAddresses) {
         lat: -18.9186, // Centro de Uberlândia
         lng: -48.2772
       },
-      title: `${addr.ordem}. ${addr.endereco}`,
-      description: `CEP: ${addr.cep}${addr.destinatario ? `\nDestinatário: ${addr.destinatario}` : ''}\n⚠️ Coordenadas não disponíveis`,
+      title: `${addr.ordem}. ${addr.objeto} - ${addr.endereco}`,
+      description: `📦 Objeto: ${addr.objeto}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}\n⚠️ Coordenadas não disponíveis`,
       type: 'delivery',
       order: parseInt(addr.ordem),
       trackingCode: addr.objeto,
@@ -825,11 +825,23 @@ function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   // ✅ DESTINO: Localização do usuário (rota circular)
   const destination = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
   
-  // ✅ WAYPOINTS: Endereços em ordem otimizada
-  const waypoints = deliveryPoints.map(point => {
-    const address = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
-    return encodeURIComponent(address);
-  }).join('|');
+            // ✅ WAYPOINTS: Endereços em ordem otimizada (FORMATO CORRETO PARA GOOGLE MAPS)
+          const waypoints = deliveryPoints.map(point => {
+            // ✅ FORMATO CORRETO: Rua, Número, Cidade, Estado, CEP
+            const numberMatch = point.endereco.match(/(\d+)(?=\s*CEP|$)/);
+            const streetPart = point.endereco.replace(/\s*CEP.*$/, '').trim();
+            
+            let formattedAddress;
+            if (numberMatch) {
+              const number = numberMatch[1];
+              const streetWithoutNumber = streetPart.replace(/\d+$/, '').trim();
+              formattedAddress = `${streetWithoutNumber}, ${number}, Uberlândia - MG, ${point.cep}`;
+            } else {
+              formattedAddress = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
+            }
+            
+            return encodeURIComponent(formattedAddress);
+          }).join('|');
   
   // ✅ PARÂMETROS ADICIONAIS
   const params = new URLSearchParams({

@@ -304,10 +304,24 @@ CEP: 38400-200`;
           cleanAddress = `Endereço ${index + 1} (requer edição)`;
         }
         
-        // ✅ CRIAR ENDEREÇO COMPLETO PARA O MAPA
-        const fullAddress = cleanAddress.includes('(requer edição)') 
-          ? cleanAddress 
-          : `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
+        // ✅ CRIAR ENDEREÇO COMPLETO PARA O MAPA (FORMATO CORRETO PARA GOOGLE MAPS)
+        let fullAddress;
+        if (cleanAddress.includes('(requer edição)')) {
+          fullAddress = cleanAddress;
+        } else {
+          // ✅ FORMATO CORRETO: Rua, Número, Cidade, Estado, CEP
+          // Extrair número do endereço
+          const numberMatch = cleanAddress.match(/(\d+)(?=\s*CEP|$)/);
+          const streetPart = cleanAddress.replace(/\s*CEP.*$/, '').trim();
+          
+          if (numberMatch) {
+            const number = numberMatch[1];
+            const streetWithoutNumber = streetPart.replace(/\d+$/, '').trim();
+            fullAddress = `${streetWithoutNumber}, ${number}, Uberlândia - MG, ${addr.cep}`;
+          } else {
+            fullAddress = `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
+          }
+        }
         
         const addressResult: AddressResult = {
           address: fullAddress, // ✅ ENDEREÇO COMPLETO PARA O MAPA
@@ -330,7 +344,7 @@ CEP: 38400-200`;
           if (!geocodeResult) {
             console.log(`🔍 Endereço não está em cache, chamando API...`);
             
-            const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/geocode`, {
+            const response = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/geocode`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
