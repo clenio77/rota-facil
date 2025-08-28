@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// ✅ IMPORTAR SERVIÇOS DE GEOCODIFICAÇÃO
+import { geocodeWithCache } from '@/lib/geocodeCache';
+
 interface AddressResult {
   address: string;
   confidence: number;
@@ -262,8 +265,8 @@ CEP: 38400-200`;
       
       console.log(`✅ Endereços extraídos: ${carteiroAddresses.length}`);
       
-      // ✅ CONVERTER PARA FORMATO AddressResult (compatível com o frontend)
-      addresses = carteiroAddresses.map((addr, index) => {
+      // ✅ CONVERTER PARA FORMATO AddressResult (compatível com o frontend) - AGORA ASSÍNCRONO
+      addresses = await Promise.all(carteiroAddresses.map(async (addr, index) => {
         console.log(`🔍 Processando endereço ${index + 1}:`, addr);
         
         // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
@@ -315,8 +318,28 @@ CEP: 38400-200`;
         console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${cleanAddress}`);
         console.log(`🗺️ Endereço para mapa: ${fullAddress}`);
         console.log(`📋 AddressResult criado:`, addressResult);
+        
+        // ✅ NOVO: GEOCODIFICAR O ENDEREÇO PARA OBTER COORDENADAS
+        try {
+          console.log(`🗺️ Iniciando geocodificação para: ${fullAddress}`);
+          const geocodeResult = await geocodeWithCache(fullAddress);
+          
+          if (geocodeResult && geocodeResult.lat && geocodeResult.lng) {
+            addressResult.coordinates = {
+              lat: geocodeResult.lat,
+              lng: geocodeResult.lng,
+              formatted_address: geocodeResult.formatted_address || fullAddress
+            };
+            console.log(`✅ Endereço ${index + 1} geocodificado: ${geocodeResult.lat}, ${geocodeResult.lng}`);
+          } else {
+            console.log(`⚠️ Endereço ${index + 1} não foi geocodificado`);
+          }
+        } catch (geocodeError) {
+          console.error(`❌ Erro na geocodificação do endereço ${index + 1}:`, geocodeError);
+        }
+        
         return addressResult;
-      });
+      }));
     }
 
     console.log(`✅ Processamento concluído: ${addresses.length} endereços encontrados`);
