@@ -304,6 +304,12 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
   }
 }
 
+// ✅ INTERFACE: Resultado do OCR.space
+interface OCRSpaceResult {
+  ParsedText?: string;
+  ErrorMessage?: string;
+}
+
 // ✅ NOVA FUNÇÃO: Processar PDF de forma simples
 async function processPDFSimple(base64Data: string) {
   const formData = new FormData();
@@ -334,24 +340,36 @@ async function processPDFSimple(base64Data: string) {
   const ocrData = await ocrResponse.json();
   console.log('📥 Resposta recebida do OCR.space');
   
-  // ✅ IMPORTANTE: Mesmo com erro de limite de páginas, o texto pode estar disponível
+  // ✅ IMPORTANTE: Processar TODAS as páginas disponíveis
   let extractedText = '';
+  
   if (ocrData.ParsedResults && ocrData.ParsedResults.length > 0) {
-    extractedText = ocrData.ParsedResults[0].ParsedText;
+    console.log(`📄 PDF tem ${ocrData.ParsedResults.length} páginas processadas`);
+    
+    // ✅ CONCATENAR TEXTO DE TODAS AS PÁGINAS
+    extractedText = ocrData.ParsedResults
+      .map((result: OCRSpaceResult, index: number) => {
+        const pageText = result.ParsedText || '';
+        console.log(`📄 Página ${index + 1}: ${pageText.length} caracteres`);
+        return pageText;
+      })
+      .join('\n\n--- NOVA PÁGINA ---\n\n');
+    
+    console.log(`✅ Total de texto extraído: ${extractedText.length} caracteres`);
   }
 
   if (!extractedText) {
     throw new Error('Nenhum texto foi extraído do PDF');
   }
 
-      // ✅ SE HOUVER ERRO MAS TEXTO FOI EXTRAÍDO, RETORNAR O TEXTO
-    if (ocrData.IsErroredOnProcessing) {
-      console.log(`⚠️ OCR.space retornou aviso: ${ocrData.ErrorMessage}`);
-      
-      // ✅ IMPORTANTE: SEMPRE RETORNAR O TEXTO SE FOI EXTRAÍDO
-      console.log(`✅ Texto disponível: ${extractedText.length} caracteres`);
-      return extractedText; // ✅ RETORNAR O TEXTO DISPONÍVEL
-    }
+  // ✅ SE HOUVER ERRO MAS TEXTO FOI EXTRAÍDO, RETORNAR O TEXTO
+  if (ocrData.IsErroredOnProcessing) {
+    console.log(`⚠️ OCR.space retornou aviso: ${ocrData.ErrorMessage}`);
+    
+    // ✅ IMPORTANTE: SEMPRE RETORNAR O TEXTO SE FOI EXTRAÍDO
+    console.log(`✅ Texto disponível: ${extractedText.length} caracteres`);
+    return extractedText; // ✅ RETORNAR O TEXTO DISPONÍVEL
+  }
 
   console.log('✅ PDF processado sem erros');
   return extractedText;
