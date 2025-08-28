@@ -522,6 +522,9 @@ function extractCleanAddresses(text: string): string[] {
   // ✅ PADRÃO 3: "Rua/Avenida - até X/Y, N CEP: XXXXXXXX" (novo padrão encontrado)
   const rangePattern3 = /([A-Za-zÀ-ÿ\s]+)\s*-\s*até\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
   
+  // ✅ PADRÃO 3B: "Rua/Avenida - até X/Y, N CEP: XXXXXXXX" (padrão específico encontrado)
+  const rangePattern3b = /([A-Za-zÀ-ÿ\s]+)\s*-\s*até\s+[\d\/\s]+\/[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/g;
+  
   while ((match = rangePattern3.exec(text)) !== null) {
     const [, fullAddress, singleNumber, cep] = match;
     
@@ -536,6 +539,21 @@ function extractCleanAddresses(text: string): string[] {
     cleanAddresses.push(cleanAddress);
     
     console.log(`🎯 Endereço limpo extraído (padrão 3): ${cleanAddress}`);
+  }
+  
+  // ✅ PROCESSAR PADRÃO 3B
+  while ((match = rangePattern3b.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    // ✅ SEMPRE ADICIONAR O NÚMERO ESPECÍFICO (não é opcional neste padrão)
+    cleanAddress += `, ${singleNumber}`;
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído (padrão 3B): ${cleanAddress}`);
   }
   
   // ✅ PADRÃO 4: "Rua/Avenida até X/Y, N CEP: XXXXXXXX" (sem hífen)

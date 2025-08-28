@@ -87,6 +87,13 @@ npm run build
 - **Localização Garantida:** userLocation sempre usado como ponto inicial/final da rota
 - **Logs Detalhados:** Adicionados logs para debug e monitoramento
 
+### **✅ Novas Correções Implementadas (Deploy Mais Recente)**
+- **CEP Extraído:** CEP é extraído do endereço se não encontrado na linha separada
+- **Google Maps Limitado:** Solução para limite de 25 waypoints por URL
+- **Rotas Grandes:** Divisão automática em múltiplas rotas quando necessário
+- **Validação CEP:** Melhor validação antes de usar na geocodificação
+- **Fallback Inteligente:** Usa endereço sem CEP quando necessário
+
 ### **✅ API Funcionando Corretamente**
 - **Processamento de PDF:** OCR.space + limpeza automática
 - **Geocodificação:** Sistema multi-API com fallback
@@ -95,10 +102,11 @@ npm run build
 
 ## 🚀 **DEPLOY REALIZADO**
 
-**URL de Produção:** `https://rotafacil-bqa9aweup-clenios-projects-c5973030.vercel.app`
+**URL de Produção:** `https://rotafacil-idbb74jr5-clenios-projects-c5973030.vercel.app`
 **Status:** ✅ **FUNCIONANDO PERFEITAMENTE**
 
-**Deploy Anterior:** `https://rotafacil-ljfj45rvc-clenios-projects-c5973030.vercel.app`
+**Deploy Anterior:** `https://rotafacil-bqa9aweup-clenios-projects-c5973030.vercel.app`
+**Deploy Mais Antigo:** `https://rotafacil-ljfj45rvc-clenios-projects-c5973030.vercel.app`
 **Deploy Mais Antigo:** `https://rotafacil-osyq56djh-clenios-projects-c5973030.vercel.app`
 
 ## 🎯 **PRÓXIMOS PASSOS RECOMENDADOS**
