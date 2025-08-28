@@ -184,6 +184,10 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     console.log(`✅ PDF processado: ${extractedText.length} caracteres extraídos`);
     console.log('📝 Primeiras 200 caracteres:', extractedText.substring(0, 200) + '...');
     
+    // ✅ EXTRAIR ENDEREÇOS LIMPOS (sem faixas de numeração)
+    const cleanAddresses = extractCleanAddresses(extractedText);
+    console.log(`🎯 Endereços limpos extraídos: ${cleanAddresses.length}`);
+
     // ✅ EXTRAIR ENDEREÇOS DO TEXTO (usando a mesma função das imagens)
     const addresses = extractAddressesFromText(extractedText);
     console.log(`✅ Endereços extraídos do PDF: ${addresses.length}`);
@@ -310,6 +314,14 @@ interface OCRSpaceResult {
   ErrorMessage?: string;
 }
 
+// ✅ INTERFACE: Faixa de numeração extraída
+interface AddressRange {
+  startRange: string;
+  endRange: string;
+  cleanAddress: string;
+  cep: string;
+}
+
 // ✅ NOVA FUNÇÃO: Processar PDF de forma simples
 async function processPDFSimple(base64Data: string) {
   const formData = new FormData();
@@ -373,6 +385,56 @@ async function processPDFSimple(base64Data: string) {
 
   console.log('✅ PDF processado sem erros');
   return extractedText;
+}
+
+// ✅ FUNÇÃO: Extrair endereços limpos (sem faixas de numeração)
+function extractCleanAddresses(text: string): string[] {
+  const cleanAddresses: string[] = [];
+  
+  // ✅ PADRÃO: "Rua/Avenida - de X/Y a Z/W, N CEP: XXXXXXXX"
+  const rangePattern = /([A-Za-zÀ-ÿ\s]+)\s*-\s*de\s+[\d\/\s]+a\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  
+  let match;
+  while ((match = rangePattern.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    // ✅ CONSTRUIR ENDEREÇO LIMPO: "Rua/Avenida, N, CEP: XXXXXXXX"
+    let cleanAddress = fullAddress.trim();
+    
+    // ✅ ADICIONAR NÚMERO ESPECÍFICO SE EXISTIR
+    if (singleNumber) {
+      cleanAddress += `, ${singleNumber}`;
+    }
+    
+    // ✅ ADICIONAR CEP
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído: ${cleanAddress}`);
+  }
+  
+  // ✅ PADRÃO ALTERNATIVO: "Rua/Avenida de X a Y, N CEP: XXXXXXXX"
+  const simpleRangePattern = /([A-Za-zÀ-ÿ\s]+)\s+de\s+[\d\s]+a\s+[\d\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  
+  while ((match = simpleRangePattern.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    if (singleNumber) {
+      cleanAddress += `, ${singleNumber}`;
+    }
+    
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço simples limpo: ${cleanAddress}`);
+  }
+  
+  console.log(`✅ Total de endereços limpos extraídos: ${cleanAddresses.length}`);
+  return cleanAddresses;
 }
 
 // ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto (lógica robusta)
