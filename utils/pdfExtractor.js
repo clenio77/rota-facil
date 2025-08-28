@@ -661,7 +661,8 @@ function extractAddressesFromJSON(jsonData) {
  */
 function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   console.log('🚀 Iniciando roteamento automático inteligente...');
-  
+  console.log('📍 Localização recebida como parâmetro:', userLocation);
+
   // ✅ CAPTURAR LOCALIZAÇÃO AUTOMATICAMENTE
   let startLocation = userLocation;
   
@@ -680,7 +681,8 @@ function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   }
   
   console.log(`📍 Ponto inicial definido: ${startLocation.lat}, ${startLocation.lng}`);
-  
+  console.log('📍 Localização completa do startLocation:', JSON.stringify(startLocation, null, 2));
+
   // ✅ VALIDAR ENDEREÇOS
   if (!geocodedAddresses || geocodedAddresses.length === 0) {
     console.log('⚠️ Nenhum endereço para otimizar');
@@ -740,6 +742,8 @@ function optimizeRouteWithTSP(addresses, startLocation) {
   console.log('🧠 Otimizando rota com algoritmo TSP inteligente...');
   
   // ✅ ADICIONAR PONTO INICIAL/FINAL (localização do usuário)
+  console.log('🏠 Adicionando pontos inicial e final com localização:', startLocation);
+
   const routeWithStart = [
     {
       id: 'start',
@@ -765,6 +769,10 @@ function optimizeRouteWithTSP(addresses, startLocation) {
       isEndPoint: true
     }
   ];
+
+  console.log('✅ Rota com pontos inicial/final:', routeWithStart.length, 'pontos');
+  console.log('📍 Ponto inicial:', routeWithStart[0]);
+  console.log('📍 Ponto final:', routeWithStart[routeWithStart.length - 1]);
   
   // ✅ ALGORITMO: VIZINHO MAIS PRÓXIMO COM MELHORIAS
   const optimizedRoute = [];

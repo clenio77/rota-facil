@@ -53,9 +53,13 @@ export async function POST(request: NextRequest) {
     if (userLocationStr) {
       try {
         userLocation = JSON.parse(userLocationStr);
+        console.log('📍 Localização do usuário recebida:', userLocation);
       } catch (error) {
-        console.warn('Erro ao parsear userLocation:', error);
+        console.warn('❌ Erro ao parsear userLocation:', error);
+        console.log('📝 userLocationStr recebido:', userLocationStr);
       }
+    } else {
+      console.log('⚠️ Nenhuma localização do usuário foi enviada');
     }
     
     // ✅ NOVA ABORDAGEM: Processar arquivo em memória

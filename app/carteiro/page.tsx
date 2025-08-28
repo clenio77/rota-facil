@@ -158,7 +158,9 @@ export default function CarteiroPage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
+        const location = { lat: latitude, lng: longitude };
+        console.log('📍 Localização capturada no frontend:', location);
+        setUserLocation(location);
         setIsGettingLocation(false);
       },
       (error) => {
@@ -260,7 +262,7 @@ export default function CarteiroPage() {
 
       // ✅ SIMULAR PROCESSAMENTO AUTOMÁTICO
       setTimeout(() => {
-        setScheduledRoutes(prev => [...prev, newScheduledRoute]);
+        setScheduledRoutes(prev => [...prev, newScheduledRoute as any]);
         
         // ✅ PROCESSAR ROTA AUTOMATICAMENTE
         if (config.preferences.autoOptimize) {
@@ -527,6 +529,12 @@ export default function CarteiroPage() {
 
         {/* ✅ NOVA SEÇÃO: Upload Inteligente com CarteiroUpload */}
         <div className="mb-6">
+          {(() => {
+            if (userLocation) {
+              console.log('📍 Passando localização para CarteiroUpload:', userLocation);
+            }
+            return null;
+          })()}
           <CarteiroUpload
             onAddressesLoaded={handleAddressesLoaded}
             userLocation={userLocation ? {

@@ -116,9 +116,12 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     try {
       const formData = new FormData();
       formData.append('image', image.file);
-      
+
       if (userLocation) {
+        console.log('📍 Enviando localização do usuário para API ocr-process:', userLocation);
         formData.append('userLocation', JSON.stringify(userLocation));
+      } else {
+        console.log('⚠️ Nenhuma localização do usuário para enviar para ocr-process');
       }
 
       console.log(`🔍 Processando imagem: ${image.file.name}`);
@@ -370,9 +373,12 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       if (userLocation) {
+        console.log('📍 Enviando localização do usuário para API process-pdf:', userLocation);
         formData.append('userLocation', JSON.stringify(userLocation));
+      } else {
+        console.log('⚠️ Nenhuma localização do usuário para enviar para process-pdf');
       }
 
       setUploadProgress('Processando arquivo...');
