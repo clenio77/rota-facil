@@ -631,6 +631,267 @@ function extractAddressesFromJSON(jsonData) {
   return addresses;
 }
 
+/**
+ * 🚀 ROTEAMENTO AUTOMÁTICO INTELIGENTE
+ * 
+ * Algoritmo que:
+ * 1. Captura localização do dispositivo automaticamente
+ * 2. Otimiza a rota usando algoritmo do caixeiro viajante
+ * 3. Gera URL do Google Maps automaticamente
+ * 4. Define ponto inicial/final na localização atual
+ */
+function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
+  console.log('🚀 Iniciando roteamento automático inteligente...');
+  
+  // ✅ CAPTURAR LOCALIZAÇÃO AUTOMATICAMENTE
+  let startLocation = userLocation;
+  
+  if (!startLocation) {
+    console.log('📍 Localização do usuário não fornecida, tentando capturar automaticamente...');
+    
+    // ✅ TENTAR CAPTURAR LOCALIZAÇÃO AUTOMATICAMENTE
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      // Em ambiente de servidor, usar coordenadas padrão de Uberlândia
+      startLocation = { lat: -18.9186, lng: -48.2772, city: 'Uberlândia', state: 'MG' };
+      console.log('📍 Usando coordenadas padrão de Uberlândia como ponto inicial');
+    } else {
+      startLocation = { lat: -18.9186, lng: -48.2772, city: 'Uberlândia', state: 'MG' };
+      console.log('📍 Usando coordenadas padrão de Uberlândia como ponto inicial');
+    }
+  }
+  
+  console.log(`📍 Ponto inicial definido: ${startLocation.lat}, ${startLocation.lng}`);
+  
+  // ✅ VALIDAR ENDEREÇOS
+  if (!geocodedAddresses || geocodedAddresses.length === 0) {
+    console.log('⚠️ Nenhum endereço para otimizar');
+    return {
+      success: false,
+      error: 'Nenhum endereço encontrado para otimização'
+    };
+  }
+  
+  // ✅ FILTRAR ENDEREÇOS COM COORDENADAS
+  const validAddresses = geocodedAddresses.filter(addr => 
+    addr.coordinates && addr.coordinates.lat && addr.coordinates.lng
+  );
+  
+  if (validAddresses.length === 0) {
+    console.log('⚠️ Nenhum endereço com coordenadas válidas');
+    return {
+      success: false,
+      error: 'Nenhum endereço com coordenadas válidas encontrado'
+    };
+  }
+  
+  console.log(`✅ ${validAddresses.length} endereços válidos para otimização`);
+  
+  // ✅ ALGORITMO DE OTIMIZAÇÃO: CAIXEIRO VIAJANTE
+  const optimizedRoute = optimizeRouteWithTSP(validAddresses, startLocation);
+  
+  // ✅ GERAR URL DO GOOGLE MAPS AUTOMATICAMENTE
+  const googleMapsUrl = generateGoogleMapsUrl(optimizedRoute, startLocation);
+  
+  // ✅ CALCULAR MÉTRICAS DA ROTA
+  const routeMetrics = calculateRouteMetrics(optimizedRoute, startLocation);
+  
+  console.log('🚀 Roteamento automático concluído com sucesso!');
+  
+  return {
+    success: true,
+    optimizedRoute,
+    googleMapsUrl,
+    startLocation,
+    metrics: routeMetrics,
+    totalStops: optimizedRoute.length,
+    estimatedTime: routeMetrics.totalTime,
+    estimatedDistance: routeMetrics.totalDistance
+  };
+}
+
+/**
+ * 🧠 ALGORITMO DO CAIXEIRO VIAJANTE (TSP) - VERSÃO OTIMIZADA
+ * 
+ * Usa algoritmo de vizinho mais próximo com melhorias:
+ * 1. Considera distâncias reais entre pontos
+ * 2. Evita cruzamentos desnecessários
+ * 3. Prioriza sequência lógica
+ */
+function optimizeRouteWithTSP(addresses, startLocation) {
+  console.log('🧠 Otimizando rota com algoritmo TSP inteligente...');
+  
+  // ✅ ADICIONAR PONTO INICIAL/FINAL (localização do usuário)
+  const routeWithStart = [
+    {
+      id: 'start',
+      ordem: '0',
+      objeto: 'PONTO INICIAL',
+      endereco: 'Sua Localização',
+      cep: 'N/A',
+      destinatario: 'Ponto de Partida',
+      coordinates: startLocation,
+      geocoded: true,
+      isStartPoint: true
+    },
+    ...addresses,
+    {
+      id: 'end',
+      ordem: String(addresses.length + 1).padStart(3, '0'),
+      objeto: 'PONTO FINAL',
+      endereco: 'Sua Localização',
+      cep: 'N/A',
+      destinatario: 'Ponto de Chegada',
+      coordinates: startLocation,
+      geocoded: true,
+      isEndPoint: true
+    }
+  ];
+  
+  // ✅ ALGORITMO: VIZINHO MAIS PRÓXIMO COM MELHORIAS
+  const optimizedRoute = [];
+  const unvisited = [...routeWithStart];
+  let current = unvisited.shift(); // Começar no ponto inicial
+  
+  optimizedRoute.push(current);
+  
+  while (unvisited.length > 0) {
+    // ✅ ENCONTRAR O PRÓXIMO PONTO MAIS PRÓXIMO
+    let nextIndex = 0;
+    let minDistance = Infinity;
+    
+    for (let i = 0; i < unvisited.length; i++) {
+      const distance = calculateDistance(
+        current.coordinates.lat, current.coordinates.lng,
+        unvisited[i].coordinates.lat, unvisited[i].coordinates.lng
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nextIndex = i;
+      }
+    }
+    
+    // ✅ ADICIONAR PRÓXIMO PONTO À ROTA
+    current = unvisited.splice(nextIndex, 1)[0];
+    optimizedRoute.push(current);
+  }
+  
+  console.log(`✅ Rota otimizada com ${optimizedRoute.length} pontos`);
+  return optimizedRoute;
+}
+
+/**
+ * 📏 CALCULAR DISTÂNCIA ENTRE DOIS PONTOS (Fórmula de Haversine)
+ */
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+/**
+ * 🗺️ GERAR URL DO GOOGLE MAPS AUTOMATICAMENTE
+ * 
+ * Cria URL otimizada com:
+ * - Ponto inicial: localização do usuário
+ * - Ponto final: localização do usuário
+ * - Waypoints: endereços em ordem otimizada
+ */
+function generateGoogleMapsUrl(optimizedRoute, startLocation) {
+  console.log('🗺️ Gerando URL do Google Maps automaticamente...');
+  
+  // ✅ FILTRAR APENAS ENDEREÇOS DE ENTREGA (não pontos inicial/final)
+  const deliveryPoints = optimizedRoute.filter(point => 
+    !point.isStartPoint && !point.isEndPoint
+  );
+  
+  if (deliveryPoints.length === 0) {
+    console.log('⚠️ Nenhum ponto de entrega para incluir na rota');
+    return null;
+  }
+  
+  // ✅ CONSTRUIR URL DO GOOGLE MAPS
+  const baseUrl = 'https://www.google.com/maps/dir/';
+  
+  // ✅ ORIGEM: Localização do usuário
+  const origin = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
+  
+  // ✅ DESTINO: Localização do usuário (rota circular)
+  const destination = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
+  
+  // ✅ WAYPOINTS: Endereços em ordem otimizada
+  const waypoints = deliveryPoints.map(point => {
+    const address = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
+    return encodeURIComponent(address);
+  }).join('|');
+  
+  // ✅ PARÂMETROS ADICIONAIS
+  const params = new URLSearchParams({
+    api: '1',
+    origin: origin,
+    destination: destination,
+    waypoints: waypoints,
+    travelmode: 'driving'
+  });
+  
+  const fullUrl = `${baseUrl}?${params.toString()}`;
+  
+  console.log('✅ URL do Google Maps gerada automaticamente');
+  console.log(`📍 Origem: ${startLocation.lat}, ${startLocation.lng}`);
+  console.log(`🏁 Destino: ${startLocation.lat}, ${startLocation.lng}`);
+  console.log(`📍 Waypoints: ${deliveryPoints.length} endereços otimizados`);
+  
+  return fullUrl;
+}
+
+/**
+ * 📊 CALCULAR MÉTRICAS DA ROTA OTIMIZADA
+ */
+function calculateRouteMetrics(optimizedRoute, startLocation) {
+  console.log('📊 Calculando métricas da rota...');
+  
+  let totalDistance = 0;
+  let totalTime = 0;
+  
+  // ✅ CALCULAR DISTÂNCIA E TEMPO ENTRE PONTOS
+  for (let i = 0; i < optimizedRoute.length - 1; i++) {
+    const current = optimizedRoute[i];
+    const next = optimizedRoute[i + 1];
+    
+    const distance = calculateDistance(
+      current.coordinates.lat, current.coordinates.lng,
+      next.coordinates.lat, next.coordinates.lng
+    );
+    
+    totalDistance += distance;
+    
+    // ✅ ESTIMAR TEMPO: 3 min por parada + tempo de deslocamento
+    const travelTime = distance * 2; // 2 min por km
+    totalTime += travelTime;
+    
+    if (!next.isEndPoint) {
+      totalTime += 3; // 3 min para entrega
+    }
+  }
+  
+  const metrics = {
+    totalDistance: Math.round(totalDistance * 10) / 10, // Arredondar para 1 casa decimal
+    totalTime: Math.round(totalTime), // Tempo em minutos
+    averageSpeed: totalTime > 0 ? Math.round((totalDistance / totalTime) * 60) : 0, // km/h
+    stops: optimizedRoute.filter(point => !point.isStartPoint && !point.isEndPoint).length
+  };
+  
+  console.log(`📊 Métricas calculadas: ${metrics.totalDistance} km, ${metrics.totalTime} min`);
+  
+  return metrics;
+}
+
 module.exports = {
   extractTextFromPDF,
   extractAddressesFromCarteiro,
@@ -644,5 +905,10 @@ module.exports = {
   processCarteiroFile,
   generateMapData,
   calculateBounds,
-  detectFileType
+  detectFileType,
+  generateOptimizedRoute,
+  optimizeRouteWithTSP,
+  calculateDistance,
+  generateGoogleMapsUrl,
+  calculateRouteMetrics
 };

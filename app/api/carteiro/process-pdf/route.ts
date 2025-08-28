@@ -3,7 +3,7 @@ import { writeFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 
-import { processCarteiroFile, generateMapData, detectFileType } from '../../../../utils/pdfExtractor';
+import { processCarteiroFile, generateMapData, detectFileType, generateOptimizedRoute } from '../../../../utils/pdfExtractor';
 
 // ✅ INTERFACE LOCAL PARA ENDEREÇOS DO CARTEIRO
 interface CarteiroAddress {
@@ -115,15 +115,31 @@ export async function POST(request: NextRequest) {
         throw new Error('Endereços não foram processados corretamente');
       }
       
-      // Gerar dados para o mapa
+      // ✅ NOVO: ROTEAMENTO AUTOMÁTICO INTELIGENTE
+      console.log('🚀 Iniciando roteamento automático...');
+      
+      // ✅ GERAR ROTA OTIMIZADA AUTOMATICAMENTE
+      const optimizedRoute = generateOptimizedRoute(result.addresses, userLocation);
+      
+      if (!optimizedRoute.success) {
+        console.error('❌ Erro na otimização da rota:', optimizedRoute.error);
+        throw new Error('Falha na otimização automática da rota');
+      }
+      
+      // ✅ GERAR DADOS DO MAPA COM ROTA OTIMIZADA
       const mapData = generateMapData(result.addresses);
       
       console.log(`✅ ${fileType.toUpperCase()} processado: ${result.geocoded}/${result.total} endereços geocodificados`);
+      console.log(`🚀 Rota otimizada: ${optimizedRoute.totalStops} paradas, ${optimizedRoute.metrics?.totalDistance || 0} km, ${optimizedRoute.metrics?.totalTime || 0} min`);
       
       return NextResponse.json({
         success: true,
         addresses: result.addresses,
         mapData,
+        optimizedRoute: optimizedRoute.optimizedRoute,
+        googleMapsUrl: optimizedRoute.googleMapsUrl,
+        routeMetrics: optimizedRoute.metrics,
+        startLocation: optimizedRoute.startLocation,
         fileName: file.name,
         fileSize: file.size,
         processedAt: new Date().toISOString(),
