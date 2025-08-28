@@ -87,7 +87,66 @@ npm run build
 - **Localização Garantida:** userLocation sempre usado como ponto inicial/final da rota
 - **Logs Detalhados:** Adicionados logs para debug e monitoramento
 
-### **✅ ASSOCIAÇÃO INTELIGENTE DE CEP IMPLEMENTADA (Deploy Mais Recente - aea5e60)**
+### **✅ PROBLEMA FUNDAMENTAL RESOLVIDO (Deploy Mais Recente - ee6d57d)**
+
+**🔧 PROBLEMA PRINCIPAL IDENTIFICADO E RESOLVIDO:**
+**CEPs sendo associados a endereços incorretos** - ✅ **RESOLVIDO DEFINITIVAMENTE**
+
+**🎯 CAUSA RAIZ DESCOBERTA:**
+O sistema estava **substituindo completamente** os endereços reais do PDF pelos endereços limpos extraídos, causando perda de informação e CEPs incorretos.
+
+**📊 EXEMPLO DO PROBLEMA:**
+- **PDF REAL:** `Rua Artur Gonçalves de Oliveira, 1747 CEP: 38400688`
+- **SISTEMA APLICANDO:** `Avenida João Pinheiro, 1783` (INCORRETO)
+- **RESULTADO:** Endereço real perdido, CEP incorreto
+
+**🚀 SOLUÇÃO IMPLEMENTADA:**
+- ✅ **Preserva endereços reais** do PDF
+- ✅ **Aplica limpeza APENAS** se endereço tiver faixa de numeração
+- ✅ **Mantém CEPs originais** extraídos do PDF
+- ✅ **Logs detalhados** para verificação
+
+**🔧 PROBLEMAS RESOLVIDOS:**
+1. **CEPs sendo associados a endereços incorretos** - ✅ **RESOLVIDO COM SISTEMA INTELIGENTE**
+2. **Endereços reais sendo perdidos** - ✅ **RESOLVIDO - Preservação implementada**
+3. **Pontos inicial/final da rota não sendo exibidos** - Implementada exibição visual
+4. **Incompatibilidade de tipos TypeScript** - Unificados tipos entre componentes
+5. **Falta de visualização da rota completa** - Adicionada seção dedicada
+6. **CEPs duplicados incorretos** - Implementada validação robusta
+7. **Padrão 'até X/Y' não sendo capturado** - Corrigidos padrões de regex
+
+**🚀 FUNCIONALIDADES IMPLEMENTADAS:**
+- ✅ Exibição clara dos pontos de partida e chegada
+- ✅ Estatísticas da rota otimizada
+- ✅ Botão direto para Google Maps
+- ✅ **VALIDAÇÃO ROBUSTA DE CEP:**
+  - Limpeza automática (remove espaços, traços, etc.)
+  - Validação de formato (8 dígitos obrigatórios)
+  - Verificação de intervalo Uberlândia (38400000-38499999)
+  - Correção automática de CEPs malformados
+  - Detecção e correção de CEPs duplicados incorretos
+  - Extração de CEP do endereço quando necessário
+- ✅ **ASSOCIAÇÃO INTELIGENTE DE CEP:**
+  - Coleta de CEPs sem associação imediata
+  - Análise posterior baseada em proximidade de linhas
+  - Sistema de distância para encontrar melhor correspondência
+  - Associação inteligente aos endereços corretos
+- ✅ **PRESERVAÇÃO DE ENDEREÇOS REAIS:**
+  - Endereços originais do PDF são mantidos
+  - Limpeza aplicada apenas quando necessário
+  - CEPs originais preservados
+- ✅ Seção visual mostrando rota completa
+
+**📁 ARQUIVOS MODIFICADOS:**
+- `app/api/carteiro/process-pdf/route.ts` - Lógica de CEP corrigida + validação robusta + **associação inteligente** + **preservação de endereços reais**
+- `app/carteiro/page.tsx` - Interface da rota otimizada
+- `components/CarteiroAutomation.tsx` - Tipos unificados
+- `utils/pdfExtractor.js` - Validação de CEP melhorada
+
+**🔗 DEPLOY:**
+- **URL:** https://rotafacil-qq2n9jb3f-clenios-projects-c5973030.vercel.app
+- **Commit:** ee6d57d
+- **Status:** ✅ Deployado com sucesso
 
 **🔧 PROBLEMAS RESOLVIDOS:**
 1. **CEPs sendo associados a endereços incorretos** - ✅ **RESOLVIDO COM SISTEMA INTELIGENTE**

@@ -232,6 +232,37 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       }
     }
     
+    // ✅ NOVA ESTRATÉGIA: Corrigir CEPs baseado nos endereços limpos extraídos
+    console.log('🔧 Corrigindo CEPs baseado nos endereços limpos...');
+    for (let i = 0; i < addresses.length; i++) {
+      const currentAddress = addresses[i];
+      
+      // ✅ PROCURAR ENDEREÇO LIMPO CORRESPONDENTE
+      for (const cleanAddress of cleanAddresses) {
+        // ✅ VERIFICAR SE O ENDEREÇO LIMPO CORRESPONDE AO ENDEREÇO ATUAL
+        const cleanStreet = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
+        const currentStreet = currentAddress.endereco.replace(/\s*CEP.*$/, '').trim();
+        
+        // ✅ COMPARAR RUAS (ignorando diferenças de formatação)
+        if (cleanStreet.toLowerCase().includes(currentStreet.toLowerCase()) || 
+            currentStreet.toLowerCase().includes(cleanStreet.toLowerCase())) {
+          
+          // ✅ EXTRAIR CEP CORRETO DO ENDEREÇO LIMPO
+          const cepMatch = cleanAddress.match(/CEP: (\d{8})/);
+          if (cepMatch) {
+            const correctCep = cepMatch[1];
+            
+            // ✅ VERIFICAR SE O CEP ESTÁ CORRETO
+            if (correctCep !== currentAddress.cep) {
+              console.log(`🔧 CEP corrigido baseado no endereço limpo: ${currentAddress.cep} → ${correctCep}`);
+              currentAddress.cep = correctCep;
+            }
+          }
+          break; // ✅ ENCONTRADO, SAIR DO LOOP
+        }
+      }
+    }
+    
     // ✅ ESTRATÉGIA 2: Aplicar endereços limpos por correspondência de CEP (para endereços não limpos)
     console.log('🔍 Aplicando endereços limpos por correspondência de CEP...');
     for (let i = 0; i < addresses.length; i++) {
@@ -903,6 +934,34 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
           if (correctedCep && correctedCep !== addr.cep) {
             addr.cep = correctedCep;
             console.log(`🔧 CEP duplicado corrigido: ${correctedCep}`);
+          }
+        }
+      }
+      
+      // ✅ NOVA VALIDAÇÃO: Corrigir CEPs baseado nos endereços limpos extraídos
+      if (cleanAddresses.length > 0) {
+        // ✅ PROCURAR ENDEREÇO LIMPO CORRESPONDENTE
+        for (const cleanAddress of cleanAddresses) {
+          // ✅ VERIFICAR SE O ENDEREÇO LIMPO CORRESPONDE AO ENDEREÇO ATUAL
+          const cleanStreet = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
+          const currentStreet = addr.endereco.replace(/\s*CEP.*$/, '').trim();
+          
+          // ✅ COMPARAR RUAS (ignorando diferenças de formatação)
+          if (cleanStreet.toLowerCase().includes(currentStreet.toLowerCase()) || 
+              currentStreet.toLowerCase().includes(cleanStreet.toLowerCase())) {
+            
+            // ✅ EXTRAIR CEP CORRETO DO ENDEREÇO LIMPO
+            const cepMatch = cleanAddress.match(/CEP: (\d{8})/);
+            if (cepMatch) {
+              const correctCep = cepMatch[1];
+              
+              // ✅ VERIFICAR SE O CEP ESTÁ CORRETO
+              if (correctCep !== addr.cep) {
+                console.log(`🔧 CEP corrigido baseado no endereço limpo: ${addr.cep} → ${correctCep}`);
+                addr.cep = correctCep;
+              }
+            }
+            break; // ✅ ENCONTRADO, SAIR DO LOOP
           }
         }
       }
