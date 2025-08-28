@@ -15,6 +15,8 @@ interface CarteiroAddress {
     confidence: number;
   };
   geocoded: boolean;
+  extractedText?: string;
+  address?: string;
 }
 
 interface MapData {
@@ -231,8 +233,8 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
         const carteiroAddress: CarteiroAddress = {
           ordem: sequence.toString(),
           objeto: address.extractedText || `Endereço ${sequence}`,
-          endereco: address.address,
-          cep: address.extractedText.match(/CEP:\s*(\d{8})/)?.[1] || 'CEP não encontrado',
+          endereco: address.address || 'Endereço não especificado',
+          cep: address.extractedText?.match(/CEP:\s*(\d{8})/)?.[1] || 'CEP não encontrado',
           destinatario: 'Endereço extraído da imagem',
           coordinates: address.coordinates,
           geocoded: !!address.coordinates
@@ -394,8 +396,16 @@ export default function CarteiroUpload({ onAddressesLoaded, userLocation }: Cart
       setResult(data);
       setUploadProgress('Concluído!');
 
-      // Notificar componente pai
-      onAddressesLoaded(data.addresses, data.mapData);
+      // ✅ VALIDAR DADOS ANTES DE NOTIFICAR COMPONENTE PAI
+      console.log('🔍 Validando dados recebidos:', data);
+      
+      if (data.addresses && Array.isArray(data.addresses)) {
+        console.log(`✅ ${data.addresses.length} endereços encontrados, notificando componente pai`);
+        onAddressesLoaded(data.addresses, data.mapData);
+      } else {
+        console.error('❌ Dados inválidos recebidos:', data);
+        throw new Error('Formato de dados inválido: addresses não encontrado ou não é um array');
+      }
 
     } catch (error) {
       console.error('Erro no upload:', error);
