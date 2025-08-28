@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// ✅ IMPORTAR SERVIÇOS DE GEOCODIFICAÇÃO
-import { geocodeWithCache } from '@/lib/geocodeCache';
+// ✅ IMPORTAR SERVIÇOS DE GEOCODIFICAÇÃO DIRETAMENTE
+import { searchGeocodingCache, saveToGeocodingCache } from '@/lib/geocodingCache';
 
 interface AddressResult {
   address: string;
@@ -322,8 +322,48 @@ CEP: 38400-200`;
         // ✅ NOVO: GEOCODIFICAR O ENDEREÇO PARA OBTER COORDENADAS
         try {
           console.log(`🗺️ Iniciando geocodificação para: ${fullAddress}`);
-          const geocodeResult = await geocodeWithCache(fullAddress);
           
+          // ✅ PRIMEIRO: Verificar cache
+          let geocodeResult = await searchGeocodingCache(fullAddress);
+          
+          // ✅ SE NÃO ESTIVER EM CACHE: Chamar API de geocodificação
+          if (!geocodeResult) {
+            console.log(`🔍 Endereço não está em cache, chamando API...`);
+            
+            const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/geocode`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                address: fullAddress,
+                userLocation: { city: 'Uberlândia', state: 'MG' }
+              }),
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.lat && result.lng) {
+                geocodeResult = {
+                  lat: result.lat,
+                  lng: result.lng,
+                  formatted_address: result.formatted_address || fullAddress,
+                  confidence: result.confidence || 0.9,
+                  provider: result.provider || 'api'
+                };
+                
+                // ✅ SALVAR NO CACHE (usar formato correto)
+                await saveToGeocodingCache(fullAddress, {
+                  lat: result.lat,
+                  lng: result.lng,
+                  address: fullAddress,
+                  confidence: result.confidence || 0.9,
+                  provider: result.provider || 'api'
+                });
+                console.log(`💾 Endereço salvo no cache: ${fullAddress}`);
+              }
+            }
+          }
+          
+          // ✅ APLICAR COORDENADAS SE OBTIDAS
           if (geocodeResult && geocodeResult.lat && geocodeResult.lng) {
             addressResult.coordinates = {
               lat: geocodeResult.lat,
