@@ -263,6 +263,45 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       }
     }
     
+    // ✅ VALIDAR E LIMPAR ENDEREÇOS FINAIS
+    console.log('🧹 Validando e limpando endereços finais...');
+    addresses.forEach((addr, index) => {
+      // ✅ VALIDAR CEP
+      if (addr.cep !== 'CEP a ser extraído' && !addr.cep.includes('ser extraído')) {
+        // ✅ LIMPAR CEP (remover espaços, traços, etc.)
+        const cleanCep = addr.cep.replace(/[^\d]/g, '');
+        
+        // ✅ VERIFICAR SE O CEP TEM 8 DÍGITOS
+        if (cleanCep.length === 8) {
+          const cepNum = parseInt(cleanCep);
+          
+          // ✅ VERIFICAR SE O CEP ESTÁ NO INTERVALO CORRETO PARA UBERLÂNDIA
+          if (cepNum >= 38400000 && cepNum <= 38499999) {
+            if (cleanCep !== addr.cep) {
+              addr.cep = cleanCep;
+              console.log(`🧹 CEP limpo e validado: ${addr.cep}`);
+            }
+          } else {
+            console.log(`⚠️ CEP fora do intervalo de Uberlândia: ${addr.cep}`);
+          }
+        } else {
+          console.log(`❌ CEP malformado: ${addr.cep} (${cleanCep.length} dígitos)`);
+        }
+      }
+      
+      // ✅ VALIDAR ENDEREÇO
+      if (addr.endereco.includes('ser extraído')) {
+        addr.endereco = `Endereço ${index + 1} (requer edição)`;
+      }
+      
+      // ✅ VALIDAR DESTINATÁRIO
+      if (addr.destinatario.includes('ser extraído')) {
+        addr.destinatario = 'Localização não especificada';
+      }
+      
+      console.log(`✅ Endereço ${index + 1} validado: ${addr.objeto} - ${addr.endereco} (CEP: ${addr.cep})`);
+    });
+    
     // ✅ ESTRATÉGIA 2: Aplicar endereços limpos por correspondência de CEP (para endereços não limpos)
     console.log('🔍 Aplicando endereços limpos por correspondência de CEP...');
     for (let i = 0; i < addresses.length; i++) {
