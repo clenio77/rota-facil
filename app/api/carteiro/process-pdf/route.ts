@@ -978,32 +978,8 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       }
       
       // ✅ NOVA VALIDAÇÃO: Corrigir CEPs baseado nos endereços limpos extraídos
-      if (cleanAddresses.length > 0) {
-        // ✅ PROCURAR ENDEREÇO LIMPO CORRESPONDENTE
-        for (const cleanAddress of cleanAddresses) {
-          // ✅ VERIFICAR SE O ENDEREÇO LIMPO CORRESPONDE AO ENDEREÇO ATUAL
-          const cleanStreet = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
-          const currentStreet = addr.endereco.replace(/\s*CEP.*$/, '').trim();
-          
-          // ✅ COMPARAR RUAS (ignorando diferenças de formatação)
-          if (cleanStreet.toLowerCase().includes(currentStreet.toLowerCase()) || 
-              currentStreet.toLowerCase().includes(cleanStreet.toLowerCase())) {
-            
-            // ✅ EXTRAIR CEP CORRETO DO ENDEREÇO LIMPO
-            const cepMatch = cleanAddress.match(/CEP: (\d{8})/);
-            if (cepMatch) {
-              const correctCep = cepMatch[1];
-              
-              // ✅ VERIFICAR SE O CEP ESTÁ CORRETO
-              if (correctCep !== addr.cep) {
-                console.log(`🔧 CEP corrigido baseado no endereço limpo: ${addr.cep} → ${correctCep}`);
-                addr.cep = correctCep;
-              }
-            }
-            break; // ✅ ENCONTRADO, SAIR DO LOOP
-          }
-        }
-      }
+      // ❌ REMOVIDO - cleanAddresses não está disponível nesta função
+      // A validação será feita na função principal
       
       // ✅ VALIDAR DESTINATÁRIO
       if (addr.destinatario.includes('ser extraído')) {
