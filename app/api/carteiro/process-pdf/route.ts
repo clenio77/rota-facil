@@ -200,7 +200,26 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       throw new Error('Nenhum endereço foi extraído do PDF');
     }
     
-    console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados`);
+    // ✅ APLICAR ENDEREÇOS LIMPOS AOS ENDEREÇOS FINAIS
+    console.log('🧹 Aplicando endereços limpos (sem faixas de numeração)...');
+    for (let i = 0; i < addresses.length && i < cleanAddresses.length; i++) {
+      const cleanAddress = cleanAddresses[i];
+      if (cleanAddress) {
+        // ✅ EXTRAIR NÚMERO E CEP DO ENDEREÇO LIMPO
+        const numberMatch = cleanAddress.match(/, (\d+), CEP: (\d{8})/);
+        if (numberMatch) {
+          const [, number, cep] = numberMatch;
+          const streetName = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
+          
+          addresses[i].endereco = `${streetName}, ${number}`;
+          addresses[i].cep = cep;
+          
+          console.log(`🧹 Endereço ${i + 1} limpo: "${streetName}, ${number}" (CEP: ${cep})`);
+        }
+      }
+    }
+    
+    console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados e limpos`);
 
     // ✅ NOVO: GEOCODIFICAR ENDEREÇOS
     console.log('🗺️ Iniciando geocodificação dos endereços...');
