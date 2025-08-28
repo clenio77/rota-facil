@@ -122,6 +122,25 @@ interface OptimizedRouteData {
   totalTime: number;
   algorithm: string;
   googleMapsUrl: string;
+  // ✅ NOVOS CAMPOS: Rota otimizada com pontos inicial/final
+  optimizedRoute?: Array<{
+    id: string;
+    ordem: string;
+    objeto: string;
+    endereco: string;
+    cep: string;
+    destinatario?: string;
+    coordinates?: { lat: number; lng: number };
+    geocoded: boolean;
+    isStartPoint?: boolean;
+    isEndPoint?: boolean;
+  }>;
+  startLocation?: { lat: number; lng: number; city?: string; state?: string };
+  totalStops?: number;
+  routeMetrics?: {
+    totalDistance: number;
+    totalTime: number;
+  };
 }
 
 export default function CarteiroPage() {
@@ -262,7 +281,7 @@ export default function CarteiroPage() {
 
       // ✅ SIMULAR PROCESSAMENTO AUTOMÁTICO
       setTimeout(() => {
-        setScheduledRoutes(prev => [...prev, newScheduledRoute as any]);
+        setScheduledRoutes(prev => [...prev, newScheduledRoute]);
         
         // ✅ PROCESSAR ROTA AUTOMATICAMENTE
         if (config.preferences.autoOptimize) {
@@ -556,6 +575,79 @@ export default function CarteiroPage() {
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* ✅ NOVA SEÇÃO: Rota Otimizada com Pontos Inicial/Final */}
+        {processedData?.googleMapsUrl && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              🚀 Rota Otimizada Gerada
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Informações da Rota */}
+              <div>
+                <h3 className="font-medium text-gray-700 mb-3">📊 Estatísticas da Rota</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total de Paradas:</span>
+                    <span className="font-medium">{processedData.totalItems}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tempo Estimado:</span>
+                    <span className="font-medium">{routeStats?.estimatedTime || 0} min</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Distância Estimada:</span>
+                    <span className="font-medium">{routeStats?.estimatedDistance || 0} km</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Botão do Google Maps */}
+              <div className="flex flex-col justify-center">
+                <a
+                  href={processedData.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-center"
+                >
+                  🗺️ Abrir no Google Maps
+                </a>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Clique para abrir a rota otimizada no Google Maps
+                </p>
+              </div>
+            </div>
+            
+            {/* ✅ PONTOS INICIAL E FINAL */}
+            {userLocation && (
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-800 mb-3">📍 Pontos de Partida e Chegada</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🚀</div>
+                    <div className="text-sm font-medium text-blue-700">Ponto de Partida</div>
+                    <div className="text-xs text-blue-600">
+                      {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+                    </div>
+                    <div className="text-xs text-blue-500">Sua Localização Atual</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🏁</div>
+                    <div className="text-sm font-medium text-blue-700">Ponto de Chegada</div>
+                    <div className="text-xs text-blue-600">
+                      {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+                    </div>
+                    <div className="text-xs text-blue-500">Sua Localização Atual</div>
+                  </div>
+                </div>
+                <p className="text-xs text-blue-600 mt-3 text-center">
+                  ✅ Sua rota começará e terminará na sua localização atual
+                </p>
+              </div>
+            )}
           </div>
         )}
 

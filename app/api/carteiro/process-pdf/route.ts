@@ -656,14 +656,26 @@ function extractAddressesFromText(text: string) {
       }
     }
 
-    // ✅ DETECTAR CEP (padrões mais flexíveis)
+    // ✅ DETECTAR CEP (padrões mais flexíveis) - CORRIGIDO
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
-      const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
-      if (cepMatch) {
-        const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
-        if (cep) {
+      // ✅ VERIFICAR SE A LINHA CONTÉM APENAS CEP (sem outros dados)
+      if (trimmedLine.startsWith('CEP:') || trimmedLine.match(/^\d{8}$/) || trimmedLine.match(/^\d{5}-\d{3}$/)) {
+        const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
+        if (cepMatch) {
+          const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
+          if (cep) {
+            currentAddress.cep = cep;
+            console.log(`📮 CEP encontrado para ${currentAddress.objeto}: ${cep}`);
+          }
+        }
+      }
+      // ✅ VERIFICAR SE A LINHA CONTÉM CEP NO FINAL (padrão: "Endereço CEP: XXXXXXXX")
+      else if (trimmedLine.includes('CEP:')) {
+        const cepMatch = trimmedLine.match(/CEP:\s*(\d{8})/);
+        if (cepMatch) {
+          const cep = cepMatch[1];
           currentAddress.cep = cep;
-          console.log(`📮 CEP encontrado: ${cep}`);
+          console.log(`📮 CEP extraído do endereço para ${currentAddress.objeto}: ${cep}`);
         }
       }
     }
@@ -718,7 +730,7 @@ function extractAddressesFromText(text: string) {
         cleanAddress = `Endereço ${index + 1} (requer edição)`;
       }
       
-      // ✅ VALIDAR CEP (CORRIGIDO)
+      // ✅ VALIDAR CEP (CORRIGIDO E MELHORADO)
       if (addr.cep.includes('ser extraído')) {
         // ✅ TENTAR EXTRAIR CEP DO ENDEREÇO SE NÃO FOI ENCONTRADO
         const cepFromAddress = addr.endereco.match(/CEP:\s*(\d{8})/);
@@ -728,6 +740,17 @@ function extractAddressesFromText(text: string) {
         } else {
           addr.cep = 'CEP não encontrado';
           console.log(`⚠️ CEP não encontrado para endereço: ${addr.endereco}`);
+        }
+      }
+      
+      // ✅ VERIFICAÇÃO FINAL: Garantir que o CEP está correto
+      if (addr.cep !== 'CEP não encontrado' && !addr.cep.includes('ser extraído')) {
+        // ✅ VERIFICAR SE O CEP ESTÁ NO INTERVALO CORRETO PARA UBERLÂNDIA
+        const cepNum = parseInt(addr.cep);
+        if (cepNum >= 38400000 && cepNum <= 38499999) {
+          console.log(`✅ CEP válido para Uberlândia: ${addr.cep}`);
+        } else {
+          console.log(`⚠️ CEP fora do intervalo de Uberlândia: ${addr.cep}`);
         }
       }
       

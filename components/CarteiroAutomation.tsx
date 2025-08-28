@@ -2,6 +2,18 @@
 
 import React, { useState, useCallback } from 'react';
 
+// ✅ IMPORTAR TIPO ECTItem
+interface ECTItem {
+  id: string;
+  sequence: number;
+  objectCode: string;
+  address: string;
+  cep: string;
+  lat: number;
+  lng: number;
+  correctedAddress?: string;
+}
+
 // ✅ INTERFACE: Configuração de Automação
 interface AutoRouteConfig {
   mode: 'manual' | 'semi-auto' | 'full-auto';
@@ -26,25 +38,13 @@ interface AutoRouteConfig {
   };
 }
 
-// ✅ INTERFACE: Rota Agendada
+// ✅ INTERFACE: Rota Agendada (usando ECTItem para compatibilidade)
 interface ScheduledRoute {
   id: string;
   date: string;
   time: string;
-  items: RouteItem[];
+  items: ECTItem[];
   status: 'pending' | 'processing' | 'ready' | 'delivered';
-}
-
-// ✅ INTERFACE: Item da Rota (usando ECTItem para compatibilidade)
-interface RouteItem {
-  id: string;
-  sequence: number;
-  address: string;
-  objectCode?: string;
-  cep?: string;
-  lat?: number;
-  lng?: number;
-  correctedAddress?: string;
 }
 
 interface CarteiroAutomationProps {
