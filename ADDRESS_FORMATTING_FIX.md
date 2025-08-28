@@ -23,10 +23,11 @@
 ## 🔧 **ARQUIVOS MODIFICADOS**
 
 ### **`app/api/carteiro/process-pdf/route.ts`**
-- ✅ Função `extractCleanAddresses` corrigida
+- ✅ Função `extractCleanAddresses` corrigida com 5 padrões diferentes
 - ✅ Aplicação automática dos endereços limpos aos endereços finais
 - ✅ Logs de debug para rastrear o processamento
 - ✅ Integração correta com `generateOptimizedRoute`
+- ✅ Captura de todos os formatos de faixas de numeração encontrados
 
 ### **`utils/pdfExtractor.js`**
 - ✅ Função `generateOptimizedRoute` verificada e funcionando
@@ -66,6 +67,13 @@ npm run build
 - **Exemplo:** "Avenida João Pinheiro, 1783, CEP: 38400712"
 - **Faixas de numeração:** Completamente removidas
 
+**Padrões Capturados:**
+1. **"Rua - de X/Y a Z/W, N CEP: XXXXXXXX"** → "Rua, N, CEP: XXXXXXXX"
+2. **"Rua de X a Y, N CEP: XXXXXXXX"** → "Rua, N, CEP: XXXXXXXX"
+3. **"Rua - até X/Y, N CEP: XXXXXXXX"** → "Rua, N, CEP: XXXXXXXX"
+4. **"Rua até X/Y, N CEP: XXXXXXXX"** → "Rua, N, CEP: XXXXXXXX"
+5. **"Rua - de X/Y até Z/W, N CEP: XXXXXXXX"** → "Rua, N, CEP: XXXXXXXX"
+
 ### **✅ Localização Integrada na Rota**
 - **Ponto inicial:** Localização do dispositivo do usuário
 - **Ponto final:** Localização do dispositivo do usuário
@@ -80,8 +88,10 @@ npm run build
 
 ## 🚀 **DEPLOY REALIZADO**
 
-**URL de Produção:** `https://rotafacil-osyq56djh-clenios-projects-c5973030.vercel.app`
+**URL de Produção:** `https://rotafacil-ljfj45rvc-clenios-projects-c5973030.vercel.app`
 **Status:** ✅ **FUNCIONANDO PERFEITAMENTE**
+
+**Deploy Anterior:** `https://rotafacil-osyq56djh-clenios-projects-c5973030.vercel.app`
 
 ## 🎯 **PRÓXIMOS PASSOS RECOMENDADOS**
 

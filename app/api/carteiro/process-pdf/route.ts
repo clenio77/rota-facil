@@ -202,6 +202,8 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     
     // ✅ APLICAR ENDEREÇOS LIMPOS AOS ENDEREÇOS FINAIS
     console.log('🧹 Aplicando endereços limpos (sem faixas de numeração)...');
+    
+    // ✅ ESTRATÉGIA 1: Aplicar endereços limpos por correspondência de índice
     for (let i = 0; i < addresses.length && i < cleanAddresses.length; i++) {
       const cleanAddress = cleanAddresses[i];
       if (cleanAddress) {
@@ -212,9 +214,70 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
           const streetName = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
           
           addresses[i].endereco = `${streetName}, ${number}`;
-          addresses[i].cep = cep;
+          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
+          // addresses[i].cep = cep; // ❌ REMOVIDO - mantém CEP original
           
-          console.log(`🧹 Endereço ${i + 1} limpo: "${streetName}, ${number}" (CEP: ${cep})`);
+          console.log(`🧹 Endereço ${i + 1} limpo (índice): "${streetName}, ${number}" (CEP: ${addresses[i].cep} - MANTIDO)`);
+        }
+      }
+    }
+    
+    // ✅ ESTRATÉGIA 2: Aplicar endereços limpos por correspondência de CEP (para endereços não limpos)
+    console.log('🔍 Aplicando endereços limpos por correspondência de CEP...');
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      
+      // ✅ SE O ENDEREÇO AINDA TEM FAIXA DE NUMERAÇÃO, PROCURAR POR CEP CORRESPONDENTE
+      if (address.endereco.includes('de ') && address.endereco.includes(' a ') && address.cep !== 'CEP a ser extraído') {
+        console.log(`🔍 Endereço ${i + 1} ainda tem faixa de numeração: ${address.endereco}`);
+        
+        // ✅ PROCURAR ENDEREÇO LIMPO COM MESMO CEP
+        for (const cleanAddress of cleanAddresses) {
+          if (cleanAddress.includes(`CEP: ${address.cep}`)) {
+            const numberMatch = cleanAddress.match(/, (\d+), CEP: (\d{8})/);
+            if (numberMatch) {
+              const [, number, cep] = numberMatch;
+              const streetName = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
+              
+              address.endereco = `${streetName}, ${number}`;
+              // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
+              // address.cep = cep; // ❌ REMOVIDO - mantém CEP original
+              
+              console.log(`🧹 Endereço ${i + 1} limpo (CEP): "${streetName}, ${number}" (CEP: ${address.cep} - MANTIDO)`);
+              break; // ✅ ENCONTRADO, SAIR DO LOOP
+            }
+          }
+        }
+      }
+    }
+    
+    // ✅ ESTRATÉGIA 3: Limpeza manual para endereços restantes
+    console.log('🔧 Aplicando limpeza manual para endereços restantes...');
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      
+      // ✅ SE AINDA TEM FAIXA DE NUMERAÇÃO, APLICAR LIMPEZA MANUAL
+      if (address.endereco.includes('de ') && address.endereco.includes(' a ')) {
+        console.log(`🔧 Aplicando limpeza manual ao endereço ${i + 1}: ${address.endereco}`);
+        
+        // ✅ PADRÃO: "Rua - de X/Y a Z/W, N CEP: XXXXXXXX"
+        const manualClean = address.endereco.match(/^([^-]+)-\s*de\s+[\d\/\s]+a\s+[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/);
+        if (manualClean) {
+          const [, streetName, number, cep] = manualClean;
+          address.endereco = `${streetName.trim()}, ${number}`;
+          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
+          // address.cep = cep; // ❌ REMOVIDO - mantém CEP original
+          console.log(`🔧 Endereço ${i + 1} limpo manualmente: "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
+        }
+        
+        // ✅ PADRÃO: "Rua até X/Y, N CEP: XXXXXXXX"
+        const manualClean2 = address.endereco.match(/^([^-]+)-\s*até\s+[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/);
+        if (manualClean2) {
+          const [, streetName, number, cep] = manualClean2;
+          address.endereco = `${streetName.trim()}, ${number}`;
+          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
+          // address.cep = cep; // ❌ REMOVIDO - mantém CEP original
+          console.log(`🔧 Endereço ${i + 1} limpo manualmente: "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
         }
       }
     }
