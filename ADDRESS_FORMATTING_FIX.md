@@ -87,7 +87,44 @@ npm run build
 - **Localização Garantida:** userLocation sempre usado como ponto inicial/final da rota
 - **Logs Detalhados:** Adicionados logs para debug e monitoramento
 
-### **✅ VALIDAÇÃO ROBUSTA DE CEP IMPLEMENTADA (Deploy Mais Recente - 0a13437)**
+### **✅ ASSOCIAÇÃO INTELIGENTE DE CEP IMPLEMENTADA (Deploy Mais Recente - aea5e60)**
+
+**🔧 PROBLEMAS RESOLVIDOS:**
+1. **CEPs sendo associados a endereços incorretos** - ✅ **RESOLVIDO COM SISTEMA INTELIGENTE**
+2. **Pontos inicial/final da rota não sendo exibidos** - Implementada exibição visual
+3. **Incompatibilidade de tipos TypeScript** - Unificados tipos entre componentes
+4. **Falta de visualização da rota completa** - Adicionada seção dedicada
+5. **CEPs duplicados incorretos** - Implementada validação robusta
+6. **Padrão 'até X/Y' não sendo capturado** - Corrigidos padrões de regex
+
+**🚀 FUNCIONALIDADES IMPLEMENTADAS:**
+- ✅ Exibição clara dos pontos de partida e chegada
+- ✅ Estatísticas da rota otimizada
+- ✅ Botão direto para Google Maps
+- ✅ **VALIDAÇÃO ROBUSTA DE CEP:**
+  - Limpeza automática (remove espaços, traços, etc.)
+  - Validação de formato (8 dígitos obrigatórios)
+  - Verificação de intervalo Uberlândia (38400000-38499999)
+  - Correção automática de CEPs malformados
+  - Detecção e correção de CEPs duplicados incorretos
+  - Extração de CEP do endereço quando necessário
+- ✅ **ASSOCIAÇÃO INTELIGENTE DE CEP:**
+  - Coleta de CEPs sem associação imediata
+  - Análise posterior baseada em proximidade de linhas
+  - Sistema de distância para encontrar melhor correspondência
+  - Associação inteligente aos endereços corretos
+- ✅ Seção visual mostrando rota completa
+
+**📁 ARQUIVOS MODIFICADOS:**
+- `app/api/carteiro/process-pdf/route.ts` - Lógica de CEP corrigida + validação robusta + **associação inteligente**
+- `app/carteiro/page.tsx` - Interface da rota otimizada
+- `components/CarteiroAutomation.tsx` - Tipos unificados
+- `utils/pdfExtractor.js` - Validação de CEP melhorada
+
+**🔗 DEPLOY:**
+- **URL:** https://rotafacil-oy9nvbssf-clenios-projects-c5973030.vercel.app
+- **Commit:** aea5e60
+- **Status:** ✅ Deployado com sucesso
 
 **🔧 PROBLEMAS RESOLVIDOS:**
 1. **CEPs sendo associados a endereços incorretos** - Corrigida lógica de extração

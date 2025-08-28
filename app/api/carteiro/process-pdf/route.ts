@@ -201,24 +201,33 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       throw new Error('Nenhum endereço foi extraído do PDF');
     }
     
-    // ✅ APLICAR ENDEREÇOS LIMPOS AOS ENDEREÇOS FINAIS
+    // ✅ APLICAR ENDEREÇOS LIMPOS AOS ENDEREÇOS FINAIS (CORRIGIDO)
     console.log('🧹 Aplicando endereços limpos (sem faixas de numeração)...');
     
-    // ✅ ESTRATÉGIA 1: Aplicar endereços limpos por correspondência de índice
+    // ✅ ESTRATÉGIA 1: Aplicar endereços limpos APENAS se o endereço atual tiver faixa de numeração
     for (let i = 0; i < addresses.length && i < cleanAddresses.length; i++) {
       const cleanAddress = cleanAddresses[i];
-      if (cleanAddress) {
-        // ✅ EXTRAIR NÚMERO E CEP DO ENDEREÇO LIMPO
-        const numberMatch = cleanAddress.match(/, (\d+), CEP: (\d{8})/);
-        if (numberMatch) {
-          const [, number, cep] = numberMatch;
-          const streetName = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
-          
-          addresses[i].endereco = `${streetName}, ${number}`;
-          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
-          // addresses[i].cep = cep; // ❌ REMOVIDO - mantém CEP original
-          
-          console.log(`🧹 Endereço ${i + 1} limpo (índice): "${streetName}, ${number}" (CEP: ${addresses[i].cep} - MANTIDO)`);
+      const currentAddress = addresses[i];
+      
+      if (cleanAddress && currentAddress) {
+        // ✅ VERIFICAR SE O ENDEREÇO ATUAL TEM FAIXA DE NUMERAÇÃO
+        const hasRange = currentAddress.endereco.includes('de ') && currentAddress.endereco.includes(' a ') ||
+                        currentAddress.endereco.includes('até');
+        
+        if (hasRange) {
+          // ✅ EXTRAIR NÚMERO E CEP DO ENDEREÇO LIMPO
+          const numberMatch = cleanAddress.match(/, (\d+), CEP: (\d{8})/);
+          if (numberMatch) {
+            const [, number, cep] = numberMatch;
+            const streetName = cleanAddress.replace(/, \d+, CEP: \d{8}/, '').trim();
+            
+            // ✅ APLICAR APENAS A LIMPEZA, MANTENDO O ENDEREÇO ORIGINAL
+            currentAddress.endereco = `${streetName}, ${number}`;
+            
+            console.log(`🧹 Endereço ${i + 1} limpo (faixa removida): "${streetName}, ${number}" (CEP: ${currentAddress.cep} - MANTIDO)`);
+          }
+        } else {
+          console.log(`✅ Endereço ${i + 1} não tem faixa de numeração, mantido original: "${currentAddress.endereco}"`);
         }
       }
     }
