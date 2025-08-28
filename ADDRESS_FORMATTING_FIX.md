@@ -80,6 +80,13 @@ npm run build
 - **Rota otimizada:** Entre os pontos inicial/final
 - **Algoritmo:** TSP (Caixeiro Viajante) otimizado
 
+### **✅ Correções Implementadas (Deploy Atual)**
+- **CEP Preservado:** CEPs originais não são mais sobrescritos ao limpar endereços
+- **3 Estratégias:** Implementadas estratégias múltiplas para limpeza de endereços
+- **Correspondência Melhorada:** Melhor correspondência entre endereços limpos e endereços do PDF
+- **Localização Garantida:** userLocation sempre usado como ponto inicial/final da rota
+- **Logs Detalhados:** Adicionados logs para debug e monitoramento
+
 ### **✅ API Funcionando Corretamente**
 - **Processamento de PDF:** OCR.space + limpeza automática
 - **Geocodificação:** Sistema multi-API com fallback
@@ -88,10 +95,11 @@ npm run build
 
 ## 🚀 **DEPLOY REALIZADO**
 
-**URL de Produção:** `https://rotafacil-ljfj45rvc-clenios-projects-c5973030.vercel.app`
+**URL de Produção:** `https://rotafacil-bqa9aweup-clenios-projects-c5973030.vercel.app`
 **Status:** ✅ **FUNCIONANDO PERFEITAMENTE**
 
-**Deploy Anterior:** `https://rotafacil-osyq56djh-clenios-projects-c5973030.vercel.app`
+**Deploy Anterior:** `https://rotafacil-ljfj45rvc-clenios-projects-c5973030.vercel.app`
+**Deploy Mais Antigo:** `https://rotafacil-osyq56djh-clenios-projects-c5973030.vercel.app`
 
 ## 🎯 **PRÓXIMOS PASSOS RECOMENDADOS**
 

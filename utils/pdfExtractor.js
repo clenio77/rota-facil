@@ -823,12 +823,13 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 }
 
 /**
- * 🗺️ GERAR URL DO GOOGLE MAPS AUTOMATICAMENTE
+ * 🗺️ GERAR URL DO GOOGLE MAPS AUTOMATICAMENTE (COM SOLUÇÃO PARA LIMITE DE PONTOS)
  * 
  * Cria URL otimizada com:
  * - Ponto inicial: localização do usuário
  * - Ponto final: localização do usuário
  * - Waypoints: endereços em ordem otimizada
+ * - SOLUÇÃO: Divide rotas grandes em múltiplas URLs
  */
 function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   console.log('🗺️ Gerando URL do Google Maps automaticamente...');
@@ -843,7 +844,27 @@ function generateGoogleMapsUrl(optimizedRoute, startLocation) {
     return null;
   }
   
-  // ✅ CONSTRUIR URL DO GOOGLE MAPS
+  // ✅ SOLUÇÃO PARA LIMITE DO GOOGLE MAPS (máximo 25 waypoints por URL)
+  const MAX_WAYPOINTS_PER_URL = 23; // Google Maps aceita até 25, mas deixamos margem
+  
+  if (deliveryPoints.length <= MAX_WAYPOINTS_PER_URL) {
+    // ✅ ROTA PEQUENA: Uma única URL
+    return generateSingleGoogleMapsUrl(deliveryPoints, startLocation);
+  } else {
+    // ✅ ROTA GRANDE: Múltiplas URLs
+    console.log(`⚠️ Rota com ${deliveryPoints.length} pontos excede limite do Google Maps (${MAX_WAYPOINTS_PER_URL})`);
+    console.log('🔄 Dividindo em múltiplas rotas...');
+    
+    return generateMultipleGoogleMapsUrls(deliveryPoints, startLocation, MAX_WAYPOINTS_PER_URL);
+  }
+}
+
+/**
+ * 🗺️ GERAR UMA ÚNICA URL DO GOOGLE MAPS
+ */
+function generateSingleGoogleMapsUrl(deliveryPoints, startLocation) {
+  console.log('🗺️ Gerando URL única do Google Maps...');
+  
   const baseUrl = 'https://www.google.com/maps/dir/';
   
   // ✅ ORIGEM: Localização do usuário
@@ -852,41 +873,151 @@ function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   // ✅ DESTINO: Localização do usuário (rota circular)
   const destination = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
   
-            // ✅ WAYPOINTS: Endereços em ordem otimizada (FORMATO CORRETO PARA GOOGLE MAPS)
-          const waypoints = deliveryPoints.map(point => {
-            // ✅ FORMATO CORRETO: Rua, Número, Cidade, Estado, CEP
-            const numberMatch = point.endereco.match(/(\d+)(?=\s*CEP|$)/);
-            const streetPart = point.endereco.replace(/\s*CEP.*$/, '').trim();
-            
-            let formattedAddress;
-            if (numberMatch) {
-              const number = numberMatch[1];
-              const streetWithoutNumber = streetPart.replace(/\d+$/, '').trim();
-              formattedAddress = `${streetWithoutNumber}, ${number}, Uberlândia - MG, ${point.cep}`;
-            } else {
-              formattedAddress = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
-            }
-            
-            return encodeURIComponent(formattedAddress);
-          }).join('|');
+  // ✅ WAYPOINTS: Endereços em ordem otimizada
+  const waypoints = deliveryPoints.map(point => {
+    // ✅ VERIFICAR SE O CEP EXISTE ANTES DE USAR
+    if (!point.cep || point.cep === 'CEP a ser extraído' || point.cep === 'CEP não encontrado') {
+      console.log(`⚠️ CEP ausente para endereço: ${point.endereco}`);
+      // ✅ USAR ENDEREÇO SEM CEP SE NECESSÁRIO
+      return encodeURIComponent(`${point.endereco}, Uberlândia - MG`);
+    }
+    
+    // ✅ FORMATO CORRETO: Rua, Número, Cidade, Estado, CEP
+    const numberMatch = point.endereco.match(/(\d+)(?=\s*CEP|$)/);
+    const streetPart = point.endereco.replace(/\s*CEP.*$/, '').trim();
+    
+    let formattedAddress;
+    if (numberMatch) {
+      const number = numberMatch[1];
+      const streetWithoutNumber = streetPart.replace(/\d+$/, '').trim();
+      formattedAddress = `${streetWithoutNumber}, ${number}, Uberlândia - MG, ${point.cep}`;
+    } else {
+      formattedAddress = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
+    }
+    
+    console.log(`📍 Waypoint formatado: ${formattedAddress}`);
+    return encodeURIComponent(formattedAddress);
+  }).join('|');
   
   // ✅ PARÂMETROS ADICIONAIS
   const params = new URLSearchParams({
     api: '1',
     origin: origin,
-    destination: destination,
     waypoints: waypoints,
+    destination: destination,
     travelmode: 'driving'
   });
   
   const fullUrl = `${baseUrl}?${params.toString()}`;
   
-  console.log('✅ URL do Google Maps gerada automaticamente');
+  console.log('✅ URL única do Google Maps gerada');
   console.log(`📍 Origem: ${startLocation.lat}, ${startLocation.lng}`);
   console.log(`🏁 Destino: ${startLocation.lat}, ${startLocation.lng}`);
   console.log(`📍 Waypoints: ${deliveryPoints.length} endereços otimizados`);
   
   return fullUrl;
+}
+
+/**
+ * 🗺️ GERAR MÚLTIPLAS URLS DO GOOGLE MAPS PARA ROTAS GRANDES
+ */
+function generateMultipleGoogleMapsUrls(deliveryPoints, startLocation, maxWaypointsPerUrl) {
+  console.log('🔄 Gerando múltiplas URLs do Google Maps...');
+  
+  const routes = [];
+  const totalRoutes = Math.ceil(deliveryPoints.length / maxWaypointsPerUrl);
+  
+  for (let i = 0; i < totalRoutes; i++) {
+    const startIndex = i * maxWaypointsPerUrl;
+    const endIndex = Math.min(startIndex + maxWaypointsPerUrl, deliveryPoints.length);
+    const routePoints = deliveryPoints.slice(startIndex, endIndex);
+    
+    console.log(`🔄 Gerando rota ${i + 1}/${totalRoutes}: pontos ${startIndex + 1} a ${endIndex}`);
+    
+    const baseUrl = 'https://www.google.com/maps/dir/';
+    
+    // ✅ ORIGEM: Localização do usuário (para primeira rota) ou último ponto da rota anterior
+    let origin;
+    if (i === 0) {
+      origin = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
+    } else {
+      const lastPointOfPreviousRoute = deliveryPoints[startIndex - 1];
+      if (lastPointOfPreviousRoute.cep && lastPointOfPreviousRoute.cep !== 'CEP a ser extraído') {
+        origin = encodeURIComponent(`${lastPointOfPreviousRoute.endereco}, Uberlândia - MG, ${lastPointOfPreviousRoute.cep}`);
+      } else {
+        origin = encodeURIComponent(`${lastPointOfPreviousRoute.endereco}, Uberlândia - MG`);
+      }
+    }
+    
+    // ✅ DESTINO: Localização do usuário (para última rota) ou primeiro ponto da próxima rota
+    let destination;
+    if (i === totalRoutes - 1) {
+      destination = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
+    } else {
+      const firstPointOfNextRoute = deliveryPoints[endIndex];
+      if (firstPointOfNextRoute.cep && firstPointOfNextRoute.cep !== 'CEP a ser extraído') {
+        destination = encodeURIComponent(`${firstPointOfNextRoute.endereco}, Uberlândia - MG, ${firstPointOfNextRoute.cep}`);
+      } else {
+        destination = encodeURIComponent(`${firstPointOfNextRoute.endereco}, Uberlândia - MG`);
+      }
+    }
+    
+    // ✅ WAYPOINTS: Endereços da rota atual
+    const waypoints = routePoints.map(point => {
+      if (!point.cep || point.cep === 'CEP a ser extraído' || point.cep === 'CEP não encontrado') {
+        console.log(`⚠️ CEP ausente para endereço: ${point.endereco}`);
+        return encodeURIComponent(`${point.endereco}, Uberlândia - MG`);
+      }
+      
+      const numberMatch = point.endereco.match(/(\d+)(?=\s*CEP|$)/);
+      const streetPart = point.endereco.replace(/\s*CEP.*$/, '').trim();
+      
+      let formattedAddress;
+      if (numberMatch) {
+        const number = numberMatch[1];
+        const streetWithoutNumber = streetPart.replace(/\d+$/, '').trim();
+        formattedAddress = `${streetWithoutNumber}, ${number}, Uberlândia - MG, ${point.cep}`;
+      } else {
+        formattedAddress = `${point.endereco}, Uberlândia - MG, ${point.cep}`;
+      }
+      
+      return encodeURIComponent(formattedAddress);
+    }).join('|');
+    
+    // ✅ PARÂMETROS ADICIONAIS
+    const params = new URLSearchParams({
+      api: '1',
+      origin: origin,
+      waypoints: waypoints,
+      destination: destination,
+      travelmode: 'driving'
+    });
+    
+    const fullUrl = `${baseUrl}?${params.toString()}`;
+    
+    routes.push({
+      routeNumber: i + 1,
+      totalRoutes: totalRoutes,
+      startPoint: startIndex + 1,
+      endPoint: endIndex,
+      waypoints: routePoints.length,
+      url: fullUrl,
+      description: `Rota ${i + 1} de ${totalRoutes}: ${startIndex + 1} a ${endIndex}`
+    });
+    
+    console.log(`✅ Rota ${i + 1}/${totalRoutes} gerada: ${routePoints.length} waypoints`);
+  }
+  
+  console.log(`✅ ${totalRoutes} rotas do Google Maps geradas para ${deliveryPoints.length} endereços`);
+  
+  // ✅ RETORNAR OBJETO COM MÚLTIPLAS ROTAS
+  return {
+    type: 'multiple',
+    totalRoutes: totalRoutes,
+    routes: routes,
+    primaryUrl: routes[0].url, // ✅ PRIMEIRA ROTA COMO PRINCIPAL
+    message: `Rota dividida em ${totalRoutes} partes devido ao limite do Google Maps (máximo ${maxWaypointsPerUrl} pontos por rota)`
+  };
 }
 
 /**

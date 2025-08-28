@@ -700,9 +700,17 @@ function extractAddressesFromText(text: string) {
         cleanAddress = `Endereço ${index + 1} (requer edição)`;
       }
       
-      // ✅ VALIDAR CEP
+      // ✅ VALIDAR CEP (CORRIGIDO)
       if (addr.cep.includes('ser extraído')) {
-        addr.cep = 'CEP não encontrado';
+        // ✅ TENTAR EXTRAIR CEP DO ENDEREÇO SE NÃO FOI ENCONTRADO
+        const cepFromAddress = addr.endereco.match(/CEP:\s*(\d{8})/);
+        if (cepFromAddress) {
+          addr.cep = cepFromAddress[1];
+          console.log(`🔍 CEP extraído do endereço: ${addr.cep}`);
+        } else {
+          addr.cep = 'CEP não encontrado';
+          console.log(`⚠️ CEP não encontrado para endereço: ${addr.endereco}`);
+        }
       }
       
       // ✅ VALIDAR DESTINATÁRIO
