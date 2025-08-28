@@ -14,6 +14,25 @@ const { XMLParser } = require('fast-xml-parser');
 const execAsync = util.promisify(exec);
 
 /**
+ * 🎯 EXTRAIR CÓDIGO LIMPO DO OBJETO
+ * 
+ * Converte: "001 BN 409 063 176 BR 1-7 X" → "BN409063176BR"
+ * Remove: espaços, números de sequência, caracteres especiais
+ */
+function extractCleanObjectCode(objectCode) {
+  if (!objectCode) return 'N/A';
+  
+  // ✅ EXTRAIR APENAS AS PARTES ESSENCIAIS: LETRAS + NÚMEROS
+  const cleanCode = objectCode
+    .replace(/\s+/g, '') // Remove espaços
+    .replace(/^\d+\s*/, '') // Remove sequência inicial (001, 002...)
+    .replace(/\s*\d+-\d+\s*[A-Z]*$/, '') // Remove parte final (1-7 X, 2-9, etc)
+    .replace(/[^\w]/g, ''); // Remove caracteres especiais
+  
+  return cleanCode || 'N/A';
+}
+
+/**
  * Detecta o tipo de arquivo baseado na extensão
  */
 function detectFileType(filename) {
@@ -488,8 +507,8 @@ function generateMapData(geocodedAddresses) {
           lat: addr.coordinates.lat,
           lng: addr.coordinates.lng
         },
-        title: `${addr.ordem}. ${addr.objeto} - ${addr.endereco}`,
-        description: `📦 Objeto: ${addr.objeto}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}`,
+        title: `${addr.ordem}. ${extractCleanObjectCode(addr.objeto)} - ${addr.endereco}`,
+        description: `📦 Objeto: ${extractCleanObjectCode(addr.objeto)}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}`,
         type: 'delivery',
         order: parseInt(addr.ordem),
         trackingCode: addr.objeto,
@@ -504,8 +523,8 @@ function generateMapData(geocodedAddresses) {
         lat: -18.9186, // Centro de Uberlândia
         lng: -48.2772
       },
-      title: `${addr.ordem}. ${addr.objeto} - ${addr.endereco}`,
-      description: `📦 Objeto: ${addr.objeto}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}\n⚠️ Coordenadas não disponíveis`,
+      title: `${addr.ordem}. ${extractCleanObjectCode(addr.objeto)} - ${addr.endereco}`,
+      description: `📦 Objeto: ${extractCleanObjectCode(addr.objeto)}\n📍 CEP: ${addr.cep}${addr.destinatario ? `\n👤 Destinatário: ${addr.destinatario}` : ''}\n⚠️ Coordenadas não disponíveis`,
       type: 'delivery',
       order: parseInt(addr.ordem),
       trackingCode: addr.objeto,
@@ -922,5 +941,6 @@ module.exports = {
   optimizeRouteWithTSP,
   calculateDistance,
   generateGoogleMapsUrl,
-  calculateRouteMetrics
+  calculateRouteMetrics,
+  extractCleanObjectCode
 };
