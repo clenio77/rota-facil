@@ -122,13 +122,15 @@ export async function POST(request: NextRequest) {
       
       return NextResponse.json({
         success: true,
-        data: {
-          ...result,
-          mapData,
-          fileName: file.name,
-          fileSize: file.size,
-          processedAt: new Date().toISOString()
-        }
+        addresses: result.addresses,
+        mapData,
+        fileName: file.name,
+        fileSize: file.size,
+        processedAt: new Date().toISOString(),
+        total: result.total,
+        geocoded: result.geocoded,
+        fileType: result.fileType,
+        metadata: result.metadata
       });
       
     } catch (processingError) {
