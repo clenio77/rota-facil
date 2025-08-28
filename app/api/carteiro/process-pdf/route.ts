@@ -15,6 +15,7 @@ interface CarteiroAddress {
   destinatario: string;
   coordinates?: { lat: number; lng: number };
   geocoded?: boolean;
+  cepData?: Array<{ cep: string; line: string; position: number }>; // ✅ NOVA PROPRIEDADE: CEPs para análise posterior
 }
 
 export async function POST(request: NextRequest) {
@@ -658,7 +659,8 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         cep: 'CEP a ser extraído',
         destinatario: 'Localização a ser extraída',
         coordinates: undefined,
-        geocoded: false
+        geocoded: false,
+        cepData: [] // ✅ NOVA PROPRIEDADE: Armazenar CEPs para análise posterior
       };
       
       console.log(`✅ NOVO OBJETO ECT: ${trimmedLine} (sequência ${sequence})`);
@@ -679,7 +681,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       }
     }
 
-    // ✅ DETECTAR CEP (padrões mais flexíveis) - CORRIGIDO
+    // ✅ DETECTAR CEP (padrões mais flexíveis) - CORRIGIDO E MELHORADO
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
       // ✅ VERIFICAR SE A LINHA CONTÉM APENAS CEP (sem outros dados)
       if (trimmedLine.startsWith('CEP:') || trimmedLine.match(/^\d{8}$/) || trimmedLine.match(/^\d{5}-\d{3}$/)) {
@@ -687,8 +689,16 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         if (cepMatch) {
           const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
           if (cep) {
-            currentAddress.cep = cep;
-            console.log(`📮 CEP encontrado para ${currentAddress.objeto}: ${cep}`);
+            // ✅ IMPORTANTE: NÃO ASSOCIAR CEP IMEDIATAMENTE - ARMAZENAR PARA ANÁLISE POSTERIOR
+            if (!currentAddress.cepData) {
+              currentAddress.cepData = [];
+            }
+            currentAddress.cepData.push({
+              cep: cep,
+              line: trimmedLine,
+              position: lines.indexOf(line)
+            });
+            console.log(`📮 CEP encontrado e armazenado para análise: ${cep}`);
           }
         }
       }
@@ -697,6 +707,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         const cepMatch = trimmedLine.match(/CEP:\s*(\d{8})/);
         if (cepMatch) {
           const cep = cepMatch[1];
+          // ✅ ASSOCIAR CEP DIRETAMENTE SE ESTIVER NO ENDEREÇO
           currentAddress.cep = cep;
           console.log(`📮 CEP extraído do endereço para ${currentAddress.objeto}: ${cep}`);
         }
@@ -716,6 +727,52 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
   if (currentAddress) {
     addresses.push(currentAddress);
   }
+
+  // ✅ NOVA FUNÇÃO: Analisar e associar CEPs corretamente
+  console.log('🔍 Analisando associação de CEPs aos endereços...');
+  
+  // ✅ COLETAR TODOS OS CEPs ENCONTRADOS
+  const allCeps: Array<{ cep: string; line: string; position: number; addressIndex: number }> = [];
+  
+  addresses.forEach((addr, index) => {
+    if (addr.cepData && addr.cepData.length > 0) {
+      addr.cepData.forEach(cepInfo => {
+        allCeps.push({
+          ...cepInfo,
+          addressIndex: index
+        });
+      });
+    }
+  });
+  
+  console.log(`📊 Total de CEPs coletados: ${allCeps.length}`);
+  
+  // ✅ ASSOCIAR CEPs AOS ENDEREÇOS CORRETOS
+  addresses.forEach((addr, index) => {
+    if (addr.cep === 'CEP a ser extraído') {
+      // ✅ PROCURAR O CEP MAIS PRÓXIMO DESTE ENDEREÇO
+      let bestCep = null;
+      let minDistance = Infinity;
+      
+      allCeps.forEach(cepInfo => {
+        const distance = Math.abs(cepInfo.position - lines.findIndex(line => 
+          line.trim().includes(addr.objeto.split(' ')[0]) // Primeira parte do código do objeto
+        ));
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestCep = cepInfo.cep;
+        }
+      });
+      
+      if (bestCep) {
+        addr.cep = bestCep;
+        console.log(`🔗 CEP ${bestCep} associado ao endereço ${index + 1} (${addr.objeto})`);
+      } else {
+        console.log(`⚠️ Nenhum CEP encontrado para endereço ${index + 1}`);
+      }
+    }
+  });
 
       // ✅ VALIDAR E LIMPAR ENDEREÇOS (mesma lógica das imagens)
     return addresses.map((addr, index) => {
