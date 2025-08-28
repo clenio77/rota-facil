@@ -87,7 +87,31 @@ npm run build
 - **Localização Garantida:** userLocation sempre usado como ponto inicial/final da rota
 - **Logs Detalhados:** Adicionados logs para debug e monitoramento
 
-### **✅ Novas Correções Implementadas (Deploy Mais Recente)**
+### **✅ CORREÇÕES FINAIS IMPLEMENTADAS (Deploy Mais Recente - 0c22e33)**
+
+**🔧 PROBLEMAS RESOLVIDOS:**
+1. **CEPs sendo associados a endereços incorretos** - Corrigida lógica de extração
+2. **Pontos inicial/final da rota não sendo exibidos** - Implementada exibição visual
+3. **Incompatibilidade de tipos TypeScript** - Unificados tipos entre componentes
+4. **Falta de visualização da rota completa** - Adicionada seção dedicada
+
+**🚀 FUNCIONALIDADES IMPLEMENTADAS:**
+- ✅ Exibição clara dos pontos de partida e chegada
+- ✅ Estatísticas da rota otimizada
+- ✅ Botão direto para Google Maps
+- ✅ Validação de CEP por cidade (Uberlândia)
+- ✅ Seção visual mostrando rota completa
+
+**📁 ARQUIVOS MODIFICADOS:**
+- `app/api/carteiro/process-pdf/route.ts` - Lógica de CEP corrigida
+- `app/carteiro/page.tsx` - Interface da rota otimizada
+- `components/CarteiroAutomation.tsx` - Tipos unificados
+- `utils/pdfExtractor.js` - Validação de CEP melhorada
+
+**🔗 DEPLOY:**
+- **URL:** https://rotafacil-b5u0uouyl-clenios-projects-c5973030.vercel.app
+- **Commit:** 0c22e33
+- **Status:** ✅ Deployado com sucesso
 - **CEP Extraído:** CEP é extraído do endereço se não encontrado na linha separada
 - **Google Maps Limitado:** Solução para limite de 25 waypoints por URL
 - **Rotas Grandes:** Divisão automática em múltiplas rotas quando necessário

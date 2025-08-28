@@ -251,13 +251,14 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       }
     }
     
-    // ✅ ESTRATÉGIA 3: Limpeza manual para endereços restantes
+    // ✅ ESTRATÉGIA 3: Limpeza manual para endereços restantes (MELHORADA)
     console.log('🔧 Aplicando limpeza manual para endereços restantes...');
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
       
-      // ✅ SE AINDA TEM FAIXA DE NUMERAÇÃO, APLICAR LIMPEZA MANUAL
-      if (address.endereco.includes('de ') && address.endereco.includes(' a ')) {
+      // ✅ SE AINDA TEM FAIXA DE NUMERAÇÃO OU "até", APLICAR LIMPEZA MANUAL
+      if (address.endereco.includes('de ') && address.endereco.includes(' a ') || 
+          address.endereco.includes('até')) {
         console.log(`🔧 Aplicando limpeza manual ao endereço ${i + 1}: ${address.endereco}`);
         
         // ✅ PADRÃO: "Rua - de X/Y a Z/W, N CEP: XXXXXXXX"
@@ -265,19 +266,23 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
         if (manualClean) {
           const [, streetName, number, cep] = manualClean;
           address.endereco = `${streetName.trim()}, ${number}`;
-          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
-          // address.cep = cep; // ❌ REMOVIDO - mantém CEP original
           console.log(`🔧 Endereço ${i + 1} limpo manualmente: "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
         }
         
-        // ✅ PADRÃO: "Rua até X/Y, N CEP: XXXXXXXX"
-        const manualClean2 = address.endereco.match(/^([^-]+)-\s*até\s+[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/);
+        // ✅ PADRÃO: "Rua - até X/Y, N CEP: XXXXXXXX" (CORRIGIDO)
+        const manualClean2 = address.endereco.match(/^([^-]+)-\s*até\s+[\d\/\s]+\/[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/);
         if (manualClean2) {
           const [, streetName, number, cep] = manualClean2;
           address.endereco = `${streetName.trim()}, ${number}`;
-          // ✅ IMPORTANTE: NÃO SOBRESCREVER O CEP ORIGINAL!
-          // address.cep = cep; // ❌ REMOVIDO - mantém CEP original
-          console.log(`🔧 Endereço ${i + 1} limpo manualmente: "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
+          console.log(`🔧 Endereço ${i + 1} limpo manualmente (até): "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
+        }
+        
+        // ✅ PADRÃO: "Rua - até X/Y, N CEP: XXXXXXXX" (alternativo)
+        const manualClean3 = address.endereco.match(/^([^-]+)-\s*até\s+[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/);
+        if (manualClean3) {
+          const [, streetName, number, cep] = manualClean3;
+          address.endereco = `${streetName.trim()}, ${number}`;
+          console.log(`🔧 Endereço ${i + 1} limpo manualmente (até alt): "${address.endereco}" (CEP: ${address.cep} - MANTIDO)`);
         }
       }
     }
@@ -525,6 +530,9 @@ function extractCleanAddresses(text: string): string[] {
   // ✅ PADRÃO 3B: "Rua/Avenida - até X/Y, N CEP: XXXXXXXX" (padrão específico encontrado)
   const rangePattern3b = /([A-Za-zÀ-ÿ\s]+)\s*-\s*até\s+[\d\/\s]+\/[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/g;
   
+  // ✅ PADRÃO 3C: "Rua/Avenida - até X/Y, N CEP: XXXXXXXX" (padrão mais específico)
+  const rangePattern3c = /([A-Za-zÀ-ÿ\s]+)\s*-\s*até\s+[\d\/\s]+\/[\d\/\s]+,\s*(\d+)\s*CEP:\s*(\d{8})/g;
+  
   while ((match = rangePattern3.exec(text)) !== null) {
     const [, fullAddress, singleNumber, cep] = match;
     
@@ -554,6 +562,21 @@ function extractCleanAddresses(text: string): string[] {
     cleanAddresses.push(cleanAddress);
     
     console.log(`🎯 Endereço limpo extraído (padrão 3B): ${cleanAddress}`);
+  }
+  
+  // ✅ PROCESSAR PADRÃO 3C (padrão mais específico)
+  while ((match = rangePattern3c.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    // ✅ SEMPRE ADICIONAR O NÚMERO ESPECÍFICO (não é opcional neste padrão)
+    cleanAddress += `, ${singleNumber}`;
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído (padrão 3C): ${cleanAddress}`);
   }
   
   // ✅ PADRÃO 4: "Rua/Avenida até X/Y, N CEP: XXXXXXXX" (sem hífen)
@@ -599,8 +622,8 @@ function extractCleanAddresses(text: string): string[] {
 }
 
 // ✅ FUNÇÃO AUXILIAR: Extrair endereços do texto (lógica robusta)
-function extractAddressesFromText(text: string) {
-  const addresses = [];
+function extractAddressesFromText(text: string): CarteiroAddress[] {
+  const addresses: CarteiroAddress[] = [];
   const lines = text.split(/\r?\n|\r/);
   let sequence = 1;
   let currentAddress = null;
@@ -743,14 +766,78 @@ function extractAddressesFromText(text: string) {
         }
       }
       
-      // ✅ VERIFICAÇÃO FINAL: Garantir que o CEP está correto
+      // ✅ FUNÇÃO AUXILIAR: Tentar corrigir CEP incorreto
+      function tryToCorrectCep(endereco: string): string | null {
+        // ✅ TENTAR EXTRAIR CEP DO ENDEREÇO
+        const cepMatch = endereco.match(/CEP:\s*(\d{8})/);
+        if (cepMatch) {
+          const cep = cepMatch[1];
+          // ✅ VERIFICAR SE O CEP EXTRAÍDO É VÁLIDO PARA UBERLÂNDIA
+          const cepNum = parseInt(cep);
+          if (cepNum >= 38400000 && cepNum <= 38499999) {
+            return cep;
+          }
+        }
+        return null;
+      }
+
+      // ✅ VALIDAÇÃO ROBUSTA DE CEP (CORRIGIDA E MELHORADA)
       if (addr.cep !== 'CEP não encontrado' && !addr.cep.includes('ser extraído')) {
-        // ✅ VERIFICAR SE O CEP ESTÁ NO INTERVALO CORRETO PARA UBERLÂNDIA
-        const cepNum = parseInt(addr.cep);
-        if (cepNum >= 38400000 && cepNum <= 38499999) {
-          console.log(`✅ CEP válido para Uberlândia: ${addr.cep}`);
+        // ✅ LIMPAR CEP (remover espaços, traços, etc.)
+        const cleanCep = addr.cep.replace(/[^\d]/g, '');
+        
+        // ✅ VERIFICAR SE O CEP TEM 8 DÍGITOS
+        if (cleanCep.length === 8) {
+          const cepNum = parseInt(cleanCep);
+          
+          // ✅ VERIFICAR SE O CEP ESTÁ NO INTERVALO CORRETO PARA UBERLÂNDIA
+          if (cepNum >= 38400000 && cepNum <= 38499999) {
+            // ✅ ATUALIZAR CEP LIMPO
+            if (cleanCep !== addr.cep) {
+              addr.cep = cleanCep;
+              console.log(`🧹 CEP limpo e validado: ${addr.cep}`);
+            } else {
+              console.log(`✅ CEP válido para Uberlândia: ${addr.cep}`);
+            }
+          } else {
+            console.log(`⚠️ CEP fora do intervalo de Uberlândia: ${addr.cep}`);
+            // ✅ TENTAR CORRIGIR CEP INCORRETO
+            const correctedCep = tryToCorrectCep(addr.endereco);
+            if (correctedCep) {
+              addr.cep = correctedCep;
+              console.log(`🔧 CEP corrigido: ${correctedCep}`);
+            }
+          }
         } else {
-          console.log(`⚠️ CEP fora do intervalo de Uberlândia: ${addr.cep}`);
+          console.log(`❌ CEP malformado: ${addr.cep} (${cleanCep.length} dígitos)`);
+          // ✅ TENTAR CORRIGIR CEP MALFORMADO
+          const correctedCep = tryToCorrectCep(addr.endereco);
+          if (correctedCep) {
+            addr.cep = correctedCep;
+            console.log(`🔧 CEP corrigido: ${correctedCep}`);
+          }
+        }
+      }
+      
+      // ✅ VERIFICAÇÃO FINAL: Evitar CEPs duplicados incorretos
+      if (addr.cep !== 'CEP não encontrado' && !addr.cep.includes('ser extraído')) {
+        // ✅ VERIFICAR SE O CEP ESTÁ DUPLICADO EM OUTROS ENDEREÇOS
+        const duplicateCep = addresses.find((otherAddr, otherIndex) => 
+          otherIndex !== index && 
+          otherAddr.cep === addr.cep && 
+          otherAddr.cep !== 'CEP não encontrado' &&
+          !otherAddr.cep.includes('ser extraído')
+        );
+        
+        if (duplicateCep) {
+          console.log(`⚠️ CEP duplicado detectado: ${addr.cep} em endereços ${index + 1} e ${addresses.indexOf(duplicateCep) + 1}`);
+          
+          // ✅ TENTAR CORRIGIR CEP DUPLICADO
+          const correctedCep = tryToCorrectCep(addr.endereco);
+          if (correctedCep && correctedCep !== addr.cep) {
+            addr.cep = correctedCep;
+            console.log(`🔧 CEP duplicado corrigido: ${correctedCep}`);
+          }
         }
       }
       
