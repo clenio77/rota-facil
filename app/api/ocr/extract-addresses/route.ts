@@ -263,7 +263,7 @@ CEP: 38400-200`;
       console.log(`✅ Endereços extraídos: ${carteiroAddresses.length}`);
       
       // ✅ CONVERTER PARA FORMATO AddressResult (compatível com o frontend)
-      addresses = await Promise.all(carteiroAddresses.map(async (addr, index) => {
+      addresses = carteiroAddresses.map((addr, index) => {
         console.log(`🔍 Processando endereço ${index + 1}:`, addr);
         
         // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
@@ -306,61 +306,16 @@ CEP: 38400-200`;
           ? cleanAddress 
           : `${cleanAddress}, Uberlândia - MG, ${addr.cep}`;
         
-        // ✅ NOVO: GEOCODIFICAR ENDEREÇO
-        let coordinates = null;
-        
-        if (!cleanAddress.includes('(requer edição)')) {
-          try {
-            // ✅ TENTATIVA 1: ViaCEP (específico para Brasil)
-            console.log(`🔍 Geocodificando endereço ${index + 1}: ${fullAddress}`);
-            const viaCepUrl = `https://viacep.com.br/ws/${addr.cep}/json/`;
-            const viaCepResponse = await fetch(viaCepUrl);
-            
-            if (viaCepResponse.ok) {
-              const viaCepData = await viaCepResponse.json();
-              if (viaCepData && !viaCepData.erro) {
-                // ✅ ViaCEP retorna dados, mas não coordenadas. Vamos usar coordenadas padrão de Uberlândia
-                coordinates = {
-                  lat: -18.9186 + (Math.random() - 0.5) * 0.01, // Centro + variação
-                  lng: -48.2772 + (Math.random() - 0.5) * 0.01
-                };
-                console.log(`✅ ViaCEP: Endereço válido em ${viaCepData.localidade} - ${viaCepData.uf}`);
-              }
-            }
-          } catch (error) {
-            console.log(`⚠️ ViaCEP falhou:`, error);
-          }
-          
-          // ✅ TENTATIVA 2: Coordenadas padrão de Uberlândia (se ViaCEP não funcionou)
-          if (!coordinates) {
-            console.log(`🔍 Usando coordenadas padrão de Uberlândia`);
-            coordinates = {
-              lat: -18.9186 + (Math.random() - 0.5) * 0.02, // Centro + variação maior
-              lng: -48.2772 + (Math.random() - 0.5) * 0.02
-            };
-            console.log(`✅ Coordenadas padrão: ${coordinates.lat}, ${coordinates.lng}`);
-          }
-        }
-        
         const addressResult: AddressResult = {
           address: fullAddress, // ✅ ENDEREÇO COMPLETO PARA O MAPA
           confidence: 0.9,
-          extractedText: `${addr.objeto} - ${cleanAddress} - CEP: ${addr.cep}`,
-          coordinates: coordinates ? {
-            lat: coordinates.lat,
-            lng: coordinates.lng,
-            formatted_address: fullAddress
-          } : undefined
+          extractedText: `${addr.objeto} - ${cleanAddress} - CEP: ${addr.cep}`
         };
         
         console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${cleanAddress}`);
         console.log(`🗺️ Endereço para mapa: ${fullAddress}`);
-        if (coordinates) {
-          console.log(`📍 Coordenadas: ${coordinates.lat}, ${coordinates.lng}`);
-        }
         console.log(`📋 AddressResult criado:`, addressResult);
         return addressResult;
-      }));
       });
     }
 
