@@ -414,11 +414,11 @@ async function processPDFSimple(base64Data: string) {
 function extractCleanAddresses(text: string): string[] {
   const cleanAddresses: string[] = [];
   
-  // ✅ PADRÃO: "Rua/Avenida - de X/Y a Z/W, N CEP: XXXXXXXX"
-  const rangePattern = /([A-Za-zÀ-ÿ\s]+)\s*-\s*de\s+[\d\/\s]+a\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  // ✅ PADRÃO 1: "Rua/Avenida - de X/Y a Z/W, N CEP: XXXXXXXX"
+  const rangePattern1 = /([A-Za-zÀ-ÿ\s]+)\s*-\s*de\s+[\d\/\s]+a\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
   
   let match;
-  while ((match = rangePattern.exec(text)) !== null) {
+  while ((match = rangePattern1.exec(text)) !== null) {
     const [, fullAddress, singleNumber, cep] = match;
     
     // ✅ CONSTRUIR ENDEREÇO LIMPO: "Rua/Avenida, N, CEP: XXXXXXXX"
@@ -434,13 +434,13 @@ function extractCleanAddresses(text: string): string[] {
     
     cleanAddresses.push(cleanAddress);
     
-    console.log(`🎯 Endereço limpo extraído: ${cleanAddress}`);
+    console.log(`🎯 Endereço limpo extraído (padrão 1): ${cleanAddress}`);
   }
   
-  // ✅ PADRÃO ALTERNATIVO: "Rua/Avenida de X a Y, N CEP: XXXXXXXX"
-  const simpleRangePattern = /([A-Za-zÀ-ÿ\s]+)\s+de\s+[\d\s]+a\s+[\d\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  // ✅ PADRÃO 2: "Rua/Avenida de X a Y, N CEP: XXXXXXXX"
+  const rangePattern2 = /([A-Za-zÀ-ÿ\s]+)\s+de\s+[\d\s]+a\s+[\d\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
   
-  while ((match = simpleRangePattern.exec(text)) !== null) {
+  while ((match = rangePattern2.exec(text)) !== null) {
     const [, fullAddress, singleNumber, cep] = match;
     
     let cleanAddress = fullAddress.trim();
@@ -453,7 +453,64 @@ function extractCleanAddresses(text: string): string[] {
     
     cleanAddresses.push(cleanAddress);
     
-    console.log(`🎯 Endereço simples limpo: ${cleanAddress}`);
+    console.log(`🎯 Endereço limpo extraído (padrão 2): ${cleanAddress}`);
+  }
+  
+  // ✅ PADRÃO 3: "Rua/Avenida - até X/Y, N CEP: XXXXXXXX" (novo padrão encontrado)
+  const rangePattern3 = /([A-Za-zÀ-ÿ\s]+)\s*-\s*até\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  
+  while ((match = rangePattern3.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    if (singleNumber) {
+      cleanAddress += `, ${singleNumber}`;
+    }
+    
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído (padrão 3): ${cleanAddress}`);
+  }
+  
+  // ✅ PADRÃO 4: "Rua/Avenida até X/Y, N CEP: XXXXXXXX" (sem hífen)
+  const rangePattern4 = /([A-Za-zÀ-ÿ\s]+)\s+até\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  
+  while ((match = rangePattern4.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    if (singleNumber) {
+      cleanAddress += `, ${singleNumber}`;
+    }
+    
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído (padrão 4): ${cleanAddress}`);
+  }
+  
+  // ✅ PADRÃO 5: "Rua/Avenida - de X/Y até Z/W, N CEP: XXXXXXXX" (com "até" no meio)
+  const rangePattern5 = /([A-Za-zÀ-ÿ\s]+)\s*-\s*de\s+[\d\/\s]+até\s+[\d\/\s]+(?:,\s*(\d+))?\s*CEP:\s*(\d{8})/g;
+  
+  while ((match = rangePattern5.exec(text)) !== null) {
+    const [, fullAddress, singleNumber, cep] = match;
+    
+    let cleanAddress = fullAddress.trim();
+    
+    if (singleNumber) {
+      cleanAddress += `, ${singleNumber}`;
+    }
+    
+    cleanAddress += `, CEP: ${cep}`;
+    
+    cleanAddresses.push(cleanAddress);
+    
+    console.log(`🎯 Endereço limpo extraído (padrão 5): ${cleanAddress}`);
   }
   
   console.log(`✅ Total de endereços limpos extraídos: ${cleanAddresses.length}`);
