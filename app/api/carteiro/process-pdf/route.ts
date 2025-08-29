@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         const base64Data = buffer.toString('base64');
         console.log('🧠 Chamando processCarteiroFileFromBuffer para PDF...');
         try {
-          result = await processCarteiroFileFromBuffer(base64Data, file.name, userLocation);
+        result = await processCarteiroFileFromBuffer(base64Data, file.name, userLocation);
           console.log('✅ processCarteiroFileFromBuffer retornou com sucesso');
         } catch (pdfProcessingError) {
           console.error('❌ ERRO CRÍTICO em processCarteiroFileFromBuffer:', pdfProcessingError);
@@ -776,7 +776,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         destinatario: 'Localização a ser extraída',
         coordinates: undefined,
         geocoded: false,
-        cepData: [] // ✅ NOVA PROPRIEDADE: Armazenar CEPs para análise posterior
+        cepData: [] as Array<{ cep: string; line: string; position: number }> // ✅ NOVA PROPRIEDADE: Armazenar CEPs para análise posterior
       };
       
       console.log(`✅ NOVO OBJETO ECT: ${trimmedLine} (sequência ${sequence})`);
@@ -801,10 +801,10 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
     if (currentAddress && currentAddress.cep.includes('ser extraído')) {
       // ✅ VERIFICAR SE A LINHA CONTÉM APENAS CEP (sem outros dados)
       if (trimmedLine.startsWith('CEP:') || trimmedLine.match(/^\d{8}$/) || trimmedLine.match(/^\d{5}-\d{3}$/)) {
-        const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
-        if (cepMatch) {
-          const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
-          if (cep) {
+      const cepMatch = trimmedLine.match(/(\d{8})|(\d{5}-\d{3})/);
+      if (cepMatch) {
+        const cep = cepMatch[1] || cepMatch[2]?.replace('-', '');
+        if (cep) {
             // ✅ IMPORTANTE: NÃO ASSOCIAR CEP IMEDIATAMENTE - ARMAZENAR PARA ANÁLISE POSTERIOR
             if (!currentAddress.cepData) {
               currentAddress.cepData = [];
@@ -892,10 +892,13 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
 
       // ✅ VALIDAR E LIMPAR ENDEREÇOS (mesma lógica das imagens)
     return addresses.map((addr, index) => {
-      // ✅ LIMPAR O ENDEREÇO (remover prefixos desnecessários CORRETAMENTE)
+      // ✅ CORREÇÃO CRÍTICA: Aplicar endereço limpo APENAS se necessário
       let cleanAddress = addr.endereco;
       
-              // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
+            // ✅ APLICAR LIMPEZA APENAS SE O ENDEREÇO ORIGINAL TEM PREFIXO "Endereço:"
+      if (addr.endereco.includes('Endereço:') || addr.endereco.includes('ndereço:')) {
+        
+        // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
         const addressPrefixes = [
           'ndereço:\t', 'ndereço:', 'ndereço',
           'Endereço:\t', 'Endereço:', 'Endereço',
@@ -903,13 +906,18 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
           'ndereçc\t', 'ndereçc'
         ];
         
-        // ✅ REMOVER CADA PREFIXO ENCONTRADO
+        // ✅ CORREÇÃO CRÍTICA: Remover TODOS os prefixos de endereço
         for (const prefix of addressPrefixes) {
           if (cleanAddress.includes(prefix)) {
             cleanAddress = cleanAddress.replace(prefix, '').trim();
             console.log(`🧹 Prefixo removido do PDF: "${prefix}" → "${cleanAddress}"`);
-            break; // Remove apenas o primeiro prefixo encontrado
           }
+        }
+        
+        // ✅ CORREÇÃO ADICIONAL: Remover qualquer "Endereço:" restante
+        if (cleanAddress.startsWith('Endereço:')) {
+          cleanAddress = cleanAddress.replace('Endereço:', '').trim();
+          console.log(`🧹 "Endereço:" removido: "${cleanAddress}"`);
         }
         
         // ✅ REMOVER TABULAÇÕES E ESPAÇOS EXTRA
@@ -920,10 +928,15 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
           cleanAddress = cleanAddress.substring(1).trim();
           console.log(`🔧 "E" inicial removido: "${cleanAddress}"`);
         }
+        
+        // ✅ APLICAR ENDEREÇO LIMPO
+        addr.endereco = cleanAddress;
+        console.log(`✅ Endereço ${index + 1} limpo: "${cleanAddress}"`);
+      }
       
       // ✅ SE AINDA TEM "ser extraído", usar fallback
-      if (cleanAddress.includes('ser extraído')) {
-        cleanAddress = `Endereço ${index + 1} (requer edição)`;
+      if (addr.endereco.includes('ser extraído')) {
+        addr.endereco = `Endereço ${index + 1} (requer edição)`;
       }
       
       // ✅ VALIDAR CEP (CORRIGIDO E MELHORADO)
@@ -934,7 +947,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
           addr.cep = cepFromAddress[1];
           console.log(`🔍 CEP extraído do endereço: ${addr.cep}`);
         } else {
-          addr.cep = 'CEP não encontrado';
+        addr.cep = 'CEP não encontrado';
           console.log(`⚠️ CEP não encontrado para endereço: ${addr.endereco}`);
         }
       }

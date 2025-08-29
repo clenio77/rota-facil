@@ -848,9 +848,16 @@ function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   // ✅ USAR PONTO INICIAL E FINAL (localização do usuário) + endereços de entrega
   const startPoint = optimizedRoute.find(point => point.isStartPoint);
   const endPoint = optimizedRoute.find(point => point.isEndPoint);
+  
+  // ✅ CORREÇÃO CRÍTICA: Usar startLocation diretamente em vez de filtrar
   const deliveryPoints = optimizedRoute.filter(point => 
     !point.isStartPoint && !point.isEndPoint
   );
+  
+  console.log('🔍 DEBUG: Pontos encontrados na rota otimizada:');
+  console.log('📍 Ponto inicial:', startPoint);
+  console.log('📍 Ponto final:', endPoint);
+  console.log('📍 Total de pontos de entrega:', deliveryPoints.length);
   
   if (deliveryPoints.length === 0) {
     console.log('⚠️ Nenhum ponto de entrega para incluir na rota');
@@ -877,14 +884,16 @@ function generateGoogleMapsUrl(optimizedRoute, startLocation) {
  */
 function generateSingleGoogleMapsUrl(deliveryPoints, startLocation) {
   console.log('🗺️ Gerando URL única do Google Maps...');
+  console.log('🔍 DEBUG: startLocation recebida:', startLocation);
   
   const baseUrl = 'https://www.google.com/maps/dir/';
   
-  // ✅ ORIGEM: Localização do usuário
+  // ✅ CORREÇÃO CRÍTICA: SEMPRE usar localização do usuário como origem e destino
   const origin = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
-  
-  // ✅ DESTINO: Localização do usuário (rota circular)
   const destination = encodeURIComponent(`${startLocation.lat},${startLocation.lng}`);
+  
+  console.log('📍 Origem (usuário):', `${startLocation.lat},${startLocation.lng}`);
+  console.log('🏁 Destino (usuário):', `${startLocation.lat},${startLocation.lng}`);
   
   // ✅ WAYPOINTS: Endereços em ordem otimizada
   const waypoints = deliveryPoints.map(point => {
