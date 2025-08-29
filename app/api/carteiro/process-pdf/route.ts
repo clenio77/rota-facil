@@ -561,35 +561,40 @@ interface AddressRange {
   cep: string;
 }
 
-// ✅ NOVA FUNÇÃO: Processar PDF de forma simples
-async function processPDFSimple(base64Data: string) {
-  const formData = new FormData();
-  formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
-  formData.append('language', 'por');
-  formData.append('isOverlayRequired', 'false');
-  formData.append('detectOrientation', 'true');
-  formData.append('scale', 'true');
-  formData.append('OCREngine', '2');
-  formData.append('filetype', 'pdf');
-  formData.append('isTable', 'true');
+// ✅ NOVA FUNÇÃO: Processar PDF de forma simples COM RETRY E TIMEOUT AUMENTADO
+async function processPDFSimple(base64Data: string, retryCount = 0): Promise<string> {
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 180000; // ✅ AUMENTADO: 3 minutos para PDFs grandes
   
-  console.log('📤 Enviando PDF para OCR.space...');
+  try {
+    const formData = new FormData();
+    formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
+    formData.append('language', 'por');
+    formData.append('isOverlayRequired', 'false');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    formData.append('OCREngine', '2');
+    formData.append('filetype', 'pdf');
+    formData.append('isTable', 'true');
+    
+    console.log(`📤 Enviando PDF para OCR.space (tentativa ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+    console.log(`⏱️ Timeout configurado: ${TIMEOUT_MS / 1000} segundos`);
 
-  const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
-    method: 'POST',
-    body: formData,
-    headers: {
-      'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
-    },
-    signal: AbortSignal.timeout(90000) // 90 segundos para PDFs
-  });
+    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS) // ✅ TIMEOUT AUMENTADO
+    });
 
-  if (!ocrResponse.ok) {
-    throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
-  }
+    if (!ocrResponse.ok) {
+      throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
+    }
 
-  const ocrData = await ocrResponse.json();
-  console.log('📥 Resposta recebida do OCR.space');
+    const ocrData = await ocrResponse.json();
+    console.log('📥 Resposta recebida do OCR.space');
   
   // ✅ IMPORTANTE: Processar TODAS as páginas disponíveis
   let extractedText = '';
@@ -624,6 +629,22 @@ async function processPDFSimple(base64Data: string) {
 
   console.log('✅ PDF processado sem erros');
   return extractedText;
+  
+  } catch (error) {
+    console.log(`❌ Tentativa ${retryCount + 1} falhou:`, error);
+    
+    // ✅ RETRY LOGIC: Tentar novamente se ainda não atingiu o limite
+    if (retryCount < MAX_RETRIES) {
+      console.log(`🔄 Tentando novamente em 5 segundos... (${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // ✅ Esperar 5 segundos
+      return processPDFSimple(base64Data, retryCount + 1); // ✅ RECURSÃO COM RETRY
+    }
+    
+    // ✅ ÚLTIMA TENTATIVA FALHOU
+    console.error(`❌ Todas as ${MAX_RETRIES + 1} tentativas falharam`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`OCR.space falhou após ${MAX_RETRIES + 1} tentativas: ${errorMessage}`);
+  }
 }
 
 // ✅ FUNÇÃO: Extrair endereços limpos (sem faixas de numeração)
