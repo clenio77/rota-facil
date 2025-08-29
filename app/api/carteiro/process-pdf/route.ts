@@ -377,6 +377,9 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     
     console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados e limpos`);
 
+    // ✅ DEBUG: Verificar se chegou até aqui
+    console.log('🔍 DEBUG: Chegou até a geocodificação dos endereços');
+
     // ✅ NOVO: GEOCODIFICAR ENDEREÇOS
     console.log('🗺️ Iniciando geocodificação dos endereços...');
     console.log(`🔍 Total de endereços para geocodificar: ${addresses.length}`);
