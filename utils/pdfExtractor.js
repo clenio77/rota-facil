@@ -845,19 +845,18 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   console.log('🗺️ Gerando URL do Google Maps automaticamente...');
   
-  // ✅ USAR PONTO INICIAL E FINAL (localização do usuário) + endereços de entrega
-  const startPoint = optimizedRoute.find(point => point.isStartPoint);
-  const endPoint = optimizedRoute.find(point => point.isEndPoint);
+  // ✅ CORREÇÃO CRÍTICA: SEMPRE usar startLocation como origem e destino
+  console.log('🔍 DEBUG: startLocation recebida:', startLocation);
+  console.log('🔍 DEBUG: Rota otimizada recebida:', optimizedRoute.length, 'pontos');
   
-  // ✅ CORREÇÃO CRÍTICA: Usar startLocation diretamente em vez de filtrar
+  // ✅ FILTRAR APENAS OS PONTOS DE ENTREGA (não início/fim)
   const deliveryPoints = optimizedRoute.filter(point => 
     !point.isStartPoint && !point.isEndPoint
   );
   
   console.log('🔍 DEBUG: Pontos encontrados na rota otimizada:');
-  console.log('📍 Ponto inicial:', startPoint);
-  console.log('📍 Ponto final:', endPoint);
   console.log('📍 Total de pontos de entrega:', deliveryPoints.length);
+  console.log('📍 startLocation será usado como origem e destino');
   
   if (deliveryPoints.length === 0) {
     console.log('⚠️ Nenhum ponto de entrega para incluir na rota');
