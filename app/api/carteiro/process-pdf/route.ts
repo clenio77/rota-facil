@@ -379,6 +379,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
 
     // ✅ DEBUG: Verificar se chegou até aqui
     console.log('🔍 DEBUG: Chegou até a geocodificação dos endereços');
+    console.log('🔍 DEBUG: Continuando execução...');
 
     // ✅ NOVO: GEOCODIFICAR ENDEREÇOS
     console.log('🗺️ Iniciando geocodificação dos endereços...');
