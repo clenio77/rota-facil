@@ -375,6 +375,9 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       }
     }
     
+    // ✅ DEBUG: Verificar se chegou até aqui
+    console.log('🔍 DEBUG: Chegou até o final da limpeza de endereços');
+    
     console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados e limpos`);
 
     // ✅ DEBUG: Verificar se chegou até aqui
