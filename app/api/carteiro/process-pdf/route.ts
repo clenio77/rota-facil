@@ -463,6 +463,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       geocoded: geocodedCount,
       addresses: addresses,
       fileType: 'pdf',
+      userLocation: userLocation, // ✅ INCLUIR LOCALIZAÇÃO DO USUÁRIO
       metadata: {
         extractedAt: new Date().toISOString(),
         fileName,
