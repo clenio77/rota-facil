@@ -895,7 +895,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       // ✅ CORREÇÃO CRÍTICA: Aplicar endereço limpo APENAS se necessário
       let cleanAddress = addr.endereco;
       
-            // ✅ APLICAR LIMPEZA APENAS SE O ENDEREÇO ORIGINAL TEM PREFIXO "Endereço:"
+            // ✅ CORREÇÃO CRÍTICA: SEMPRE limpar prefixos "Endereço:" (não apenas quando necessário)
       if (addr.endereco.includes('Endereço:') || addr.endereco.includes('ndereço:')) {
         
         // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
