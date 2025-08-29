@@ -1094,11 +1094,10 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       console.log(`✅ Endereço ${index + 1} processado: ${addr.objeto} - ${addr.endereco} (CEP: ${addr.cep})`);
       return addr;
     });
-}
 
-// Configuração para aceitar uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+    // ✅ IMPORTANTE: Retornar endereços processados
+    console.log(`✅ Total de endereços processados: ${addresses.length}`);
+    return addresses;
+  }
+
+  // ✅ FUNÇÃO: Processar PDF de forma simples COM RETRY E TIMEOUT AUMENTADO

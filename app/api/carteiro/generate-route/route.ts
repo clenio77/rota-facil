@@ -15,6 +15,7 @@ interface RouteRequest {
   totalItems: number;
   city: string;
   state: string;
+  userLocation?: {lat: number; lng: number; city?: string; state?: string}; // ✅ ADICIONAR LOCALIZAÇÃO DO USUÁRIO
 }
 
 export async function POST(request: NextRequest) {
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
     };
 
     // ✅ GERAR NOVA URL DO GOOGLE MAPS COM ROTA OTIMIZADA E LOCALIZAÇÃO DO USUÁRIO
+    console.log('🔍 DEBUG: userLocation recebida:', data.userLocation);
+    console.log('🔍 DEBUG: userLocation type:', typeof data.userLocation);
+    console.log('🔍 DEBUG: userLocation.lat:', data.userLocation?.lat);
+    console.log('🔍 DEBUG: userLocation.lng:', data.userLocation?.lng);
+    
     const googleMapsUrl = generateGoogleMapsUrl(optimizedItems, data.userLocation);
     
     if (!googleMapsUrl) {

@@ -457,7 +457,8 @@ export default function CarteiroPage() {
 
     const updatedData = {
       ...processedData,
-      items: editableItems
+      items: editableItems,
+      userLocation: userLocation // ✅ ADICIONAR LOCALIZAÇÃO DO USUÁRIO
     };
 
     try {
