@@ -122,8 +122,16 @@ export async function POST(request: NextRequest) {
       
       // ✅ NOVO: ROTEAMENTO AUTOMÁTICO INTELIGENTE
       console.log('🚀 Iniciando roteamento automático...');
+      console.log('📍 Localização do usuário para roteamento:', JSON.stringify(userLocation, null, 2));
+      console.log('🔍 Total de endereços para otimizar:', result.addresses.length);
+      console.log('🔍 Primeiros 3 endereços:', result.addresses.slice(0, 3).map(addr => ({
+        endereco: addr.endereco,
+        cep: addr.cep,
+        coordinates: addr.coordinates
+      })));
       
       // ✅ GERAR ROTA OTIMIZADA AUTOMATICAMENTE
+      console.log('🧠 Chamando generateOptimizedRoute...');
       const optimizedRoute = generateOptimizedRoute(result.addresses, userLocation);
       
       if (!optimizedRoute.success) {
