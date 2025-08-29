@@ -2,16 +2,16 @@
 
 import React, { useState, useCallback } from 'react';
 
-// ✅ IMPORTAR TIPO ECTItem
+// ✅ IMPORTAR TIPO ECTItem do arquivo principal
 interface ECTItem {
-  id: string;
   sequence: number;
   objectCode: string;
   address: string;
-  cep: string;
-  lat: number;
-  lng: number;
+  cep?: string;
+  lat?: number;
+  lng?: number;
   correctedAddress?: string;
+  id?: string; // ✅ ID opcional para compatibilidade
 }
 
 // ✅ INTERFACE: Configuração de Automação

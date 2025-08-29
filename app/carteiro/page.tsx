@@ -107,11 +107,12 @@ interface AutoRouteConfig {
   };
 }
 
+// ✅ INTERFACE: Rota Agendada (usando ECTItem para compatibilidade)
 interface ScheduledRoute {
   id: string;
   date: string;
   time: string;
-  items: ECTItem[]; // ✅ USAR ECTItem em vez de RouteItem
+  items: ECTItem[];
   status: 'pending' | 'processing' | 'ready' | 'delivered';
 }
 
@@ -776,13 +777,11 @@ export default function CarteiroPage() {
                     🚀 Abrir no Google Maps
                   </a>
                   <div className="mt-3 text-sm text-green-700">
-                    <p>📍 <strong>Origem:</strong> {processedData.items?.[0]?.address || 'Primeiro endereço'}</p>
-                    <p>🏁 <strong>Destino:</strong> {processedData.items?.[processedData.items.length - 1]?.address || 'Último endereço'}</p>
-                    {userLocation && (
-                      <p className="text-xs mt-2 bg-green-200 p-2 rounded">
-                        💡 <strong>Dica:</strong> Sua localização será usada como ponto de partida e chegada
-                      </p>
-                    )}
+                    <p>📍 <strong>Origem:</strong> Sua localização atual ({userLocation?.lat?.toFixed(6)}, {userLocation?.lng?.toFixed(6)})</p>
+                    <p>🏁 <strong>Destino:</strong> Sua localização atual ({userLocation?.lat?.toFixed(6)}, {userLocation?.lng?.toFixed(6)})</p>
+                    <p className="text-xs mt-2 bg-green-200 p-2 rounded">
+                      ✅ <strong>Rota Circular:</strong> Inicia e termina na sua localização
+                    </p>
                   </div>
                 </div>
               )}
