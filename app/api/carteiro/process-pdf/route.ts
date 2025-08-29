@@ -371,6 +371,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
 
     // ✅ NOVO: GEOCODIFICAR ENDEREÇOS
     console.log('🗺️ Iniciando geocodificação dos endereços...');
+    console.log(`🔍 Total de endereços para geocodificar: ${addresses.length}`);
     let geocodedCount = 0;
     
     for (let i = 0; i < addresses.length; i++) {
