@@ -456,6 +456,16 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     }
     
     console.log(`✅ Geocodificação concluída: ${geocodedCount}/${addresses.length} endereços geocodificados`);
+    
+    // ✅ DEBUG: Verificar coordenadas dos endereços
+    console.log('🔍 Verificando coordenadas dos endereços...');
+    addresses.forEach((addr, index) => {
+      if (addr.coordinates) {
+        console.log(`📍 Endereço ${index + 1}: ${addr.coordinates.lat}, ${addr.coordinates.lng}`);
+      } else {
+        console.log(`❌ Endereço ${index + 1}: Sem coordenadas`);
+      }
+    });
 
     return {
       success: true,
