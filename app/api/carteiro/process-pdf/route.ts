@@ -76,7 +76,15 @@ export async function POST(request: NextRequest) {
       if (fileType === 'pdf') {
         // ✅ PARA PDF: Converter para base64 e processar
         const base64Data = buffer.toString('base64');
-        result = await processCarteiroFileFromBuffer(base64Data, file.name, userLocation);
+        console.log('🧠 Chamando processCarteiroFileFromBuffer para PDF...');
+        try {
+          result = await processCarteiroFileFromBuffer(base64Data, file.name, userLocation);
+          console.log('✅ processCarteiroFileFromBuffer retornou com sucesso');
+        } catch (pdfProcessingError) {
+          console.error('❌ ERRO CRÍTICO em processCarteiroFileFromBuffer:', pdfProcessingError);
+          console.error('Stack trace:', pdfProcessingError instanceof Error ? pdfProcessingError.stack : 'Sem stack');
+          throw pdfProcessingError;
+        }
       } else {
         // ✅ PARA OUTROS FORMATOS: Criar arquivo temporário apenas se necessário
         const tempDir = path.join(process.cwd(), 'temp');
@@ -182,6 +190,7 @@ export async function POST(request: NextRequest) {
 // ✅ NOVA FUNÇÃO: Processar PDF diretamente do buffer
 async function processCarteiroFileFromBuffer(base64Data: string, fileName: string, userLocation: unknown) {
   try {
+    console.log('🚀 INÍCIO: processCarteiroFileFromBuffer foi chamada');
     console.log('🔍 Processando PDF diretamente do buffer...');
     
     // ✅ ABORDAGEM SIMPLES: PROCESSAR PDF COMO IMAGEM INDIVIDUAL
@@ -379,6 +388,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     console.log('🔍 DEBUG: Chegou até o final da limpeza de endereços');
     
     console.log(`✅ PDF processado com sucesso: ${addresses.length} endereços encontrados e limpos`);
+    console.log('🔍 DEBUG: PASSOU do log de sucesso - função continua...');
 
     // ✅ DEBUG: Verificar se chegou até aqui
     console.log('🔍 DEBUG: Chegou até a geocodificação dos endereços');
