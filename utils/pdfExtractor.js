@@ -693,12 +693,23 @@ function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   }
   
   // ✅ FILTRAR ENDEREÇOS COM COORDENADAS
+  console.log('🔍 Verificando coordenadas dos endereços recebidos...');
+  geocodedAddresses.forEach((addr, index) => {
+    if (addr.coordinates) {
+      console.log(`📍 Endereço ${index + 1}: ${addr.coordinates.lat}, ${addr.coordinates.lng}`);
+    } else {
+      console.log(`❌ Endereço ${index + 1}: Sem coordenadas`);
+    }
+  });
+  
   const validAddresses = geocodedAddresses.filter(addr => 
     addr.coordinates && addr.coordinates.lat && addr.coordinates.lng
   );
   
   if (validAddresses.length === 0) {
     console.log('⚠️ Nenhum endereço com coordenadas válidas');
+    console.log('🔍 Total de endereços recebidos:', geocodedAddresses.length);
+    console.log('🔍 Endereços sem coordenadas:', geocodedAddresses.length - validAddresses.length);
     return {
       success: false,
       error: 'Nenhum endereço com coordenadas válidas encontrado'
@@ -834,7 +845,9 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 function generateGoogleMapsUrl(optimizedRoute, startLocation) {
   console.log('🗺️ Gerando URL do Google Maps automaticamente...');
   
-  // ✅ FILTRAR APENAS ENDEREÇOS DE ENTREGA (não pontos inicial/final)
+  // ✅ USAR PONTO INICIAL E FINAL (localização do usuário) + endereços de entrega
+  const startPoint = optimizedRoute.find(point => point.isStartPoint);
+  const endPoint = optimizedRoute.find(point => point.isEndPoint);
   const deliveryPoints = optimizedRoute.filter(point => 
     !point.isStartPoint && !point.isEndPoint
   );
