@@ -85,27 +85,31 @@ export async function POST(request: NextRequest) {
     const optimizedItems = optimizeRouteForDelivery(data.items);
     console.log(`🎯 Rota otimizada: ${optimizedItems.length} endereços reorganizados`);
 
-    // ✅ FORMATO IDEAL PARA GOOGLE MAPS: Endereços OTIMIZADOS
-    const generateGoogleMapsUrl = (items: ECTItem[]) => {
+    // ✅ FORMATO IDEAL PARA GOOGLE MAPS: Endereços OTIMIZADOS COM LOCALIZAÇÃO DO USUÁRIO
+    const generateGoogleMapsUrl = (items: ECTItem[], userLocation?: {lat: number; lng: number; city?: string; state?: string}) => {
       if (items.length === 0) return null;
+      
+      // ✅ CORREÇÃO CRÍTICA: SEMPRE usar localização do usuário como origem e destino
+      const startLocation = userLocation ? `${userLocation.lat},${userLocation.lng}` : 'Sua localização';
       
       if (items.length === 1) {
         // ✅ ENDEREÇO ÚNICO: Formato simples e direto
         const address = items[0].address;
         const params = new URLSearchParams({
           api: '1',
-          destination: address,
+          origin: startLocation,
+          destination: startLocation, // ✅ VOLTAR PARA LOCALIZAÇÃO DO USUÁRIO
           travelmode: 'driving'
         });
         return `https://www.google.com/maps/dir/?${params.toString()}`;
       }
 
-      // ✅ MÚLTIPLOS ENDEREÇOS: Formato otimizado para rotas
-      const origin = items[0].address;
-      const destination = items[items.length - 1].address;
+      // ✅ MÚLTIPLOS ENDEREÇOS: Formato otimizado para rotas CIRCULARES
+      const origin = startLocation; // ✅ ORIGEM: Localização do usuário
+      const destination = startLocation; // ✅ DESTINO: Localização do usuário
       
-      // ✅ WAYPOINTS: Endereços intermediários OTIMIZADOS (sem origem e destino)
-      const waypoints = items.slice(1, -1).map(item => item.address).join('|');
+      // ✅ WAYPOINTS: TODOS os endereços como pontos de entrega
+      const waypoints = items.map(item => item.address).join('|');
 
       const params = new URLSearchParams({
         api: '1',
@@ -118,15 +122,15 @@ export async function POST(request: NextRequest) {
       const finalUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
       
       console.log('🗺️ Nova URL do Google Maps OTIMIZADA:', finalUrl);
-      console.log('📍 Origem:', origin);
-      console.log('🏁 Destino:', destination);
-      console.log('📍 Waypoints otimizados:', waypoints);
+      console.log('📍 Origem (usuário):', startLocation);
+      console.log('🏁 Destino (usuário):', startLocation);
+      console.log('📍 Waypoints (entrega):', waypoints);
       
       return finalUrl;
     };
 
-    // ✅ GERAR NOVA URL DO GOOGLE MAPS COM ROTA OTIMIZADA
-    const googleMapsUrl = generateGoogleMapsUrl(optimizedItems);
+    // ✅ GERAR NOVA URL DO GOOGLE MAPS COM ROTA OTIMIZADA E LOCALIZAÇÃO DO USUÁRIO
+    const googleMapsUrl = generateGoogleMapsUrl(optimizedItems, data.userLocation);
     
     if (!googleMapsUrl) {
       return NextResponse.json(
