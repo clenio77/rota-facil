@@ -286,6 +286,69 @@ export async function POST(request: NextRequest) {
       return route;
     };
 
+    // ✅ FUNÇÃO: Interpolação inteligente de coordenadas por número de casa
+    const interpolateStreetCoordinate = (streetName: string, houseNumber: number) => {
+      const streetInterpolationRanges: {[key: string]: {
+        start: {number: number; lat: number; lng: number};
+        end: {number: number; lat: number; lng: number};
+        region: string;
+      }} = {
+        // João Pinheiro - interpolação baseada nos números conhecidos
+        'joão pinheiro': {
+          start: { number: 1000, lat: -18.9210, lng: -48.2760 },
+          end: { number: 5000, lat: -18.9180, lng: -48.2790 },
+          region: 'Centro-Norte'
+        },
+        // Rio Grande do Sul - interpolação precisa
+        'rio grande do sul': {
+          start: { number: 800, lat: -18.9140, lng: -48.2755 },
+          end: { number: 1200, lat: -18.9155, lng: -48.2770 },
+          region: 'Centro-Leste'
+        },
+        // Avenida Brasil - interpolação norte-sul
+        'brasil': {
+          start: { number: 2000, lat: -18.9220, lng: -48.2810 },
+          end: { number: 4000, lat: -18.9240, lng: -48.2830 },
+          region: 'Norte'
+        },
+        // Cesário Alvim - interpolação leste-oeste
+        'cesário alvim': {
+          start: { number: 1000, lat: -18.9240, lng: -48.2830 },
+          end: { number: 4000, lat: -18.9260, lng: -48.2850 },
+          region: 'Tibery'
+        },
+        // Jataí - interpolação entre avenidas
+        'jatai': {
+          start: { number: 500, lat: -18.9200, lng: -48.2790 },
+          end: { number: 1500, lat: -18.9215, lng: -48.2805 },
+          region: 'Centro-Norte'
+        }
+      };
+
+      const range = streetInterpolationRanges[streetName];
+      if (!range) return null;
+
+      // ✅ VERIFICAR SE O NÚMERO ESTÁ DENTRO DO RANGE
+      if (houseNumber < range.start.number || houseNumber > range.end.number) {
+        return null; // Fora do range conhecido
+      }
+
+      // ✅ CALCULAR INTERPOLAÇÃO LINEAR
+      const ratio = (houseNumber - range.start.number) / (range.end.number - range.start.number);
+      const interpolatedLat = range.start.lat + (range.end.lat - range.start.lat) * ratio;
+      const interpolatedLng = range.start.lng + (range.end.lng - range.start.lng) * ratio;
+
+      // ✅ ADICIONAR PEQUENA VARIAÇÃO PARA EVITAR SOBREPOSIÇÃO
+      const latVariation = (Math.random() - 0.5) * 0.0002; // ~22 metros de variação
+      const lngVariation = (Math.random() - 0.5) * 0.0002;
+
+      return {
+        lat: interpolatedLat + latVariation,
+        lng: interpolatedLng + lngVariation,
+        region: range.region
+      };
+    };
+
     // ✅ FUNÇÃO: Mapear CEPs e ruas para coordenadas reais de Uberlândia
     const getRealCoordinatesFromAddress = (address: string, cep?: string) => {
       const uberlandiaRegions: {[key: string]: {lat: number; lng: number; region: string}} = {
@@ -351,7 +414,7 @@ export async function POST(request: NextRequest) {
       const streetName = addressLower.replace(/,?\s*\d+.*/, '').replace(/^(rua|avenida|av\.?)\s+/i, '');
       
       if (numberMatch) {
-        const number = numberMatch[1];
+        const number = parseInt(numberMatch[1]);
         const specificKey = `${streetName}, ${number}`;
         
         console.log(`🔍 Buscando mapeamento específico para: "${specificKey}"`);
@@ -360,6 +423,14 @@ export async function POST(request: NextRequest) {
           const coords = specificAddressMappings[specificKey];
           console.log(`🎯 ENDEREÇO ESPECÍFICO mapeado: ${specificKey} → ${coords.lat}, ${coords.lng} (${coords.region})`);
           return coords;
+        }
+        
+        // ✅ INTERPOLAÇÃO INTELIGENTE POR NÚMERO DE CASA
+        console.log(`🧮 Tentando interpolação para: ${streetName} ${number}`);
+        const interpolatedCoords = interpolateStreetCoordinate(streetName, number);
+        if (interpolatedCoords) {
+          console.log(`📊 COORDENADA INTERPOLADA: ${streetName} ${number} → ${interpolatedCoords.lat}, ${interpolatedCoords.lng}`);
+          return interpolatedCoords;
         }
       }
 

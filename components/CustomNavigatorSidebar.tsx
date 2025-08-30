@@ -376,8 +376,8 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
 
       {/* ✅ ÁREA PRINCIPAL - MAPA E CONTROLES */}
       <div className="flex-1 flex flex-col">
-        {/* Header Principal */}
-        <div className="bg-blue-600 text-white p-3 shadow-lg flex justify-between items-center">
+        {/* Header Principal - FIXO NO TOPO */}
+        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-3 shadow-lg flex justify-between items-center z-30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -420,9 +420,9 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
           </div>
         </div>
 
-        {/* INFO DA PARADA ATUAL - COMPACTO */}
+        {/* INFO DA PARADA ATUAL - COMPACTO E FIXO */}
         {isNavigating && (
-          <div className="bg-blue-700 text-white p-3">
+          <div className="fixed top-16 left-0 right-0 bg-blue-700 text-white p-3 z-20">
             {(() => {
               const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
               
@@ -463,8 +463,8 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
           </div>
         )}
 
-        {/* ✅ MAPA PRINCIPAL */}
-        <div className="flex-1 relative">
+        {/* ✅ MAPA PRINCIPAL - AJUSTADO PARA HEADERS FIXOS */}
+        <div className={`flex-1 relative ${isNavigating ? 'mt-32' : 'mt-16'}`}>
           <MapContainer
             center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
             zoom={15}
