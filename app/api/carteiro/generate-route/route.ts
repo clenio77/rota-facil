@@ -132,10 +132,10 @@ export async function POST(request: NextRequest) {
     // ✅ FUNÇÃO: Mapear CEPs e ruas para coordenadas reais de Uberlândia
     const getRealCoordinatesFromAddress = (address: string, cep?: string) => {
       const uberlandiaRegions: {[key: string]: {lat: number; lng: number; region: string}} = {
-        // Centro
+        // Centro (COORDENADAS CORRIGIDAS)
         '38400-700': { lat: -18.9185, lng: -48.2773, region: 'Centro' },
         '38400-704': { lat: -18.9195, lng: -48.2783, region: 'Centro' },
-        '38400-708': { lat: -18.9205, lng: -48.2793, region: 'Centro' },
+        '38400-708': { lat: -18.9186, lng: -48.2774, region: 'Centro' }, // ✅ CORRIGIDO: Afonso Pena centro
         '38400-712': { lat: -18.9215, lng: -48.2803, region: 'Centro-Norte' },
         '38400-714': { lat: -18.9225, lng: -48.2813, region: 'Norte' },
         '38400-718': { lat: -18.9235, lng: -48.2823, region: 'Norte' },
@@ -168,10 +168,10 @@ export async function POST(request: NextRequest) {
       const streetMappings = {
         'joão pinheiro': { lat: -18.9220, lng: -48.2810, region: 'Norte' },
         'cesário alvim': { lat: -18.9250, lng: -48.2840, region: 'Tibery' },
-        'afonso pena': { lat: -18.9200, lng: -48.2790, region: 'Centro' },
+        'afonso pena': { lat: -18.9187, lng: -48.2775, region: 'Centro' }, // ✅ CORRIGIDO: Centro real
         'brasil': { lat: -18.9230, lng: -48.2820, region: 'Norte' },
-        'floriano peixoto': { lat: -18.9190, lng: -48.2780, region: 'Centro' },
-        'amazonas': { lat: -18.9170, lng: -48.2760, region: 'Centro-Sul' },
+        'floriano peixoto': { lat: -18.9192, lng: -48.2781, region: 'Centro' }, // ✅ CORRIGIDO
+        'amazonas': { lat: -18.9172, lng: -48.2762, region: 'Centro-Sul' }, // ✅ CORRIGIDO
         'rio grande do sul': { lat: -18.9140, lng: -48.2730, region: 'Centro-Leste' },
         'artur gonçalves': { lat: -18.9240, lng: -48.2830, region: 'Tibery' },
         'jatai': { lat: -18.9160, lng: -48.2750, region: 'Nossa Senhora Aparecida' },
