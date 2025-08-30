@@ -1052,12 +1052,16 @@ export default function CarteiroPage() {
                                 hereMapsUrl += `?${waypointParams}`;
                               }
                               
+                              // ✅ DEBUG COMPLETO DA URL
                               console.log('🗺️ HERE Maps URL Final:', hereMapsUrl);
-                              console.log('📍 Waypoints:', {
-                                origin: `${origin.lat},${origin.lng}`,
-                                destination: `${destination.lat},${destination.lng}`,
-                                intermediate: intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`)
-                              });
+                              console.log('📍 Total de coordenadas:', coords.length);
+                              console.log('📍 Origem:', origin);
+                              console.log('📍 Destino:', destination);
+                              console.log('📍 Waypoints intermediários:', intermediateWaypoints.length);
+                              console.log('📍 Todas as coordenadas:', coords);
+                              
+                              // ✅ MOSTRAR URL PARA O USUÁRIO VERIFICAR
+                              alert(`🔍 DEBUG HERE MAPS:\n\nTotal pontos: ${coords.length}\nWaypoints intermediários: ${intermediateWaypoints.length}\n\nURL: ${hereMapsUrl}\n\nVerifique o console para detalhes completos.`);
                               
                               window.open(hereMapsUrl, '_blank');
                             }
@@ -1068,17 +1072,31 @@ export default function CarteiroPage() {
                         </button>
                         <button 
                           onClick={() => {
-                            // ✅ ALTERNATIVA: OPENROUTESERVICE (sem limitações)
+                            // ✅ FORÇA MÚLTIPLOS LINKS SEQUENCIAIS
                             const coords = processedData.customMapData.coordinates;
                             if (coords && coords.length > 0) {
-                              const waypoints = coords.map(c => `${c.lng},${c.lat}`).join('|');
-                              const openRouteUrl = `https://maps.openrouteservice.org/directions?n1=${coords[0].lat}&n2=${coords[0].lng}&n3=${coords[coords.length-1].lat}&n4=${coords[coords.length-1].lng}&a=${waypoints}&b=0&c=0&k1=en-US&k2=km`;
-                              window.open(openRouteUrl, '_blank');
+                              const choice = confirm(`🗺️ TESTE MÚLTIPLOS PONTOS:\n\n✅ OK = Abrir ${coords.length} abas (uma para cada ponto)\n❌ Cancelar = Tentar OpenRoute com todos os pontos\n\nQual você quer testar?`);
+                              
+                              if (choice) {
+                                // ✅ ABRIR UMA ABA PARA CADA PONTO
+                                coords.forEach((coord, index) => {
+                                  setTimeout(() => {
+                                    const singlePointUrl = `https://wego.here.com/directions/drive/${coord.lat},${coord.lng}/${coord.lat},${coord.lng}`;
+                                    window.open(singlePointUrl, `_blank_${index}`);
+                                  }, index * 1000); // 1 segundo entre cada abertura
+                                });
+                                alert(`🚀 Abrindo ${coords.length} abas sequencialmente!\nCada aba = 1 ponto da rota`);
+                              } else {
+                                // ✅ OPENROUTE COM TODOS OS PONTOS
+                                const waypoints = coords.map(c => `${c.lng},${c.lat}`).join('|');
+                                const openRouteUrl = `https://maps.openrouteservice.org/directions?n1=${coords[0].lat}&n2=${coords[0].lng}&n3=${coords[coords.length-1].lat}&n4=${coords[coords.length-1].lng}&a=${waypoints}&b=0&c=0&k1=en-US&k2=km`;
+                                window.open(openRouteUrl, '_blank');
+                              }
                             }
                           }}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors font-bold"
+                          className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition-colors font-bold"
                         >
-                          🛣️ OpenRoute (TESTE)
+                          🧪 TESTE FORÇADO
                         </button>
                         <button 
                           onClick={() => {

@@ -638,6 +638,7 @@ export async function POST(request: NextRequest) {
           address: item.address,
           sequence: index + 1,
           region: coords.region || 'Uberlândia',
+          objectCode: item.objectCode || `OBJ-${index + 1}`,
           geocoded: coords.lat !== getRealCoordinatesFromAddress(item.address, item.cep).lat // Indica se foi geocodificado de verdade
         };
       }));

@@ -12,6 +12,8 @@ interface NavigationPoint {
   address: string;
   sequence: number;
   completed?: boolean;
+  objectCode?: string;
+  region?: string;
 }
 
 interface CustomNavigatorProps {
@@ -26,6 +28,11 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
   const [currentRouteCoordinates, setCurrentRouteCoordinates] = useState<[number, number][]>([]);
   const [completeOptimizedRoute, setCompleteOptimizedRoute] = useState<[number, number][]>([]);
   const [currentLocation, setCurrentLocation] = useState(userLocation);
+  
+  // ✅ ESTADOS PARA SIDEBAR MENU
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedStop, setSelectedStop] = useState<NavigationPoint | null>(null);
+  const [completedStops, setCompletedStops] = useState<Set<string>>(new Set());
 
   // ✅ OBTER LOCALIZAÇÃO EM TEMPO REAL
   useEffect(() => {
@@ -190,6 +197,7 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
       setCurrentStopIndex(newIndex);
       
       // ✅ MARCAR PARADA ATUAL COMO CONCLUÍDA
+      setCompletedStops(prev => new Set([...prev, currentPoint.id]));
       if (onStopCompleted) {
         onStopCompleted(currentPoint.id);
       }
