@@ -22,7 +22,8 @@ interface CustomNavigatorProps {
 export default function CustomNavigator({ points, userLocation, onStopCompleted }: CustomNavigatorProps) {
   const [currentStopIndex, setCurrentStopIndex] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [currentRouteCoordinates, setCurrentRouteCoordinates] = useState<[number, number][]>([]);
+  const [completeOptimizedRoute, setCompleteOptimizedRoute] = useState<[number, number][]>([]);
   const [currentLocation, setCurrentLocation] = useState(userLocation);
 
   // ✅ OBTER LOCALIZAÇÃO EM TEMPO REAL
@@ -43,8 +44,47 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
     }
   }, []);
 
-  // ✅ CALCULAR ROTA USANDO OSRM
-  const calculateRoute = async (from: {lat: number, lng: number}, to: {lat: number, lng: number}) => {
+  // ✅ CALCULAR ROTA OTIMIZADA COMPLETA (todos os pontos em sequência)
+  const calculateCompleteOptimizedRoute = async () => {
+    try {
+      console.log('🔍 CALCULANDO ROTA OTIMIZADA COMPLETA...');
+      console.log('📍 Pontos ordenados:', points.map(p => `${p.sequence}. ${p.address}`));
+      
+      // ✅ CRIAR SEQUÊNCIA DE COORDENADAS NA ORDEM OTIMIZADA
+      const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+      const waypoints = orderedPoints.map(p => `${p.lng},${p.lat}`).join(';');
+      
+      // ✅ INCLUIR LOCALIZAÇÃO ATUAL COMO PONTO DE PARTIDA
+      const startPoint = currentLocation || { lat: -18.9203, lng: -48.2782 };
+      const fullWaypoints = `${startPoint.lng},${startPoint.lat};${waypoints}`;
+      
+      console.log('🗺️ Waypoints OSRM:', fullWaypoints);
+      
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${fullWaypoints}?overview=full&geometries=geojson&steps=true`
+      );
+      const data = await response.json();
+      
+      if (data.routes && data.routes[0]) {
+        const coordinates = data.routes[0].geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+        setCompleteOptimizedRoute(coordinates);
+        
+        console.log('✅ ROTA OTIMIZADA CALCULADA!');
+        console.log(`📏 Distância total: ${(data.routes[0].distance / 1000).toFixed(2)} km`);
+        console.log(`⏱️ Tempo estimado: ${Math.round(data.routes[0].duration / 60)} minutos`);
+        
+        return data.routes[0];
+      } else {
+        console.error('❌ Nenhuma rota encontrada:', data);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao calcular rota otimizada:', error);
+    }
+    return null;
+  };
+
+  // ✅ CALCULAR ROTA ATUAL (da posição atual para próxima parada)
+  const calculateCurrentRoute = async (from: {lat: number, lng: number}, to: {lat: number, lng: number}) => {
     try {
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
@@ -53,38 +93,50 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
       
       if (data.routes && data.routes[0]) {
         const coordinates = data.routes[0].geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
-        setRouteCoordinates(coordinates);
+        setCurrentRouteCoordinates(coordinates);
         return data.routes[0];
       }
     } catch (error) {
-      console.error('Erro ao calcular rota:', error);
+      console.error('Erro ao calcular rota atual:', error);
     }
     return null;
   };
 
-  // ✅ INICIAR NAVEGAÇÃO
+  // ✅ CALCULAR ROTA COMPLETA NA INICIALIZAÇÃO
+  useEffect(() => {
+    if (points.length > 0) {
+      calculateCompleteOptimizedRoute();
+    }
+  }, [points, currentLocation]);
+
+  // ✅ INICIAR NAVEGAÇÃO (seguindo ordem otimizada)
   const startNavigation = () => {
     setIsNavigating(true);
     setCurrentStopIndex(0);
-    if (currentLocation && points[0]) {
-      calculateRoute(currentLocation, points[0]);
+    
+    // ✅ CALCULAR ROTA PARA PRIMEIRA PARADA NA SEQUÊNCIA OTIMIZADA
+    const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+    if (currentLocation && orderedPoints[0]) {
+      calculateCurrentRoute(currentLocation, orderedPoints[0]);
     }
   };
 
-  // ✅ PRÓXIMA PARADA
+  // ✅ PRÓXIMA PARADA (seguindo sequência otimizada)
   const nextStop = () => {
-    if (currentStopIndex < points.length - 1) {
+    const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+    
+    if (currentStopIndex < orderedPoints.length - 1) {
       const newIndex = currentStopIndex + 1;
       setCurrentStopIndex(newIndex);
       
       // ✅ MARCAR PARADA ATUAL COMO CONCLUÍDA
       if (onStopCompleted) {
-        onStopCompleted(points[currentStopIndex].id);
+        onStopCompleted(orderedPoints[currentStopIndex].id);
       }
 
-      // ✅ CALCULAR ROTA PARA PRÓXIMA PARADA
-      if (currentLocation && points[newIndex]) {
-        calculateRoute(currentLocation, points[newIndex]);
+      // ✅ CALCULAR ROTA PARA PRÓXIMA PARADA NA SEQUÊNCIA
+      if (currentLocation && orderedPoints[newIndex]) {
+        calculateCurrentRoute(currentLocation, orderedPoints[newIndex]);
       }
     } else {
       // ✅ NAVEGAÇÃO CONCLUÍDA
@@ -93,11 +145,13 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
     }
   };
 
-  // ✅ NAVEGAR DIRETAMENTE PARA UMA PARADA
+  // ✅ NAVEGAR DIRETAMENTE PARA UMA PARADA (respeitando ordem otimizada)
   const navigateToStop = (index: number) => {
+    const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
     setCurrentStopIndex(index);
-    if (currentLocation && points[index]) {
-      calculateRoute(currentLocation, points[index]);
+    
+    if (currentLocation && orderedPoints[index]) {
+      calculateCurrentRoute(currentLocation, orderedPoints[index]);
     }
   };
 
@@ -144,11 +198,39 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
         </div>
 
         {/* ✅ INFO DA PARADA ATUAL */}
-        {isNavigating && currentStop && (
+        {isNavigating && (
           <div className="mt-3 bg-blue-700 p-3 rounded-lg">
-            <h3 className="font-bold text-lg">📍 Parada Atual:</h3>
-            <p className="text-blue-100">{currentStop.address}</p>
-            <p className="text-sm text-blue-200">ID: {currentStop.id}</p>
+            <h3 className="font-bold text-lg">📍 Parada Atual (Rota Otimizada):</h3>
+            {(() => {
+              const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+              const currentStop = orderedPoints[currentStopIndex];
+              return currentStop ? (
+                <>
+                  <p className="text-blue-100">{currentStop.address}</p>
+                  <p className="text-sm text-blue-200">
+                    Sequência: {currentStopIndex + 1}º de {points.length} paradas | ID: {currentStop.id}
+                  </p>
+                  <p className="text-xs text-blue-300 mt-1">
+                    ✅ Seguindo ordem otimizada por proximidade geográfica
+                  </p>
+                </>
+              ) : (
+                <p className="text-blue-100">Calculando próxima parada...</p>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ✅ INFO DA ROTA COMPLETA */}
+        {!isNavigating && completeOptimizedRoute.length > 0 && (
+          <div className="mt-3 bg-green-700 p-3 rounded-lg">
+            <h3 className="font-bold text-lg">🗺️ Rota Otimizada Calculada:</h3>
+            <p className="text-green-100">
+              ✅ {points.length} paradas ordenadas por proximidade geográfica
+            </p>
+            <p className="text-sm text-green-200">
+              📍 Linha pontilhada azul = rota completa otimizada
+            </p>
           </div>
         )}
       </div>
@@ -172,8 +254,8 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
             </Marker>
           )}
 
-          {/* ✅ PONTOS DE ENTREGA */}
-          {points.map((point, index) => (
+          {/* ✅ PONTOS DE ENTREGA (ordenados por sequência) */}
+          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => (
             <Marker
               key={point.id}
               position={[point.lat, point.lng]}
@@ -183,36 +265,57 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
             >
               <Popup>
                 <div className="text-center">
-                  <h4 className="font-bold">Parada {point.sequence}</h4>
+                  <h4 className="font-bold">
+                    {index === currentStopIndex ? '🎯' : index < currentStopIndex ? '✅' : '⏳'} 
+                    Parada {point.sequence}
+                  </h4>
                   <p className="text-sm">{point.address}</p>
+                  <p className="text-xs text-gray-500">ID: {point.id}</p>
                   <button
                     onClick={() => navigateToStop(index)}
-                    className="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm"
+                    className={`mt-2 px-3 py-1 rounded text-sm ${
+                      index === currentStopIndex 
+                        ? 'bg-blue-500 text-white' 
+                        : index < currentStopIndex 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-gray-500 text-white'
+                    }`}
                   >
-                    🧭 Navegar para aqui
+                    {index === currentStopIndex ? '🎯 Parada Atual' : index < currentStopIndex ? '✅ Concluído' : '🧭 Navegar'}
                   </button>
                 </div>
               </Popup>
             </Marker>
           ))}
 
-          {/* ✅ ROTA CALCULADA */}
-          {routeCoordinates.length > 0 && (
+          {/* ✅ ROTA OTIMIZADA COMPLETA (em azul claro) */}
+          {completeOptimizedRoute.length > 0 && (
             <Polyline
-              positions={routeCoordinates}
-              color="blue"
+              positions={completeOptimizedRoute}
+              color="lightblue"
+              weight={3}
+              opacity={0.6}
+              dashArray="5, 10"
+            />
+          )}
+
+          {/* ✅ ROTA ATUAL (da posição para próxima parada - em azul escuro) */}
+          {currentRouteCoordinates.length > 0 && (
+            <Polyline
+              positions={currentRouteCoordinates}
+              color="darkblue"
               weight={5}
-              opacity={0.7}
+              opacity={0.9}
             />
           )}
         </MapContainer>
       </div>
 
-      {/* ✅ LISTA DE PARADAS */}
+      {/* ✅ LISTA DE PARADAS (ordenada pela sequência otimizada) */}
       <div className="bg-white border-t p-4 max-h-48 overflow-y-auto">
-        <h3 className="font-bold mb-2">📋 Lista de Paradas:</h3>
+        <h3 className="font-bold mb-2">📋 Rota Otimizada (Sequência de Entrega):</h3>
         <div className="space-y-2">
-          {points.map((point, index) => (
+          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => (
             <div
               key={point.id}
               className={`p-2 rounded-lg border cursor-pointer ${
@@ -227,10 +330,15 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
               <div className="flex justify-between items-center">
                 <span className="font-medium">
                   {index < currentStopIndex ? '✅' : index === currentStopIndex ? '🎯' : '⏳'} 
-                  {point.sequence}. {point.address}
+                  {index + 1}º → {point.address}
                 </span>
-                <span className="text-sm text-gray-500">{point.id}</span>
+                <span className="text-sm text-gray-500">#{point.sequence}</span>
               </div>
+              {index === currentStopIndex && (
+                <div className="mt-1 text-xs text-blue-600">
+                  📍 Próxima entrega na sequência otimizada
+                </div>
+              )}
             </div>
           ))}
         </div>
