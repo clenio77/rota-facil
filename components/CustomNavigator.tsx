@@ -366,11 +366,127 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
           />
 
           {/* ✅ LOCALIZAÇÃO ATUAL */}
-          {currentLocation && (
-            <Marker position={[currentLocation.lat, currentLocation.lng]}>
-              <Popup>📍 Sua Localização</Popup>
-            </Marker>
-          )}
+          {currentLocation && (() => {
+            // ✅ CRIAR ÍCONE PERSONALIZADO PARA LOCALIZAÇÃO ATUAL
+            const userLocationIcon = L.divIcon({
+              html: `
+                <div style="
+                  background: #EF4444;
+                  color: white;
+                  border-radius: 50%;
+                  width: 35px;
+                  height: 35px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  font-size: 16px;
+                  border: 3px solid white;
+                  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+                  animation: pulse 2s infinite;
+                ">
+                  📍
+                </div>
+                <style>
+                  @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                    100% { transform: scale(1); }
+                  }
+                </style>
+              `,
+              className: 'user-location-marker',
+              iconSize: [35, 35],
+              iconAnchor: [17.5, 17.5]
+            });
+
+            return (
+              <Marker 
+                position={[currentLocation.lat, currentLocation.lng]}
+                icon={userLocationIcon}
+              >
+                <Popup maxWidth={300}>
+                  <div className="p-2">
+                    {/* ✅ CABEÇALHO */}
+                    <div className="text-center p-2 rounded-t mb-2 bg-red-100 text-red-800">
+                      <h4 className="font-bold text-lg">
+                        📍 SUA LOCALIZAÇÃO
+                      </h4>
+                      <p className="text-sm">
+                        Ponto de partida da rota
+                      </p>
+                    </div>
+
+                    {/* ✅ COORDENADAS ATUAIS */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">🌍 Coordenadas GPS:</h5>
+                      <p className="text-sm font-mono bg-gray-100 p-2 rounded">
+                        {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        📍 {(() => {
+                          // ✅ DETECTAR REGIÃO BASEADA NAS COORDENADAS
+                          const lat = currentLocation.lat;
+                          const lng = currentLocation.lng;
+                          
+                          if (lat >= -19.0 && lat <= -18.8 && lng >= -48.4 && lng <= -48.2) {
+                            return "Uberlândia, MG";
+                          } else if (lat >= -19.95 && lat <= -19.85 && lng >= -43.95 && lng <= -43.85) {
+                            return "Belo Horizonte, MG";
+                          } else if (lat >= -23.6 && lat <= -23.4 && lng >= -46.8 && lng <= -46.6) {
+                            return "São Paulo, SP";
+                          } else {
+                            return "Brasil";
+                          }
+                        })()}
+                      </p>
+                    </div>
+
+                    {/* ✅ STATUS DA NAVEGAÇÃO */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">🚚 Status:</h5>
+                      <p className="text-sm bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                        {isNavigating ? (
+                          <>🎯 <strong>Navegando</strong> - Rota ativa para {points.length} paradas</>
+                        ) : (
+                          <>⏳ <strong>Aguardando</strong> - Clique "Iniciar Navegação" para começar</>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* ✅ INFORMAÇÕES DA ROTA */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">📋 Rota Otimizada:</h5>
+                      <div className="text-xs bg-green-50 p-2 rounded">
+                        <p>📦 <strong>{points.length} entregas</strong> programadas</p>
+                        <p>🧭 Sequência otimizada por proximidade</p>
+                        <p>📍 {isNavigating ? `Parada atual: ${currentStopIndex + 1}/${points.length}` : 'Aguardando início'}</p>
+                      </div>
+                    </div>
+
+                    {/* ✅ AÇÃO */}
+                    <div className="text-center">
+                      {!isNavigating ? (
+                        <button
+                          onClick={startNavigation}
+                          className="bg-green-500 text-white px-4 py-2 rounded font-bold hover:bg-green-600"
+                        >
+                          🚀 Iniciar Navegação
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setIsNavigating(false)}
+                          className="bg-red-500 text-white px-4 py-2 rounded font-bold hover:bg-red-600"
+                        >
+                          ⏹️ Parar Navegação
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })()}
 
           {/* ✅ PONTOS DE ENTREGA (ordenados por sequência) */}
           {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => {
