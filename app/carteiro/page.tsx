@@ -989,19 +989,40 @@ export default function CarteiroPage() {
                     </p>
                   </div>
                   
-                  {/* Mapa Leaflet real */}
+                  {/* Navegador Customizado Real */}
                   <div className="bg-white rounded-lg overflow-hidden border border-purple-200">
-                    <div className="h-96 w-full">
-                      <MapDisplay 
-                        stops={processedData.customMapData.coordinates?.map(coord => ({
-                          id: coord.sequence,
-                          address: coord.address,
-                          lat: coord.lat,
-                          lng: coord.lng,
-                          sequence: coord.sequence
-                        })) || []}
-                        origin={processedData.customMapData.userLocation}
-                      />
+                    <div className="h-96 w-full relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white">
+                        <div className="text-center">
+                          <h3 className="text-xl font-bold mb-2">🚚 Navegador Profissional</h3>
+                          <p className="mb-4">Navegação real ponto-a-ponto com GPS</p>
+                          <button
+                            onClick={() => {
+                              // ✅ ABRIR NAVEGADOR EM TELA CHEIA
+                              const coords = processedData.customMapData.coordinates;
+                              if (coords) {
+                                const navigatorData = encodeURIComponent(JSON.stringify({
+                                  points: coords.map(coord => ({
+                                    id: coord.id,
+                                    lat: coord.lat,
+                                    lng: coord.lng,
+                                    address: coord.address,
+                                    sequence: coord.sequence
+                                  })),
+                                  userLocation: processedData.customMapData.userLocation
+                                }));
+                                
+                                // ✅ ABRIR EM NOVA ABA COM NAVEGADOR COMPLETO
+                                const navigatorUrl = `/navigator?data=${navigatorData}`;
+                                window.open(navigatorUrl, '_blank', 'fullscreen=yes,scrollbars=no,resizable=no');
+                              }
+                            }}
+                            className="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition-colors"
+                          >
+                            🚀 Abrir Navegador Completo
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
