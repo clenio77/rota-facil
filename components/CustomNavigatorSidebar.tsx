@@ -23,6 +23,17 @@ interface CustomNavigatorProps {
 }
 
 export default function CustomNavigatorSidebar({ points, userLocation, onStopCompleted }: CustomNavigatorProps) {
+  // ✅ CSS MOBILE FIX - Adicionar viewport meta se necessário
+  React.useEffect(() => {
+    // Garantir que viewport está configurado para mobile
+    let viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (!viewportMeta) {
+      viewportMeta = document.createElement('meta');
+      viewportMeta.setAttribute('name', 'viewport');
+      document.head.appendChild(viewportMeta);
+    }
+    viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+  }, []);
   const [currentStopIndex, setCurrentStopIndex] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentRouteCoordinates, setCurrentRouteCoordinates] = useState<[number, number][]>([]);
@@ -271,11 +282,11 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
   };
 
   return (
-    <div className="h-screen w-full bg-gray-100 relative flex">
+    <div className="h-screen w-full bg-gray-100 relative flex overflow-hidden">
       {/* ✅ SIDEBAR MENU - PARADAS E OBJETOS */}
       <div className={`fixed top-0 left-0 h-full bg-white shadow-2xl transition-transform duration-300 z-50 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } w-80 md:w-96`}>
+      } w-80 md:w-96 max-w-full`}>
         {/* Header do Sidebar */}
         <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
           <div>
@@ -376,12 +387,21 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
 
       {/* ✅ ÁREA PRINCIPAL - MAPA E CONTROLES */}
       <div className="flex-1 flex flex-col">
-        {/* Header Principal - FIXO NO TOPO */}
-        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white p-3 shadow-lg flex justify-between items-center z-30">
+        {/* Header Principal - SEMPRE VISÍVEL NO MOBILE */}
+        <div className="sticky top-0 bg-blue-600 text-white p-3 shadow-lg flex justify-between items-center z-30 w-full">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="bg-blue-700 hover:bg-blue-800 p-2 rounded-lg"
+              className="bg-blue-700 hover:bg-blue-800 p-2 rounded-lg touch-manipulation"
+              style={{
+                minWidth: '44px',
+                minHeight: '44px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                WebkitTapHighlightColor: 'transparent'
+              }}
             >
               📋
             </button>
@@ -396,7 +416,12 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
             {!isNavigating ? (
               <button
                 onClick={startNavigation}
-                className="bg-green-500 hover:bg-green-600 px-3 py-2 rounded-lg font-bold text-sm"
+                className="bg-green-500 hover:bg-green-600 px-3 py-2 rounded-lg font-bold text-sm touch-manipulation"
+                style={{
+                  minWidth: '80px',
+                  minHeight: '44px',
+                  WebkitTapHighlightColor: 'transparent'
+                }}
               >
                 🚀 Iniciar
               </button>
@@ -405,13 +430,23 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
                 <button
                   onClick={nextStop}
                   disabled={currentStopIndex >= points.length - 1}
-                  className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg font-bold text-sm disabled:opacity-50"
+                  className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg font-bold text-sm disabled:opacity-50 touch-manipulation"
+                  style={{
+                    minWidth: '80px',
+                    minHeight: '44px',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
                 >
                   ✅ Próxima
                 </button>
                 <button
                   onClick={() => setIsNavigating(false)}
-                  className="bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg font-bold text-sm"
+                  className="bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg font-bold text-sm touch-manipulation"
+                  style={{
+                    minWidth: '70px',
+                    minHeight: '44px',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
                 >
                   ⏹️ Parar
                 </button>
@@ -420,9 +455,9 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
           </div>
         </div>
 
-        {/* INFO DA PARADA ATUAL - COMPACTO E FIXO */}
+        {/* INFO DA PARADA ATUAL - COMPACTO */}
         {isNavigating && (
-          <div className="fixed top-16 left-0 right-0 bg-blue-700 text-white p-3 z-20">
+          <div className="bg-blue-700 text-white p-3 w-full">
             {(() => {
               const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
               
@@ -463,8 +498,8 @@ export default function CustomNavigatorSidebar({ points, userLocation, onStopCom
           </div>
         )}
 
-        {/* ✅ MAPA PRINCIPAL - AJUSTADO PARA HEADERS FIXOS */}
-        <div className={`flex-1 relative ${isNavigating ? 'mt-32' : 'mt-16'}`}>
+        {/* ✅ MAPA PRINCIPAL - OCUPA ESPAÇO RESTANTE */}
+        <div className="flex-1 relative">
           <MapContainer
             center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
             zoom={15}
