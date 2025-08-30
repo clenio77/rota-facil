@@ -178,18 +178,26 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
     
     if (currentStopIndex < orderedPoints.length - 1) {
+      const currentPoint = orderedPoints[currentStopIndex];
       const newIndex = currentStopIndex + 1;
+      const nextPoint = orderedPoints[newIndex];
+      
+      console.log('➡️ AVANÇANDO PARA PRÓXIMA PARADA...');
+      console.log(`📍 Da parada atual: ${currentPoint.address} (${currentPoint.lat}, ${currentPoint.lng})`);
+      console.log(`📍 Para próxima parada: ${nextPoint.address} (${nextPoint.lat}, ${nextPoint.lng})`);
+      
       setCurrentStopIndex(newIndex);
       
       // ✅ MARCAR PARADA ATUAL COMO CONCLUÍDA
       if (onStopCompleted) {
-        onStopCompleted(orderedPoints[currentStopIndex].id);
+        onStopCompleted(currentPoint.id);
       }
 
-      // ✅ CALCULAR ROTA PARA PRÓXIMA PARADA NA SEQUÊNCIA
-      if (currentLocation && orderedPoints[newIndex]) {
-        calculateCurrentRoute(currentLocation, orderedPoints[newIndex]);
-      }
+      // ✅ CALCULAR ROTA DA PARADA ATUAL PARA A PRÓXIMA (NÃO DA LOCALIZAÇÃO INICIAL!)
+      calculateCurrentRoute(
+        { lat: currentPoint.lat, lng: currentPoint.lng }, 
+        { lat: nextPoint.lat, lng: nextPoint.lng }
+      );
     } else {
       // ✅ NAVEGAÇÃO CONCLUÍDA
       setIsNavigating(false);
@@ -200,10 +208,28 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
   // ✅ NAVEGAR DIRETAMENTE PARA UMA PARADA (respeitando ordem otimizada)
   const navigateToStop = (index: number) => {
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+    const targetPoint = orderedPoints[index];
+    
+    console.log('🎯 NAVEGAÇÃO DIRETA PARA PARADA...');
+    console.log(`📍 Destino: ${targetPoint.address} (${targetPoint.lat}, ${targetPoint.lng})`);
+    
     setCurrentStopIndex(index);
     
-    if (currentLocation && orderedPoints[index]) {
-      calculateCurrentRoute(currentLocation, orderedPoints[index]);
+    // ✅ DECIDIR ORIGEM DA ROTA
+    if (index === 0) {
+      // ✅ PRIMEIRA PARADA: usar localização atual
+      if (currentLocation && targetPoint) {
+        console.log(`🚀 Primeira parada: de localização atual para ${targetPoint.address}`);
+        calculateCurrentRoute(currentLocation, targetPoint);
+      }
+    } else {
+      // ✅ PARADAS SUBSEQUENTES: da parada anterior para esta
+      const previousPoint = orderedPoints[index - 1];
+      console.log(`➡️ Parada ${index + 1}: de ${previousPoint.address} para ${targetPoint.address}`);
+      calculateCurrentRoute(
+        { lat: previousPoint.lat, lng: previousPoint.lng }, 
+        { lat: targetPoint.lat, lng: targetPoint.lng }
+      );
     }
   };
 
@@ -277,6 +303,16 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
                   <p className="text-xs text-blue-300">
                     ✅ Seguindo ordem otimizada por proximidade geográfica
                   </p>
+                  {/* ✅ MOSTRAR ORIGEM E DESTINO DA ROTA ATUAL */}
+                  {currentStopIndex > 0 && (
+                    <div className="mt-2 p-2 bg-blue-800 rounded">
+                      <p className="text-xs text-blue-200">
+                        🧭 <strong>Rota atual:</strong><br/>
+                        📍 <strong>De:</strong> {orderedPoints[currentStopIndex - 1]?.address || 'Localização atual'}<br/>
+                        🎯 <strong>Para:</strong> {currentStop.address}
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="text-blue-100">Calculando próxima parada...</p>
