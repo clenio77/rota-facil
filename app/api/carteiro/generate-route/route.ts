@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
       }
 
       const streetMappings = {
-        'joão pinheiro': { lat: -18.9220, lng: -48.2810, region: 'Norte' },
+        'joão pinheiro': { lat: -18.9190, lng: -48.2780, region: 'Centro-Norte' }, // ✅ CORRIGIDO: Posição mais central
         'cesário alvim': { lat: -18.9250, lng: -48.2840, region: 'Tibery' },
         'afonso pena': { lat: -18.9187, lng: -48.2775, region: 'Centro' }, // ✅ CORRIGIDO: Centro real
         'brasil': { lat: -18.9230, lng: -48.2820, region: 'Norte' },
@@ -501,15 +501,32 @@ export async function POST(request: NextRequest) {
         try {
           console.log(`🔍 Processando: ${item.address}, CEP: ${item.cep}`);
           
+          // ✅ DEBUG ESPECIAL PARA JOÃO PINHEIRO 4020
+          if (item.address.toLowerCase().includes('joão pinheiro') && item.address.includes('4020')) {
+            console.log('🚨 DEBUG ESPECIAL: Avenida João Pinheiro, 4020');
+            console.log('📍 Item completo:', item);
+          }
+          
           // ✅ PASSO 1: VALIDAR CEP COM VIACEP
           const validatedAddress = await validateAndNormalizeAddress(item.address, item.cep);
           console.log(`📋 Endereço validado:`, validatedAddress);
+          
+          // ✅ DEBUG ESPECIAL PARA JOÃO PINHEIRO 4020
+          if (item.address.toLowerCase().includes('joão pinheiro') && item.address.includes('4020')) {
+            console.log('🚨 ViaCEP result para João Pinheiro 4020:', validatedAddress);
+          }
           
           // ✅ PASSO 2: GEOCODIFICAR ENDEREÇO COMPLETO
           const geocodedResult = await geocodeAddress(validatedAddress);
           
           if (geocodedResult && geocodedResult.lat && geocodedResult.lng) {
             console.log(`🎯 GEOCODIFICAÇÃO REAL: ${validatedAddress.fullAddress} → ${geocodedResult.lat}, ${geocodedResult.lng}`);
+            
+            // ✅ DEBUG ESPECIAL PARA JOÃO PINHEIRO 4020
+            if (item.address.toLowerCase().includes('joão pinheiro') && item.address.includes('4020')) {
+              console.log('🚨 COORDENADAS GEOCODIFICADAS para João Pinheiro 4020:', geocodedResult);
+            }
+            
             coords = {
               lat: geocodedResult.lat,
               lng: geocodedResult.lng,
@@ -517,7 +534,18 @@ export async function POST(request: NextRequest) {
             };
           } else {
             console.log(`⚠️ FALLBACK para coordenadas determinísticas: ${item.address}`);
+            
+            // ✅ DEBUG ESPECIAL PARA JOÃO PINHEIRO 4020
+            if (item.address.toLowerCase().includes('joão pinheiro') && item.address.includes('4020')) {
+              console.log('🚨 USANDO FALLBACK para João Pinheiro 4020');
+            }
+            
             coords = getRealCoordinatesFromAddress(item.address, item.cep);
+            
+            // ✅ DEBUG ESPECIAL PARA JOÃO PINHEIRO 4020
+            if (item.address.toLowerCase().includes('joão pinheiro') && item.address.includes('4020')) {
+              console.log('🚨 COORDENADAS FALLBACK para João Pinheiro 4020:', coords);
+            }
           }
         } catch (error) {
           console.log(`❌ Erro na validação/geocodificação, usando fallback: ${item.address}`, error);
