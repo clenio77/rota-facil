@@ -1012,29 +1012,52 @@ export default function CarteiroPage() {
                       <div className="flex flex-wrap gap-2">
                         <button 
                           onClick={() => {
-                            // ✅ HERE MAPS - FORMATO CORRETO PARA MÚLTIPLOS WAYPOINTS
+                            // ✅ HERE MAPS - FORMATO CORRETO TESTADO
                             const coords = processedData.customMapData.coordinates;
                             if (coords && coords.length > 0) {
-                              // ✅ FORMATO: from=lat,lng&to=lat,lng&wp.0=lat,lng&wp.1=lat,lng
+                              // ✅ FORMATO HERE MAPS COM TODOS OS WAYPOINTS
                               const origin = coords[0];
                               const destination = coords[coords.length - 1];
-                              const waypoints = coords.slice(1, -1); // Pontos intermediários
+                              const intermediateWaypoints = coords.slice(1, -1);
                               
+                              // ✅ URL BASE DO HERE WEGO
                               let hereMapsUrl = `https://wego.here.com/directions/drive/${origin.lat},${origin.lng}/${destination.lat},${destination.lng}`;
                               
-                              // ✅ ADICIONAR WAYPOINTS INTERMEDIÁRIOS
-                              if (waypoints.length > 0) {
-                                const wpParams = waypoints.map((wp, index) => `wp.${index}=${wp.lat},${wp.lng}`).join('&');
-                                hereMapsUrl += `?${wpParams}`;
+                              // ✅ ADICIONAR WAYPOINTS INTERMEDIÁRIOS (formato correto)
+                              if (intermediateWaypoints.length > 0) {
+                                const waypointParams = intermediateWaypoints.map((wp, index) => 
+                                  `via${index}=${wp.lat},${wp.lng}`
+                                ).join('&');
+                                hereMapsUrl += `?${waypointParams}`;
                               }
                               
-                              console.log('🗺️ HERE Maps URL:', hereMapsUrl);
+                              console.log('🗺️ HERE Maps URL Final:', hereMapsUrl);
+                              console.log('📍 Waypoints:', {
+                                origin: `${origin.lat},${origin.lng}`,
+                                destination: `${destination.lat},${destination.lng}`,
+                                intermediate: intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`)
+                              });
+                              
                               window.open(hereMapsUrl, '_blank');
                             }
                           }}
                           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors font-bold"
                         >
                           🗺️ HERE Maps (ILIMITADO)
+                        </button>
+                        <button 
+                          onClick={() => {
+                            // ✅ ALTERNATIVA: OPENROUTESERVICE (sem limitações)
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords && coords.length > 0) {
+                              const waypoints = coords.map(c => `${c.lng},${c.lat}`).join('|');
+                              const openRouteUrl = `https://maps.openrouteservice.org/directions?n1=${coords[0].lat}&n2=${coords[0].lng}&n3=${coords[coords.length-1].lat}&n4=${coords[coords.length-1].lng}&a=${waypoints}&b=0&c=0&k1=en-US&k2=km`;
+                              window.open(openRouteUrl, '_blank');
+                            }
+                          }}
+                          className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors font-bold"
+                        >
+                          🛣️ OpenRoute (TESTE)
                         </button>
                         <button 
                           onClick={() => {
