@@ -376,17 +376,41 @@ export async function POST(request: NextRequest) {
     console.log('🎯 Ordem otimizada:', optimizedItems.map(item => `${item.sequence}. ${item.address}`).join(' → '));
 
     // ✅ PREPARAR COORDENADAS PARA O MAPA LEAFLET
-    const mapCoordinates = optimizedItems.map((item, index) => {
-      const coords = getRealCoordinatesFromAddress(item.address, item.cep);
-      return {
-        id: item.objectCode || `point-${index}`,
-        lat: coords.lat,
-        lng: coords.lng,
-        address: item.address,
-        sequence: index + 1,
-        region: coords.region || 'Uberlândia'
-      };
-    });
+      const mapCoordinates = await Promise.all(optimizedItems.map(async (item, index) => {
+        // ✅ TENTAR GEOCODIFICAÇÃO REAL PRIMEIRO
+        let coords;
+        try {
+          // Importar o serviço de geocodificação
+          const { geocodeWithCache } = await import('../../../lib/geocodeCache');
+          const fullAddress = `${item.address}, ${item.cep}, Uberlândia, MG, Brasil`;
+          const geocodedResult = await geocodeWithCache(fullAddress, data.userLocation);
+          
+          if (geocodedResult && geocodedResult.lat && geocodedResult.lng) {
+            console.log(`🎯 GEOCODIFICAÇÃO REAL: ${item.address} → ${geocodedResult.lat}, ${geocodedResult.lng}`);
+            coords = {
+              lat: geocodedResult.lat,
+              lng: geocodedResult.lng,
+              region: geocodedResult.city || 'Uberlândia'
+            };
+          } else {
+            console.log(`⚠️ FALLBACK para coordenadas determinísticas: ${item.address}`);
+            coords = getRealCoordinatesFromAddress(item.address, item.cep);
+          }
+        } catch (error) {
+          console.log(`❌ Erro na geocodificação, usando fallback: ${item.address}`, error);
+          coords = getRealCoordinatesFromAddress(item.address, item.cep);
+        }
+        
+        return {
+          id: item.objectCode || `point-${index}`,
+          lat: coords.lat,
+          lng: coords.lng,
+          address: item.address,
+          sequence: index + 1,
+          region: coords.region || 'Uberlândia',
+          geocoded: coords.lat !== getRealCoordinatesFromAddress(item.address, item.cep).lat // Indica se foi geocodificado de verdade
+        };
+      }));
 
     console.log(`🗺️ Usando visualizador próprio - SEM LIMITAÇÕES!`);
     console.log(`📍 ${mapCoordinates.length} coordenadas preparadas para mapa Leaflet`);

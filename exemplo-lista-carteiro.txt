@@ -1,0 +1,25 @@
+📋 EXEMPLO DE LISTA ECT PARA TESTE
+
+Se o OCR falhar, use estes endereços na ENTRADA MANUAL:
+
+📍 ENDEREÇOS DE TESTE (Uberlândia-MG):
+
+1. Avenida João Pinheiro, 1500, CEP: 38400-712
+2. Rua Floriano Peixoto, 800, CEP: 38400-704  
+3. Avenida Afonso Pena, 1200, CEP: 38400-708
+4. Rua Rio Grande do Sul, 600, CEP: 38400-650
+5. Avenida Brasil, 2500, CEP: 38400-718
+6. Avenida Cesário Alvim, 1800, CEP: 38400-694
+7. Rua Jataí, 900, CEP: 38400-679
+8. Rua Buriti Alegre, 400, CEP: 38400-626
+
+💡 COMO USAR:
+1. Se OCR falhar → Escolher "OK" na pergunta
+2. Copiar e colar estes endereços no editor
+3. Gerar rota otimizada normalmente
+
+🎯 RESULTADO ESPERADO:
+- Rota otimizada com 8 pontos
+- Navegação com HERE Maps ou Mapbox
+- Download GPX/KML funcionando
+- Sequência geograficamente otimizada

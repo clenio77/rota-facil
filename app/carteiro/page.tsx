@@ -1012,11 +1012,23 @@ export default function CarteiroPage() {
                       <div className="flex flex-wrap gap-2">
                         <button 
                           onClick={() => {
-                            // ✅ HERE MAPS - SEM LIMITAÇÕES DE WAYPOINTS
+                            // ✅ HERE MAPS - FORMATO CORRETO PARA MÚLTIPLOS WAYPOINTS
                             const coords = processedData.customMapData.coordinates;
                             if (coords && coords.length > 0) {
-                              const waypoints = coords.map(coord => `${coord.lat},${coord.lng}`).join(',');
-                              const hereMapsUrl = `https://wego.here.com/directions/mix/${waypoints}/?map=0,0,2,normal`;
+                              // ✅ FORMATO: from=lat,lng&to=lat,lng&wp.0=lat,lng&wp.1=lat,lng
+                              const origin = coords[0];
+                              const destination = coords[coords.length - 1];
+                              const waypoints = coords.slice(1, -1); // Pontos intermediários
+                              
+                              let hereMapsUrl = `https://wego.here.com/directions/drive/${origin.lat},${origin.lng}/${destination.lat},${destination.lng}`;
+                              
+                              // ✅ ADICIONAR WAYPOINTS INTERMEDIÁRIOS
+                              if (waypoints.length > 0) {
+                                const wpParams = waypoints.map((wp, index) => `wp.${index}=${wp.lat},${wp.lng}`).join('&');
+                                hereMapsUrl += `?${wpParams}`;
+                              }
+                              
+                              console.log('🗺️ HERE Maps URL:', hereMapsUrl);
                               window.open(hereMapsUrl, '_blank');
                             }
                           }}
