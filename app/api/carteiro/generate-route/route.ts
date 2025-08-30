@@ -328,10 +328,10 @@ export async function POST(request: NextRequest) {
         'afonso pena': { lat: -18.9187, lng: -48.2775, region: 'Centro' }, // ✅ CORRIGIDO: Centro real
         'brasil': { lat: -18.9230, lng: -48.2820, region: 'Norte' },
         'floriano peixoto': { lat: -18.9192, lng: -48.2781, region: 'Centro' }, // ✅ CORRIGIDO
-        'amazonas': { lat: -18.9172, lng: -48.2762, region: 'Centro-Sul' }, // ✅ CORRIGIDO
+        'amazonas': { lat: -18.9165, lng: -48.2760, region: 'Centro-Sul' }, // ✅ CORRIGIDO: Entre Osório José da Cunha e Rio Grande do Sul
         'rio grande do sul': { lat: -18.9140, lng: -48.2730, region: 'Centro-Leste' },
         'artur gonçalves': { lat: -18.9240, lng: -48.2830, region: 'Tibery' },
-        'jatai': { lat: -18.9160, lng: -48.2750, region: 'Nossa Senhora Aparecida' },
+        'jatai': { lat: -18.9200, lng: -48.2800, region: 'Centro-Norte' }, // ✅ CORRIGIDO: Entre Av. Brasil e Av. João Pinheiro
         'buriti alegre': { lat: -18.9150, lng: -48.2740, region: 'Jardim Brasília' },
         'itumbiara': { lat: -18.9130, lng: -48.2720, region: 'Bom Jesus' },
         'orozimbo': { lat: -18.9120, lng: -48.2710, region: 'Segismundo Pereira' }
