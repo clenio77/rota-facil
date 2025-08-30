@@ -651,6 +651,64 @@ function extractAddressesFromJSON(jsonData) {
 }
 
 /**
+ * 🔗 DEDUPLICAÇÃO DE ENDEREÇOS
+ * 
+ * Remove endereços duplicados e agrupa objetos ECT no mesmo endereço físico
+ */
+function deduplicateAddresses(addresses) {
+  console.log('🔍 Iniciando deduplicação de endereços...');
+  
+  const addressMap = new Map();
+  
+  // ✅ AGRUPAR ITENS POR ENDEREÇO NORMALIZADO
+  addresses.forEach(item => {
+    // ✅ NORMALIZAR ENDEREÇO (remover CEP, espaços extras, etc.)
+    const normalizedAddress = item.endereco
+      .replace(/\s*CEP:\s*\d{8}/gi, '') // Remover CEP
+      .replace(/\s+/g, ' ') // Normalizar espaços
+      .trim()
+      .toLowerCase();
+      
+    if (!addressMap.has(normalizedAddress)) {
+      addressMap.set(normalizedAddress, []);
+    }
+    addressMap.get(normalizedAddress).push(item);
+  });
+  
+  const deduplicatedItems = [];
+  let newSequence = 1;
+  
+  // ✅ CRIAR UM ITEM POR ENDEREÇO ÚNICO
+  addressMap.forEach((itemsAtAddress, normalizedAddress) => {
+    if (itemsAtAddress.length === 1) {
+      // ✅ ENDEREÇO ÚNICO: Manter como está
+      deduplicatedItems.push({
+        ...itemsAtAddress[0],
+        ordem: newSequence.toString().padStart(3, '0')
+      });
+      console.log(`📍 Endereço único: ${itemsAtAddress[0].endereco}`);
+    } else {
+      // ✅ ENDEREÇOS DUPLICADOS: Combinar em um item
+      const primaryItem = itemsAtAddress[0];
+      const allObjectCodes = itemsAtAddress.map(item => item.objeto).join(', ');
+      
+      deduplicatedItems.push({
+        ...primaryItem,
+        ordem: newSequence.toString().padStart(3, '0'),
+        objeto: allObjectCodes // ✅ COMBINAR CÓDIGOS DOS OBJETOS
+      });
+      
+      console.log(`🔗 Endereços combinados (${itemsAtAddress.length} objetos): ${primaryItem.endereco}`);
+      console.log(`📦 Objetos: ${allObjectCodes}`);
+    }
+    newSequence++;
+  });
+  
+  console.log(`✅ Deduplicação concluída: ${addresses.length} → ${deduplicatedItems.length} endereços únicos`);
+  return deduplicatedItems;
+}
+
+/**
  * 🚀 ROTEAMENTO AUTOMÁTICO INTELIGENTE
  * 
  * Algoritmo que:
@@ -662,6 +720,11 @@ function extractAddressesFromJSON(jsonData) {
 function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   console.log('🚀 Iniciando roteamento automático inteligente...');
   console.log('📍 Localização recebida como parâmetro:', userLocation);
+
+  // ✅ PRIMEIRO: DEDUPLICAR ENDEREÇOS ANTES DA OTIMIZAÇÃO
+  console.log('🔍 Deduplicando endereços para evitar pontos duplicados...');
+  const deduplicatedAddresses = deduplicateAddresses(geocodedAddresses);
+  console.log(`📊 Deduplicação: ${geocodedAddresses.length} → ${deduplicatedAddresses.length} endereços únicos`);
 
   // ✅ CAPTURAR LOCALIZAÇÃO AUTOMATICAMENTE
   let startLocation = userLocation;
@@ -683,8 +746,8 @@ function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   console.log(`📍 Ponto inicial definido: ${startLocation.lat}, ${startLocation.lng}`);
   console.log('📍 Localização completa do startLocation:', JSON.stringify(startLocation, null, 2));
 
-  // ✅ VALIDAR ENDEREÇOS
-  if (!geocodedAddresses || geocodedAddresses.length === 0) {
+  // ✅ VALIDAR ENDEREÇOS (USANDO ENDEREÇOS DEDUPLICADOS)
+  if (!deduplicatedAddresses || deduplicatedAddresses.length === 0) {
     console.log('⚠️ Nenhum endereço para otimizar');
     return {
       success: false,
@@ -693,8 +756,8 @@ function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
   }
   
   // ✅ FILTRAR ENDEREÇOS COM COORDENADAS
-  console.log('🔍 Verificando coordenadas dos endereços recebidos...');
-  geocodedAddresses.forEach((addr, index) => {
+  console.log('🔍 Verificando coordenadas dos endereços deduplicados...');
+  deduplicatedAddresses.forEach((addr, index) => {
     if (addr.coordinates) {
       console.log(`📍 Endereço ${index + 1}: ${addr.coordinates.lat}, ${addr.coordinates.lng}`);
     } else {
@@ -702,14 +765,14 @@ function generateOptimizedRoute(geocodedAddresses, userLocation = null) {
     }
   });
   
-  const validAddresses = geocodedAddresses.filter(addr => 
+  const validAddresses = deduplicatedAddresses.filter(addr => 
     addr.coordinates && addr.coordinates.lat && addr.coordinates.lng
   );
   
   if (validAddresses.length === 0) {
     console.log('⚠️ Nenhum endereço com coordenadas válidas');
-    console.log('🔍 Total de endereços recebidos:', geocodedAddresses.length);
-    console.log('🔍 Endereços sem coordenadas:', geocodedAddresses.length - validAddresses.length);
+    console.log('🔍 Total de endereços recebidos:', deduplicatedAddresses.length);
+    console.log('🔍 Endereços sem coordenadas:', deduplicatedAddresses.length - validAddresses.length);
     return {
       success: false,
       error: 'Nenhum endereço com coordenadas válidas encontrado'
@@ -1102,5 +1165,6 @@ module.exports = {
   calculateDistance,
   generateGoogleMapsUrl,
   calculateRouteMetrics,
-  extractCleanObjectCode
+  extractCleanObjectCode,
+  deduplicateAddresses
 };
