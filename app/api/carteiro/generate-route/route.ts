@@ -375,20 +375,41 @@ export async function POST(request: NextRequest) {
     console.log('📏 Distância estimada:', estimatedDistance, 'km');
     console.log('🎯 Ordem otimizada:', optimizedItems.map(item => `${item.sequence}. ${item.address}`).join(' → '));
 
+    // ✅ PREPARAR COORDENADAS PARA O MAPA LEAFLET
+    const mapCoordinates = optimizedItems.map((item, index) => {
+      const coords = getRealCoordinatesFromAddress(item.address, item.cep);
+      return {
+        id: item.objectCode || `point-${index}`,
+        lat: coords.lat,
+        lng: coords.lng,
+        address: item.address,
+        sequence: index + 1,
+        region: coords.region || 'Uberlândia'
+      };
+    });
+
+    console.log(`🗺️ Usando visualizador próprio - SEM LIMITAÇÕES!`);
+    console.log(`📍 ${mapCoordinates.length} coordenadas preparadas para mapa Leaflet`);
+
     return NextResponse.json({
       success: true,
       message: `🗺️ Rota OTIMIZADA regenerada com sucesso! ${totalStops} paradas processadas.`,
-      googleMapsUrl,
+      useCustomMap: true, // ✅ SINALIZAR PARA USAR MAPA PRÓPRIO
+      googleMapsUrl, // ✅ MANTER PARA COMPATIBILIDADE (BACKUP)
       routeData: {
         stops: optimizedItems, // ✅ RETORNAR ITENS OTIMIZADOS
+        coordinates: mapCoordinates, // ✅ COORDENADAS PARA O MAPA
+        userLocation: data.userLocation || { lat: -18.9186, lng: -48.2772 }, // ✅ PONTO DE PARTIDA
         totalStops,
         estimatedTime,
         estimatedDistance,
         optimized: true, // ✅ INDICAR QUE FOI OTIMIZADA
         optimizationInfo: {
-          algorithm: 'auto',
+          algorithm: 'nearest-neighbor-custom',
           totalDistance: estimatedDistance,
-          efficiency: 'Rota otimizada para menor distância total'
+          efficiency: 'Rota otimizada para menor distância total',
+          mapType: 'leaflet',
+          limitations: 'Sem limitações de waypoints'
         }
       }
     });

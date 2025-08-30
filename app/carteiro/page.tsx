@@ -118,12 +118,34 @@ interface ScheduledRoute {
 
 // ✅ INTERFACE: Dados de rota otimizada
 interface OptimizedRouteData {
-  route: ECTItem[];
-  totalDistance: number;
-  totalTime: number;
-  algorithm: string;
-  googleMapsUrl: string;
-  // ✅ NOVOS CAMPOS: Rota otimizada com pontos inicial/final
+  route?: ECTItem[];
+  totalDistance?: number;
+  totalTime?: number;
+  algorithm?: string;
+  googleMapsUrl?: string;
+  success?: boolean;
+  message?: string;
+  useCustomMap?: boolean;
+  // ✅ DADOS PARA MAPA CUSTOMIZADO
+  routeData?: {
+    coordinates?: Array<{
+      id: string;
+      lat: number;
+      lng: number;
+      address: string;
+      sequence: number;
+      region: string;
+    }>;
+    userLocation?: { lat: number; lng: number };
+    optimizationInfo?: {
+      algorithm: string;
+      totalDistance: string;
+      efficiency: string;
+      mapType: string;
+      limitations: string;
+    };
+  };
+  // ✅ CAMPOS LEGACY: Rota otimizada com pontos inicial/final
   optimizedRoute?: Array<{
     id: string;
     ordem: string;
@@ -472,11 +494,27 @@ export default function CarteiroPage() {
 
       const routeData: OptimizedRouteData = await response.json();
       
-      if (routeData.googleMapsUrl) {
-        setProcessedData({
-          ...updatedData,
-          googleMapsUrl: routeData.googleMapsUrl
-        });
+      if (routeData.success) {
+        // ✅ VERIFICAR SE DEVE USAR MAPA CUSTOMIZADO
+        if (routeData.useCustomMap && routeData.routeData?.coordinates) {
+          console.log('🗺️ Usando mapa customizado Leaflet - sem limitações!');
+          setProcessedData({
+            ...updatedData,
+            useCustomMap: true,
+            customMapData: {
+              coordinates: routeData.routeData.coordinates,
+              userLocation: routeData.routeData.userLocation,
+              optimizationInfo: routeData.routeData.optimizationInfo
+            },
+            googleMapsUrl: routeData.googleMapsUrl // Backup
+          });
+        } else if (routeData.googleMapsUrl) {
+          console.log('🗺️ Usando Google Maps (≤23 pontos)');
+          setProcessedData({
+            ...updatedData,
+            googleMapsUrl: routeData.googleMapsUrl
+          });
+        }
         setShowAddressEditor(false);
       } else {
         setError('Erro ao gerar rota. Tente novamente.');
@@ -783,6 +821,45 @@ export default function CarteiroPage() {
                     <p className="text-xs mt-2 bg-green-200 p-2 rounded">
                       ✅ <strong>Rota Circular:</strong> Inicia e termina na sua localização
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ MAPA CUSTOMIZADO LEAFLET (para rotas grandes) */}
+              {processedData.useCustomMap && processedData.customMapData && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-blue-100 border border-purple-300 rounded-lg">
+                  <h3 className="font-bold text-purple-800 mb-3">🗺️ Visualizador de Rota Avançado</h3>
+                  <div className="bg-white p-3 rounded-lg border border-purple-200 mb-4">
+                    <p className="text-purple-700 text-sm mb-2">
+                      <strong>🚀 Sem limitações:</strong> {processedData.customMapData.coordinates?.length || 0} pontos de entrega
+                    </p>
+                    <p className="text-purple-600 text-xs">
+                      ✅ <strong>Algoritmo:</strong> {processedData.customMapData.optimizationInfo?.algorithm || 'N/A'}<br/>
+                      📏 <strong>Distância:</strong> {processedData.customMapData.optimizationInfo?.totalDistance || 'N/A'}<br/>
+                      🎯 <strong>Otimização:</strong> {processedData.customMapData.optimizationInfo?.efficiency || 'N/A'}
+                    </p>
+                  </div>
+                  
+                  {/* Mapa Leaflet será renderizado aqui */}
+                  <div className="bg-white rounded-lg overflow-hidden border border-purple-200">
+                    <div className="h-96 w-full bg-gray-100 flex items-center justify-center">
+                      <div className="text-center text-gray-600">
+                        🗺️ <strong>Mapa Interativo</strong><br/>
+                        <span className="text-sm">Carregando visualizador de rota...</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors">
+                      📱 Exportar para GPS
+                    </button>
+                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+                      📄 Gerar GPX
+                    </button>
+                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors">
+                      🌐 Abrir em App de Navegação
+                    </button>
                   </div>
                 </div>
               )}
