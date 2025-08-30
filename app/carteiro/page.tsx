@@ -2,6 +2,20 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+// ✅ IMPORT DINÂMICO DO MAPA (evita problemas SSR)
+const MapDisplay = dynamic(() => import('../../components/MapDisplay'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-96 w-full bg-gray-100 flex items-center justify-center">
+      <div className="text-center text-gray-600">
+        🗺️ <strong>Carregando mapa...</strong><br/>
+        <span className="text-sm">Inicializando Leaflet...</span>
+      </div>
+    </div>
+  )
+});
 import CarteiroAutomation from '../../components/CarteiroAutomation';
 import CarteiroUpload from '../../components/CarteiroUpload';
 
@@ -165,6 +179,50 @@ interface OptimizedRouteData {
     totalTime: number;
   };
 }
+
+// ✅ FUNÇÕES UTILITÁRIAS PARA EXPORT
+const generateGPX = (coordinates: any[], userLocation?: {lat: number; lng: number}) => {
+  const startPoint = userLocation || { lat: -18.9203, lng: -48.2782 };
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Rota Fácil Carteiro" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Rota Otimizada Carteiro</name>
+    <desc>Rota gerada pelo Rota Fácil - ${new Date().toLocaleDateString()}</desc>
+  </metadata>
+  <wpt lat="${startPoint.lat}" lon="${startPoint.lng}">
+    <name>Início</name>
+    <desc>Ponto de partida</desc>
+  </wpt>
+  ${coordinates.map((coord, index) => `
+  <wpt lat="${coord.lat}" lon="${coord.lng}">
+    <name>Parada ${coord.sequence}</name>
+    <desc>${coord.address}</desc>
+  </wpt>`).join('')}
+  <wpt lat="${startPoint.lat}" lon="${startPoint.lng}">
+    <name>Fim</name>
+    <desc>Ponto de chegada</desc>
+  </wpt>
+</gpx>`;
+};
+
+const generateWazeUrl = (coordinates: any[]) => {
+  if (coordinates.length === 0) return '';
+  const firstStop = coordinates[0];
+  return `https://waze.com/ul?ll=${firstStop.lat}%2C${firstStop.lng}&navigate=yes`;
+};
+
+const downloadFile = (content: string, filename: string, contentType: string) => {
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export default function CarteiroPage() {
   const router = useRouter();
@@ -840,24 +898,60 @@ export default function CarteiroPage() {
                     </p>
                   </div>
                   
-                  {/* Mapa Leaflet será renderizado aqui */}
+                  {/* Mapa Leaflet real */}
                   <div className="bg-white rounded-lg overflow-hidden border border-purple-200">
-                    <div className="h-96 w-full bg-gray-100 flex items-center justify-center">
-                      <div className="text-center text-gray-600">
-                        🗺️ <strong>Mapa Interativo</strong><br/>
-                        <span className="text-sm">Carregando visualizador de rota...</span>
-                      </div>
+                    <div className="h-96 w-full">
+                      <MapDisplay 
+                        stops={processedData.customMapData.coordinates?.map(coord => ({
+                          id: coord.sequence,
+                          address: coord.address,
+                          lat: coord.lat,
+                          lng: coord.lng,
+                          sequence: coord.sequence
+                        })) || []}
+                        origin={processedData.customMapData.userLocation}
+                      />
                     </div>
                   </div>
                   
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors">
+                    <button 
+                      onClick={() => {
+                        // ✅ FUNÇÃO: Exportar coordenadas para GPS
+                        const coords = processedData.customMapData.coordinates;
+                        if (coords) {
+                          const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
+                          downloadFile(gpxData, 'rota-carteiro.gpx', 'application/gpx+xml');
+                        }
+                      }}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors"
+                    >
                       📱 Exportar para GPS
                     </button>
-                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+                    <button 
+                      onClick={() => {
+                        // ✅ FUNÇÃO: Gerar arquivo GPX
+                        const coords = processedData.customMapData.coordinates;
+                        if (coords) {
+                          const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
+                          downloadFile(gpxData, 'rota-otimizada.gpx', 'application/gpx+xml');
+                        }
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                    >
                       📄 Gerar GPX
                     </button>
-                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors">
+                    <button 
+                      onClick={() => {
+                        // ✅ FUNÇÃO: Abrir em app de navegação
+                        const coords = processedData.customMapData.coordinates;
+                        if (coords && coords.length > 0) {
+                          const wazeUrl = generateWazeUrl(coords);
+                          window.open(wazeUrl, '_blank');
+                        }
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                    >
                       🌐 Abrir em App de Navegação
                     </button>
                   </div>
