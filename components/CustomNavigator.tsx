@@ -97,18 +97,30 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
   // ✅ CALCULAR ROTA ATUAL (da posição atual para próxima parada)
   const calculateCurrentRoute = async (from: {lat: number, lng: number}, to: {lat: number, lng: number}) => {
     try {
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
-      );
+      console.log('🗺️ CALCULANDO ROTA ATUAL...');
+      console.log(`📍 De: ${from.lat}, ${from.lng}`);
+      console.log(`📍 Para: ${to.lat}, ${to.lng}`);
+      
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+      console.log('🌐 URL OSRM atual:', osrmUrl);
+      
+      const response = await fetch(osrmUrl);
       const data = await response.json();
+      
+      console.log('📄 Resposta OSRM rota atual:', data);
       
       if (data.routes && data.routes[0]) {
         const coordinates = data.routes[0].geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+        console.log('🗺️ Coordenadas da rota atual:', coordinates.length, 'pontos');
+        console.log('🗺️ Primeiras 3 coordenadas da rota atual:', coordinates.slice(0, 3));
+        
         setCurrentRouteCoordinates(coordinates);
         return data.routes[0];
+      } else {
+        console.error('❌ Nenhuma rota atual encontrada');
       }
     } catch (error) {
-      console.error('Erro ao calcular rota atual:', error);
+      console.error('❌ Erro ao calcular rota atual:', error);
     }
     return null;
   };
@@ -144,12 +156,19 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
 
   // ✅ INICIAR NAVEGAÇÃO (seguindo ordem otimizada)
   const startNavigation = () => {
+    console.log('🚀 INICIANDO NAVEGAÇÃO...');
+    console.log('📍 Localização atual:', currentLocation);
+    console.log('📍 Pontos recebidos:', points.map(p => `${p.sequence}. ${p.address} (${p.lat}, ${p.lng})`));
+    
     setIsNavigating(true);
     setCurrentStopIndex(0);
     
     // ✅ CALCULAR ROTA PARA PRIMEIRA PARADA NA SEQUÊNCIA OTIMIZADA
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+    console.log('📍 Primeira parada ordenada:', orderedPoints[0]);
+    
     if (currentLocation && orderedPoints[0]) {
+      console.log(`🧭 Calculando rota: ${currentLocation.lat},${currentLocation.lng} → ${orderedPoints[0].lat},${orderedPoints[0].lng}`);
       calculateCurrentRoute(currentLocation, orderedPoints[0]);
     }
   };
@@ -237,6 +256,15 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
             {(() => {
               const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
               const currentStop = orderedPoints[currentStopIndex];
+              
+              // ✅ DEBUG: Log da parada atual
+              console.log('🎯 DEBUG Parada Atual:', {
+                currentStopIndex,
+                currentStop,
+                totalPoints: points.length,
+                orderedPoints: orderedPoints.map(p => `${p.sequence}. ${p.address}`)
+              });
+              
               return currentStop ? (
                 <>
                   <p className="text-blue-100">{currentStop.address}</p>
@@ -244,6 +272,9 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
                     Sequência: {currentStopIndex + 1}º de {points.length} paradas | ID: {currentStop.id}
                   </p>
                   <p className="text-xs text-blue-300 mt-1">
+                    ✅ Coordenadas: {currentStop.lat}, {currentStop.lng}
+                  </p>
+                  <p className="text-xs text-blue-300">
                     ✅ Seguindo ordem otimizada por proximidade geográfica
                   </p>
                 </>
