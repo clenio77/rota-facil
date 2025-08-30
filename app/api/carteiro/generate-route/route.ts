@@ -31,6 +31,62 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Regenerando rota com endereços editados:', data.items.length, 'itens');
 
+    // ✅ NOVA FUNÇÃO: Deduplicar endereços para evitar pontos duplicados
+    const deduplicateAddresses = (items: ECTItem[]): ECTItem[] => {
+      console.log('🔍 Deduplicando endereços...');
+      
+      const addressMap = new Map<string, ECTItem[]>();
+      
+      // ✅ AGRUPAR ITENS POR ENDEREÇO
+      items.forEach(item => {
+        // ✅ NORMALIZAR ENDEREÇO (remover CEP, espaços extras, etc.)
+        const normalizedAddress = item.address
+          .replace(/\s*CEP:\s*\d{8}/gi, '') // Remover CEP
+          .replace(/\s+/g, ' ') // Normalizar espaços
+          .trim()
+          .toLowerCase();
+          
+        if (!addressMap.has(normalizedAddress)) {
+          addressMap.set(normalizedAddress, []);
+        }
+        addressMap.get(normalizedAddress)!.push(item);
+      });
+      
+      const deduplicatedItems: ECTItem[] = [];
+      let newSequence = 1;
+      
+      // ✅ CRIAR UM ITEM POR ENDEREÇO ÚNICO
+      addressMap.forEach((itemsAtAddress, normalizedAddress) => {
+        if (itemsAtAddress.length === 1) {
+          // ✅ ENDEREÇO ÚNICO: Manter como está
+          deduplicatedItems.push({
+            ...itemsAtAddress[0],
+            sequence: newSequence++
+          });
+          console.log(`📍 Endereço único: ${itemsAtAddress[0].address}`);
+        } else {
+          // ✅ ENDEREÇOS DUPLICADOS: Combinar em um item
+          const primaryItem = itemsAtAddress[0];
+          const allObjectCodes = itemsAtAddress.map(item => item.objectCode).join(', ');
+          
+          deduplicatedItems.push({
+            ...primaryItem,
+            sequence: newSequence++,
+            objectCode: allObjectCodes // ✅ COMBINAR CÓDIGOS DOS OBJETOS
+          });
+          
+          console.log(`🔗 Endereços combinados (${itemsAtAddress.length} objetos): ${primaryItem.address}`);
+          console.log(`📦 Objetos: ${allObjectCodes}`);
+        }
+      });
+      
+      console.log(`✅ Deduplicação concluída: ${items.length} → ${deduplicatedItems.length} endereços únicos`);
+      return deduplicatedItems;
+    };
+
+    // ✅ APLICAR DEDUPLICAÇÃO ANTES DA OTIMIZAÇÃO
+    const uniqueItems = deduplicateAddresses(data.items);
+
     // ✅ NOVA FUNÇÃO: Otimizar rota usando algoritmos inteligentes
     const optimizeRouteForDelivery = (items: ECTItem[]) => {
       if (items.length <= 2) return items; // Não precisa otimizar para 1-2 endereços
@@ -82,8 +138,8 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // ✅ OTIMIZAR ROTA ANTES DE GERAR URL
-    const optimizedItems = optimizeRouteForDelivery(data.items);
+    // ✅ OTIMIZAR ROTA ANTES DE GERAR URL (COM ITENS ÚNICOS)
+    const optimizedItems = optimizeRouteForDelivery(uniqueItems);
     console.log(`🎯 Rota otimizada: ${optimizedItems.length} endereços reorganizados`);
 
     // ✅ FORMATO IDEAL PARA GOOGLE MAPS: Endereços OTIMIZADOS COM LOCALIZAÇÃO DO USUÁRIO
