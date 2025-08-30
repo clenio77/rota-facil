@@ -578,8 +578,36 @@ export default function CarteiroPage() {
       } else {
         setError(data.error || 'Erro ao processar lista ECT');
       }
-    } catch (err) {
-      if (err instanceof Error) {
+    } catch (err: any) {
+      console.error('Erro no processamento:', err);
+      
+      // ✅ VERIFICAR SE É ERRO 422 COM FALLBACK PARA ENTRADA MANUAL
+      if (err?.response?.status === 422 && err?.response?.data?.fallbackOptions?.manualEntry) {
+        const fallbackData = err.response.data;
+        const userChoice = confirm(`${fallbackData.message}\n\n📝 OPÇÕES:\n✅ OK = Digitar endereços manualmente\n❌ Cancelar = Tentar outro PDF\n\nFormato: ${fallbackData.fallbackOptions.exampleFormat}`);
+        
+        if (userChoice) {
+          // ✅ ATIVAR MODO DE ENTRADA MANUAL
+          setError('📝 Digite os endereços abaixo (um por linha):');
+          setShowAddressEditor(true);
+          // ✅ CRIAR LISTA VAZIA PARA ENTRADA MANUAL
+          const emptyData: ProcessedECTList = {
+            items: [
+              { objectCode: '001', address: '', cep: '', lat: 0, lng: 0, sequence: 1 },
+              { objectCode: '002', address: '', cep: '', lat: 0, lng: 0, sequence: 2 },
+              { objectCode: '003', address: '', cep: '', lat: 0, lng: 0, sequence: 3 }
+            ],
+            totalItems: 3,
+            extractedFrom: 'entrada-manual',
+            optimized: false
+          };
+          setProcessedData(emptyData);
+          setEditableItems([...emptyData.items]);
+          return;
+        } else {
+          setError('OCR falhou. Tente outro PDF com texto mais claro.');
+        }
+      } else if (err instanceof Error) {
         if (err.name === 'AbortError') {
           setError('Processamento demorou muito tempo. A API está processando uma lista grande. Tente novamente em alguns minutos.');
         } else if (err.message.includes('fetch')) {

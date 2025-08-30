@@ -132,6 +132,21 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Deduplicando endereços antes da primeira exibição...');
       console.log('🔍 DEBUG: result.addresses antes da deduplicação:', result.addresses.length);
       
+      // ✅ FALLBACK: Se OCR falhou, oferecer entrada manual
+      if (result.addresses.length === 0) {
+        console.log('⚠️ FALLBACK: OCR não extraiu endereços, oferecendo entrada manual');
+        return NextResponse.json({
+          success: false,
+          message: '❌ OCR não conseguiu extrair endereços do PDF',
+          error: 'No addresses extracted',
+          fallbackOptions: {
+            manualEntry: true,
+            message: 'Digite os endereços manualmente ou tente outro PDF',
+            exampleFormat: 'Rua das Flores, 123, CEP: 38400-000'
+          }
+        }, { status: 422 });
+      }
+      
       let deduplicatedAddresses;
       try {
         deduplicatedAddresses = deduplicateAddresses(result.addresses);
