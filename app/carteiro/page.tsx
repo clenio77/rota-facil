@@ -208,8 +208,22 @@ const generateGPX = (coordinates: any[], userLocation?: {lat: number; lng: numbe
 
 const generateWazeUrl = (coordinates: any[]) => {
   if (coordinates.length === 0) return '';
-  const firstStop = coordinates[0];
-  return `https://waze.com/ul?ll=${firstStop.lat}%2C${firstStop.lng}&navigate=yes`;
+  
+  // ✅ CRIAR URL COM MÚLTIPLOS WAYPOINTS PARA WAZE
+  // Formato: https://waze.com/ul?ll=lat,lng&navigate=yes
+  // Para múltiplos pontos, vamos usar Google Maps que funciona melhor
+  const origin = coordinates[0];
+  const destination = coordinates[coordinates.length - 1];
+  const waypoints = coordinates.slice(1, -1); // Pontos intermediários
+  
+  if (coordinates.length === 1) {
+    // ✅ APENAS UM PONTO: Usar Waze direto
+    return `https://waze.com/ul?ll=${origin.lat}%2C${origin.lng}&navigate=yes`;
+  } else {
+    // ✅ MÚLTIPLOS PONTOS: Usar Google Maps que suporta melhor waypoints
+    const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
+  }
 };
 
 const downloadFile = (content: string, filename: string, contentType: string) => {
@@ -943,11 +957,28 @@ export default function CarteiroPage() {
                     </button>
                     <button 
                       onClick={() => {
-                        // ✅ FUNÇÃO: Abrir em app de navegação
+                        // ✅ FUNÇÃO: Abrir em app de navegação com MÚLTIPLAS OPÇÕES
                         const coords = processedData.customMapData.coordinates;
                         if (coords && coords.length > 0) {
-                          const wazeUrl = generateWazeUrl(coords);
-                          window.open(wazeUrl, '_blank');
+                          const origin = coords[0];
+                          const destination = coords[coords.length - 1];
+                          const waypoints = coords.slice(1, -1);
+                          const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
+                          
+                          // ✅ GOOGLE MAPS COM TODA A ROTA
+                          const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
+                          
+                          // ✅ MOSTRAR OPÇÕES PARA O USUÁRIO
+                          const userChoice = confirm(`🗺️ ESCOLHA SEU APP DE NAVEGAÇÃO:\n\n✅ OK = Google Maps (rota completa com ${coords.length} pontos)\n❌ Cancelar = Waze (apenas primeiro ponto)\n\nRecomendado: Google Maps para rota completa!`);
+                          
+                          if (userChoice) {
+                            // ✅ GOOGLE MAPS - ROTA COMPLETA
+                            window.open(googleMapsUrl, '_blank');
+                          } else {
+                            // ✅ WAZE - PRIMEIRO PONTO
+                            const wazeUrl = `https://waze.com/ul?ll=${origin.lat}%2C${origin.lng}&navigate=yes`;
+                            window.open(wazeUrl, '_blank');
+                          }
                         }
                       }}
                       className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
