@@ -200,9 +200,37 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
         { lat: nextPoint.lat, lng: nextPoint.lng }
       );
     } else {
-      // ✅ NAVEGAÇÃO CONCLUÍDA
-      setIsNavigating(false);
-      alert('🎉 Navegação concluída! Todas as entregas foram realizadas.');
+      // ✅ ÚLTIMA ENTREGA CONCLUÍDA - RETORNAR AO PONTO INICIAL
+      const lastPoint = orderedPoints[currentStopIndex];
+      
+      console.log('🏁 ÚLTIMA ENTREGA CONCLUÍDA - RETORNANDO AO PONTO INICIAL...');
+      console.log(`📍 Da última parada: ${lastPoint.address} (${lastPoint.lat}, ${lastPoint.lng})`);
+      console.log(`📍 Para ponto inicial: (${currentLocation?.lat}, ${currentLocation?.lng})`);
+      
+      // ✅ MARCAR ÚLTIMA PARADA COMO CONCLUÍDA
+      if (onStopCompleted) {
+        onStopCompleted(lastPoint.id);
+      }
+      
+      if (currentLocation) {
+        // ✅ CALCULAR ROTA DE RETORNO AO PONTO INICIAL
+        calculateCurrentRoute(
+          { lat: lastPoint.lat, lng: lastPoint.lng }, 
+          { lat: currentLocation.lat, lng: currentLocation.lng }
+        );
+        
+        // ✅ MARCAR COMO RETORNO AO INÍCIO
+        setCurrentStopIndex(-1); // -1 indica retorno ao início
+        
+        alert('🏁 Última entrega concluída! Retornando ao ponto de partida...');
+        
+        // ✅ ADICIONAR LISTENER PARA DETECTAR CHEGADA AO PONTO INICIAL
+        // Nota: Na prática, isso seria feito via GPS ou botão manual do usuário
+      } else {
+        // ✅ SEM LOCALIZAÇÃO INICIAL - FINALIZAR
+        setIsNavigating(false);
+        alert('🎉 Navegação concluída! Todas as entregas foram realizadas.');
+      }
     }
   };
 
@@ -291,6 +319,33 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
                 totalPoints: points.length,
                 orderedPoints: orderedPoints.map(p => `${p.sequence}. ${p.address}`)
               });
+              
+              // ✅ DETECTAR SE ESTÁ RETORNANDO AO PONTO INICIAL
+              if (currentStopIndex === -1) {
+                return (
+                  <>
+                    <p className="text-blue-100">🏁 Retornando ao Ponto de Partida</p>
+                    <p className="text-sm text-blue-200">
+                      Todas as entregas concluídas! Voltando à localização inicial.
+                    </p>
+                    <p className="text-xs text-blue-300 mt-1">
+                      ✅ Coordenadas destino: {currentLocation?.lat}, {currentLocation?.lng}
+                    </p>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          setIsNavigating(false);
+                          setCurrentStopIndex(0);
+                          alert('🎉 Navegação TOTALMENTE concluída! Você retornou ao ponto de partida.');
+                        }}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold"
+                      >
+                        ✅ Cheguei ao Ponto Inicial
+                      </button>
+                    </div>
+                  </>
+                );
+              }
               
               return currentStop ? (
                 <>
