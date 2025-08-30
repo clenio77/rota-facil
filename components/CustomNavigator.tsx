@@ -48,7 +48,8 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
   const calculateCompleteOptimizedRoute = async () => {
     try {
       console.log('🔍 CALCULANDO ROTA OTIMIZADA COMPLETA...');
-      console.log('📍 Pontos ordenados:', points.map(p => `${p.sequence}. ${p.address}`));
+      console.log('📍 Total de pontos:', points.length);
+      console.log('📍 Pontos ordenados:', points.map(p => `${p.sequence}. ${p.address} (${p.lat}, ${p.lng})`));
       
       // ✅ CRIAR SEQUÊNCIA DE COORDENADAS NA ORDEM OTIMIZADA
       const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
@@ -58,15 +59,23 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
       const startPoint = currentLocation || { lat: -18.9203, lng: -48.2782 };
       const fullWaypoints = `${startPoint.lng},${startPoint.lat};${waypoints}`;
       
-      console.log('🗺️ Waypoints OSRM:', fullWaypoints);
+      console.log('🗺️ Waypoints OSRM completo:', fullWaypoints);
+      console.log('🗺️ Total de waypoints:', fullWaypoints.split(';').length);
       
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${fullWaypoints}?overview=full&geometries=geojson&steps=true`
-      );
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${fullWaypoints}?overview=full&geometries=geojson&steps=true`;
+      console.log('🌐 URL OSRM:', osrmUrl);
+      
+      const response = await fetch(osrmUrl);
+      console.log('📡 Resposta OSRM status:', response.status);
+      
       const data = await response.json();
+      console.log('📄 Resposta OSRM completa:', data);
       
       if (data.routes && data.routes[0]) {
         const coordinates = data.routes[0].geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+        console.log('🗺️ Coordenadas da rota calculadas:', coordinates.length, 'pontos');
+        console.log('🗺️ Primeiras 5 coordenadas:', coordinates.slice(0, 5));
+        
         setCompleteOptimizedRoute(coordinates);
         
         console.log('✅ ROTA OTIMIZADA CALCULADA!');
@@ -76,6 +85,8 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
         return data.routes[0];
       } else {
         console.error('❌ Nenhuma rota encontrada:', data);
+        console.error('❌ Código de erro OSRM:', data.code);
+        console.error('❌ Mensagem de erro OSRM:', data.message);
       }
     } catch (error) {
       console.error('❌ Erro ao calcular rota otimizada:', error);
@@ -102,10 +113,32 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
     return null;
   };
 
+  // ✅ FALLBACK: LINHA DIRETA ENTRE PONTOS (se OSRM falhar)
+  const createFallbackRoute = () => {
+    console.log('🔄 CRIANDO ROTA FALLBACK (linha direta)...');
+    const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
+    const startPoint = currentLocation || { lat: -18.9203, lng: -48.2782 };
+    
+    // ✅ CONECTAR: localização atual → todos os pontos em sequência
+    const fallbackCoordinates: [number, number][] = [
+      [startPoint.lat, startPoint.lng],
+      ...orderedPoints.map(p => [p.lat, p.lng] as [number, number])
+    ];
+    
+    console.log('📍 Rota fallback criada com', fallbackCoordinates.length, 'pontos');
+    setCompleteOptimizedRoute(fallbackCoordinates);
+  };
+
   // ✅ CALCULAR ROTA COMPLETA NA INICIALIZAÇÃO
   useEffect(() => {
     if (points.length > 0) {
-      calculateCompleteOptimizedRoute();
+      // ✅ TENTAR OSRM PRIMEIRO, FALLBACK SE FALHAR
+      calculateCompleteOptimizedRoute().then(result => {
+        if (!result) {
+          console.log('⚠️ OSRM falhou, usando rota fallback...');
+          setTimeout(() => createFallbackRoute(), 2000); // 2 segundos de delay
+        }
+      });
     }
   }, [points, currentLocation]);
 
@@ -222,15 +255,32 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
         )}
 
         {/* ✅ INFO DA ROTA COMPLETA */}
-        {!isNavigating && completeOptimizedRoute.length > 0 && (
-          <div className="mt-3 bg-green-700 p-3 rounded-lg">
-            <h3 className="font-bold text-lg">🗺️ Rota Otimizada Calculada:</h3>
-            <p className="text-green-100">
-              ✅ {points.length} paradas ordenadas por proximidade geográfica
-            </p>
-            <p className="text-sm text-green-200">
-              📍 Linha pontilhada azul = rota completa otimizada
-            </p>
+        {!isNavigating && (
+          <div className={`mt-3 p-3 rounded-lg ${
+            completeOptimizedRoute.length > 0 ? 'bg-green-700' : 'bg-orange-700'
+          }`}>
+            <h3 className="font-bold text-lg">
+              {completeOptimizedRoute.length > 0 ? '🗺️ Rota Otimizada Calculada:' : '⏳ Calculando Rota...'}
+            </h3>
+            {completeOptimizedRoute.length > 0 ? (
+              <>
+                <p className="text-green-100">
+                  ✅ {points.length} paradas ordenadas por proximidade geográfica
+                </p>
+                <p className="text-sm text-green-200">
+                  📍 Linha pontilhada azul = rota completa otimizada ({completeOptimizedRoute.length} pontos)
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-orange-100">
+                  🔄 Conectando {points.length} paradas via OSRM...
+                </p>
+                <p className="text-sm text-orange-200">
+                  ⚠️ Se demorar muito, verifique o console (F12)
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -289,7 +339,7 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
           ))}
 
           {/* ✅ ROTA OTIMIZADA COMPLETA (em azul claro) */}
-          {completeOptimizedRoute.length > 0 && (
+          {completeOptimizedRoute.length > 0 ? (
             <Polyline
               positions={completeOptimizedRoute}
               color="lightblue"
@@ -297,16 +347,22 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
               opacity={0.6}
               dashArray="5, 10"
             />
+          ) : (
+            // ✅ DEBUG: Mostrar que não há rota calculada
+            console.log('⚠️ ROTA OTIMIZADA NÃO DISPONÍVEL:', completeOptimizedRoute.length)
           )}
 
           {/* ✅ ROTA ATUAL (da posição para próxima parada - em azul escuro) */}
-          {currentRouteCoordinates.length > 0 && (
+          {currentRouteCoordinates.length > 0 ? (
             <Polyline
               positions={currentRouteCoordinates}
               color="darkblue"
               weight={5}
               opacity={0.9}
             />
+          ) : (
+            // ✅ DEBUG: Mostrar que não há rota atual
+            console.log('⚠️ ROTA ATUAL NÃO DISPONÍVEL:', currentRouteCoordinates.length)
           )}
         </MapContainer>
       </div>
