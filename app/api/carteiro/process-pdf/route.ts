@@ -130,8 +130,17 @@ export async function POST(request: NextRequest) {
       
       // ✅ PRIMEIRO: APLICAR DEDUPLICAÇÃO ANTES DA OTIMIZAÇÃO INICIAL
       console.log('🔍 Deduplicando endereços antes da primeira exibição...');
-      const deduplicatedAddresses = deduplicateAddresses(result.addresses);
-      console.log(`📊 Deduplicação inicial: ${result.addresses.length} → ${deduplicatedAddresses.length} endereços únicos`);
+      console.log('🔍 DEBUG: result.addresses antes da deduplicação:', result.addresses.length);
+      
+      let deduplicatedAddresses;
+      try {
+        deduplicatedAddresses = deduplicateAddresses(result.addresses);
+        console.log(`📊 Deduplicação inicial: ${result.addresses.length} → ${deduplicatedAddresses.length} endereços únicos`);
+      } catch (dedupError) {
+        console.error('❌ ERRO na deduplicação:', dedupError);
+        deduplicatedAddresses = result.addresses; // Fallback para endereços originais
+        console.log('⚠️ Usando endereços originais sem deduplicação');
+      }
       
       // ✅ NOVO: ROTEAMENTO AUTOMÁTICO INTELIGENTE (COM ENDEREÇOS DEDUPLICADOS)
       console.log('🚀 Iniciando roteamento automático...');
@@ -424,12 +433,8 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
           if (viaCepResponse.ok) {
             const viaCepData = await viaCepResponse.json();
             if (viaCepData && !viaCepData.erro) {
-              // ✅ ViaCEP retorna dados, mas não coordenadas. Vamos usar coordenadas padrão de Uberlândia
-              const uberlandiaCoords = {
-                lat: -18.9186 + (Math.random() - 0.5) * 0.01, // Centro + variação
-                lng: -48.2772 + (Math.random() - 0.5) * 0.01
-              };
-              coordinates = uberlandiaCoords;
+              // ✅ ViaCEP retorna dados, mas não coordenadas. Usar coordenadas determinísticas
+              coordinates = getCepBasedCoordinates(address.cep, address.endereco);
               console.log(`✅ ViaCEP: Endereço válido em ${viaCepData.localidade} - ${viaCepData.uf}`);
             }
           }
@@ -463,14 +468,11 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
           }
         }
         
-        // ✅ TENTATIVA 3: Coordenadas padrão de Uberlândia (último recurso)
+        // ✅ TENTATIVA 3: Coordenadas fixas baseadas no CEP (último recurso)
         if (!coordinates) {
-          console.log(`🔍 Tentativa 3: Coordenadas padrão de Uberlândia`);
-          coordinates = {
-            lat: -18.9186 + (Math.random() - 0.5) * 0.02, // Centro + variação maior
-            lng: -48.2772 + (Math.random() - 0.5) * 0.02
-          };
-          console.log(`✅ Coordenadas padrão: ${coordinates.lat}, ${coordinates.lng}`);
+          console.log(`🔍 Tentativa 3: Coordenadas fixas baseadas no CEP`);
+          coordinates = getCepBasedCoordinates(address.cep, address.endereco);
+          console.log(`✅ Coordenadas baseadas no CEP: ${coordinates.lat}, ${coordinates.lng}`);
         }
         
         // ✅ APLICAR COORDENADAS ENCONTRADAS
@@ -499,35 +501,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
       }
     });
 
-    // ✅ IMPORTANTE: NUNCA retornar antes da geocodificação!
-    console.log('🔍 DEBUG: ANTES do return - função deve continuar para geocodificação');
-    
-    // ✅ CONTINUAR EXECUÇÃO PARA GEOCODIFICAÇÃO
-    console.log('🗺️ Iniciando geocodificação dos endereços...');
-    console.log(`🔍 Total de endereços para geocodificar: ${addresses.length}`);
-    
-    // ✅ GEOCODIFICAR CADA ENDEREÇO
-    for (let i = 0; i < addresses.length; i++) {
-      const address = addresses[i] as CarteiroAddress;
-      
-      // ✅ CONSTRUIR ENDEREÇO COMPLETO PARA GEOCODIFICAÇÃO
-      const fullAddress = `${address.endereco}, Uberlândia - MG, ${address.cep}`;
-      console.log(`🔍 Geocodificando endereço ${i + 1}: ${fullAddress}`);
-      
-      // ✅ COORDENADAS PADRÃO DE UBERLÂNDIA (simplificado para teste)
-      const coordinates = {
-        lat: -18.9186 + (Math.random() - 0.5) * 0.02,
-        lng: -48.2772 + (Math.random() - 0.5) * 0.02
-      };
-      
-      address.coordinates = coordinates;
-      address.geocoded = true;
-      geocodedCount++;
-      
-      console.log(`✅ Endereço ${i + 1} geocodificado: ${coordinates.lat}, ${coordinates.lng}`);
-    }
-    
-    console.log(`✅ Geocodificação concluída: ${geocodedCount}/${addresses.length} endereços geocodificados`);
+    // ✅ GEOCODIFICAÇÃO JÁ FOI REALIZADA ACIMA - NÃO DUPLICAR
     
     // ✅ AGORA SIM RETORNAR COM ENDEREÇOS GEOCODIFICADOS
     return {
@@ -1069,5 +1043,42 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
     console.log(`✅ Total de endereços processados: ${addresses.length}`);
     return addresses;
   }
+
+// ✅ FUNÇÃO: Gerar coordenadas fixas baseadas no CEP (sem aleatoriedade)
+function getCepBasedCoordinates(cep: string, endereco: string): { lat: number; lng: number } {
+  // ✅ COORDENADAS BASE DE UBERLÂNDIA
+  const baseCoords = { lat: -18.9186, lng: -48.2772 };
+  
+  // ✅ SE CEP VÁLIDO, USAR OFFSET DETERMINÍSTICO BASEADO NO CEP
+  const cepNum = parseInt(cep?.replace(/[^\d]/g, '') || '38400000');
+  if (cepNum >= 38400000 && cepNum <= 38499999) {
+    // ✅ OFFSET DETERMINÍSTICO: MESMO CEP = MESMAS COORDENADAS
+    const offset = (cepNum - 38400000) / 100000; // Normalizar entre 0-1
+    const latOffset = (offset % 1) * 0.02 - 0.01; // -0.01 a +0.01
+    const lngOffset = ((offset * 1.7) % 1) * 0.02 - 0.01; // Diferente do lat
+    
+    return {
+      lat: baseCoords.lat + latOffset,
+      lng: baseCoords.lng + lngOffset
+    };
+  }
+  
+  // ✅ CEP INVÁLIDO: OFFSET BASEADO NO HASH DO ENDEREÇO
+  let hash = 0;
+  for (let i = 0; i < endereco.length; i++) {
+    const char = endereco.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  const normalizedHash = Math.abs(hash) / 2147483647; // Normalizar 0-1
+  const latOffset = (normalizedHash % 1) * 0.02 - 0.01;
+  const lngOffset = ((normalizedHash * 1.3) % 1) * 0.02 - 0.01;
+  
+  return {
+    lat: baseCoords.lat + latOffset,
+    lng: baseCoords.lng + lngOffset
+  };
+}
 
   // ✅ FUNÇÃO: Processar PDF de forma simples COM RETRY E TIMEOUT AUMENTADO
