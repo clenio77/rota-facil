@@ -115,6 +115,22 @@ export async function POST(request: NextRequest) {
       }
       
       if (!result.success) {
+        // ✅ VERIFICAR SE É ERRO DE OCR (sem texto extraído)
+        const resultWithError = result as any; // Type assertion para acessar error
+        if (resultWithError.error && resultWithError.error.includes('Nenhum texto foi extraído')) {
+          console.log('⚠️ FALLBACK: OCR falhou completamente, oferecendo entrada manual');
+          return NextResponse.json({
+            success: false,
+            message: '❌ OCR não conseguiu extrair texto do PDF',
+            error: 'No text extracted from PDF',
+            fallbackOptions: {
+              manualEntry: true,
+              message: 'Digite os endereços manualmente ou tente outro PDF',
+              exampleFormat: 'Rua das Flores, 123, CEP: 38400-000'
+            }
+          }, { status: 422 });
+        }
+        
         return NextResponse.json({
           success: false,
           error: 'Erro ao processar arquivo'
@@ -209,10 +225,28 @@ export async function POST(request: NextRequest) {
     console.error('❌ Erro no processamento do arquivo:', error);
     console.error('Stack trace:', error instanceof Error ? error.stack : 'Sem stack');
 
+    // ✅ VERIFICAR SE É ERRO DE OCR PARA ATIVAR FALLBACK
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('Nenhum texto foi extraído') || 
+        errorMessage.includes('OCR.space falhou') ||
+        errorMessage.includes('No text extracted')) {
+      console.log('⚠️ FALLBACK: Erro de OCR detectado, oferecendo entrada manual');
+      return NextResponse.json({
+        success: false,
+        message: '❌ OCR não conseguiu processar este PDF',
+        error: 'OCR failed to extract text',
+        fallbackOptions: {
+          manualEntry: true,
+          message: 'Digite os endereços manualmente ou tente outro PDF com melhor qualidade',
+          exampleFormat: 'Rua das Flores, 123, CEP: 38400-000'
+        }
+      }, { status: 422 });
+    }
+
     return NextResponse.json({
       success: false,
       error: 'Erro interno no processamento do arquivo',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+      details: errorMessage
     }, { status: 500 });
   }
 }
