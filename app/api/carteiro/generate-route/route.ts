@@ -17,6 +17,125 @@ interface RouteRequest {
   userLocation?: {lat: number; lng: number; city?: string; state?: string}; // ✅ ADICIONAR LOCALIZAÇÃO DO USUÁRIO
 }
 
+// ✅ FUNÇÃO: VALIDAR E NORMALIZAR ENDEREÇO COM VIACEP
+async function validateAndNormalizeAddress(address: string, cep?: string) {
+  try {
+    // ✅ EXTRAIR CEP DO ENDEREÇO SE NÃO FORNECIDO
+    let cleanCep = cep;
+    if (!cleanCep && address.includes('CEP:')) {
+      cleanCep = address.match(/CEP:\s*(\d{8})/)?.[1];
+    }
+    
+    if (!cleanCep) {
+      throw new Error('CEP não encontrado');
+    }
+    
+    // ✅ VALIDAR CEP COM VIACEP
+    const viaCepUrl = `https://viacep.com.br/ws/${cleanCep}/json/`;
+    console.log(`🌐 Consultando ViaCEP: ${viaCepUrl}`);
+    
+    const response = await fetch(viaCepUrl);
+    const viaCepData = await response.json();
+    
+    if (viaCepData.erro) {
+      throw new Error(`CEP inválido: ${cleanCep}`);
+    }
+    
+    console.log(`✅ ViaCEP encontrado:`, viaCepData);
+    
+    // ✅ EXTRAIR NÚMERO DO ENDEREÇO
+    const numberMatch = address.match(/(\d+)/);
+    const number = numberMatch ? numberMatch[1] : '';
+    
+    // ✅ CONSTRUIR ENDEREÇO COMPLETO E NORMALIZADO
+    const normalizedAddress = {
+      street: viaCepData.logradouro,
+      number: number,
+      district: viaCepData.bairro,
+      city: viaCepData.localidade,
+      state: viaCepData.uf,
+      cep: viaCepData.cep,
+      fullAddress: `${viaCepData.logradouro}${number ? ', ' + number : ''}, ${viaCepData.bairro}, ${viaCepData.localidade}, ${viaCepData.uf}, Brasil`
+    };
+    
+    return normalizedAddress;
+    
+  } catch (error) {
+    console.log(`⚠️ Erro na validação ViaCEP:`, error);
+    // ✅ FALLBACK: RETORNAR ENDEREÇO ORIGINAL
+    return {
+      street: address,
+      number: '',
+      district: 'Centro',
+      city: 'Uberlândia',
+      state: 'MG',
+      cep: cep || '',
+      fullAddress: `${address}, Uberlândia, MG, Brasil`
+    };
+  }
+}
+
+// ✅ FUNÇÃO: GEOCODIFICAR ENDEREÇO COM MÚLTIPLAS APIS
+async function geocodeAddress(addressData: any) {
+  const { fullAddress } = addressData;
+  
+  // ✅ OPÇÃO 1: NOMINATIM (OpenStreetMap - Gratuito)
+  try {
+    console.log(`🌍 Tentando Nominatim: ${fullAddress}`);
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1&addressdetails=1`;
+    
+    const response = await fetch(nominatimUrl, {
+      headers: {
+        'User-Agent': 'RotaFacil/1.0 (sistema de rotas para carteiros)'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      const result = data[0];
+      console.log(`✅ Nominatim encontrou:`, result);
+      
+      return {
+        lat: parseFloat(result.lat),
+        lng: parseFloat(result.lon),
+        city: result.address?.city || result.address?.town || 'Uberlândia',
+        accuracy: 'high'
+      };
+    }
+  } catch (error) {
+    console.log(`⚠️ Erro no Nominatim:`, error);
+  }
+  
+  // ✅ OPÇÃO 2: MAPBOX (se configurado)
+  try {
+    if (process.env.MAPBOX_ACCESS_TOKEN) {
+      console.log(`🗺️ Tentando Mapbox: ${fullAddress}`);
+      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(fullAddress)}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=BR&limit=1`;
+      
+      const response = await fetch(mapboxUrl);
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const result = data.features[0];
+        console.log(`✅ Mapbox encontrou:`, result);
+        
+        return {
+          lat: result.center[1],
+          lng: result.center[0],
+          city: result.place_name.includes('Uberlândia') ? 'Uberlândia' : 'Unknown',
+          accuracy: 'high'
+        };
+      }
+    }
+  } catch (error) {
+    console.log(`⚠️ Erro no Mapbox:`, error);
+  }
+  
+  console.log(`❌ Nenhuma geocodificação funcionou para: ${fullAddress}`);
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data: RouteRequest = await request.json();
@@ -377,27 +496,31 @@ export async function POST(request: NextRequest) {
 
     // ✅ PREPARAR COORDENADAS PARA O MAPA LEAFLET
       const mapCoordinates = await Promise.all(optimizedItems.map(async (item, index) => {
-        // ✅ TENTAR GEOCODIFICAÇÃO REAL PRIMEIRO
+        // ✅ TENTAR VALIDAÇÃO E GEOCODIFICAÇÃO REAL
         let coords;
         try {
-          // Importar o serviço de geocodificação
-          const { geocodeWithCache } = await import('../../../lib/geocodeCache');
-          const fullAddress = `${item.address}, ${item.cep}, Uberlândia, MG, Brasil`;
-          const geocodedResult = await geocodeWithCache(fullAddress, data.userLocation);
+          console.log(`🔍 Processando: ${item.address}, CEP: ${item.cep}`);
+          
+          // ✅ PASSO 1: VALIDAR CEP COM VIACEP
+          const validatedAddress = await validateAndNormalizeAddress(item.address, item.cep);
+          console.log(`📋 Endereço validado:`, validatedAddress);
+          
+          // ✅ PASSO 2: GEOCODIFICAR ENDEREÇO COMPLETO
+          const geocodedResult = await geocodeAddress(validatedAddress);
           
           if (geocodedResult && geocodedResult.lat && geocodedResult.lng) {
-            console.log(`🎯 GEOCODIFICAÇÃO REAL: ${item.address} → ${geocodedResult.lat}, ${geocodedResult.lng}`);
+            console.log(`🎯 GEOCODIFICAÇÃO REAL: ${validatedAddress.fullAddress} → ${geocodedResult.lat}, ${geocodedResult.lng}`);
             coords = {
               lat: geocodedResult.lat,
               lng: geocodedResult.lng,
-              region: geocodedResult.city || 'Uberlândia'
+              region: validatedAddress.district || geocodedResult.city || 'Uberlândia'
             };
           } else {
             console.log(`⚠️ FALLBACK para coordenadas determinísticas: ${item.address}`);
             coords = getRealCoordinatesFromAddress(item.address, item.cep);
           }
         } catch (error) {
-          console.log(`❌ Erro na geocodificação, usando fallback: ${item.address}`, error);
+          console.log(`❌ Erro na validação/geocodificação, usando fallback: ${item.address}`, error);
           coords = getRealCoordinatesFromAddress(item.address, item.cep);
         }
         
