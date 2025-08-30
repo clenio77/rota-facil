@@ -3,7 +3,7 @@ import { writeFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 
-import { processCarteiroFile, generateMapData, detectFileType, generateOptimizedRoute } from '../../../../utils/pdfExtractor';
+import { processCarteiroFile, generateMapData, detectFileType, generateOptimizedRoute, deduplicateAddresses } from '../../../../utils/pdfExtractor';
 
 // ✅ INTERFACE LOCAL PARA ENDEREÇOS DO CARTEIRO
 interface CarteiroAddress {
@@ -128,19 +128,24 @@ export async function POST(request: NextRequest) {
         throw new Error('Endereços não foram processados corretamente');
       }
       
-      // ✅ NOVO: ROTEAMENTO AUTOMÁTICO INTELIGENTE
+      // ✅ PRIMEIRO: APLICAR DEDUPLICAÇÃO ANTES DA OTIMIZAÇÃO INICIAL
+      console.log('🔍 Deduplicando endereços antes da primeira exibição...');
+      const deduplicatedAddresses = deduplicateAddresses(result.addresses);
+      console.log(`📊 Deduplicação inicial: ${result.addresses.length} → ${deduplicatedAddresses.length} endereços únicos`);
+      
+      // ✅ NOVO: ROTEAMENTO AUTOMÁTICO INTELIGENTE (COM ENDEREÇOS DEDUPLICADOS)
       console.log('🚀 Iniciando roteamento automático...');
       console.log('📍 Localização do usuário para roteamento:', JSON.stringify(userLocation, null, 2));
-      console.log('🔍 Total de endereços para otimizar:', result.addresses.length);
-      console.log('🔍 Primeiros 3 endereços:', result.addresses.slice(0, 3).map(addr => ({
+      console.log('🔍 Total de endereços para otimizar:', deduplicatedAddresses.length);
+      console.log('🔍 Primeiros 3 endereços:', deduplicatedAddresses.slice(0, 3).map(addr => ({
         endereco: addr.endereco,
         cep: addr.cep,
         coordinates: addr.coordinates
       })));
       
-      // ✅ GERAR ROTA OTIMIZADA AUTOMATICAMENTE
+      // ✅ GERAR ROTA OTIMIZADA AUTOMATICAMENTE (COM ENDEREÇOS DEDUPLICADOS)
       console.log('🧠 Chamando generateOptimizedRoute...');
-      const optimizedRoute = generateOptimizedRoute(result.addresses, userLocation);
+      const optimizedRoute = generateOptimizedRoute(deduplicatedAddresses, userLocation);
       
       if (!optimizedRoute.success) {
         console.error('❌ Erro na otimização da rota:', optimizedRoute.error);
@@ -148,14 +153,15 @@ export async function POST(request: NextRequest) {
       }
       
       // ✅ GERAR DADOS DO MAPA COM ROTA OTIMIZADA
-      const mapData = generateMapData(result.addresses);
+      const mapData = generateMapData(deduplicatedAddresses);
       
       console.log(`✅ ${fileType.toUpperCase()} processado: ${result.geocoded}/${result.total} endereços geocodificados`);
+      console.log(`🔗 Deduplicação aplicada: ${result.addresses.length} → ${deduplicatedAddresses.length} endereços únicos`);
       console.log(`🚀 Rota otimizada: ${optimizedRoute.totalStops} paradas, ${optimizedRoute.metrics?.totalDistance || 0} km, ${optimizedRoute.metrics?.totalTime || 0} min`);
       
       return NextResponse.json({
         success: true,
-        addresses: result.addresses,
+        addresses: deduplicatedAddresses,
         mapData,
         optimizedRoute: optimizedRoute.optimizedRoute,
         googleMapsUrl: optimizedRoute.googleMapsUrl,
@@ -482,7 +488,7 @@ async function processCarteiroFileFromBuffer(base64Data: string, fileName: strin
     }
     
     console.log(`✅ Geocodificação concluída: ${geocodedCount}/${addresses.length} endereços geocodificados`);
-    
+
     // ✅ DEBUG: Verificar coordenadas dos endereços
     console.log('🔍 Verificando coordenadas dos endereços...');
     addresses.forEach((addr, index) => {
@@ -567,34 +573,34 @@ async function processPDFSimple(base64Data: string, retryCount = 0): Promise<str
   const TIMEOUT_MS = 180000; // ✅ AUMENTADO: 3 minutos para PDFs grandes
   
   try {
-    const formData = new FormData();
-    formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
-    formData.append('language', 'por');
-    formData.append('isOverlayRequired', 'false');
-    formData.append('detectOrientation', 'true');
-    formData.append('scale', 'true');
-    formData.append('OCREngine', '2');
-    formData.append('filetype', 'pdf');
-    formData.append('isTable', 'true');
-    
+  const formData = new FormData();
+  formData.append('base64Image', `data:application/pdf;base64,${base64Data}`);
+  formData.append('language', 'por');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('detectOrientation', 'true');
+  formData.append('scale', 'true');
+  formData.append('OCREngine', '2');
+  formData.append('filetype', 'pdf');
+  formData.append('isTable', 'true');
+  
     console.log(`📤 Enviando PDF para OCR.space (tentativa ${retryCount + 1}/${MAX_RETRIES + 1})...`);
     console.log(`⏱️ Timeout configurado: ${TIMEOUT_MS / 1000} segundos`);
 
-    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
-      },
+  const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'apikey': process.env.OCR_SPACE_API_KEY || 'helloworld'
+    },
       signal: AbortSignal.timeout(TIMEOUT_MS) // ✅ TIMEOUT AUMENTADO
-    });
+  });
 
-    if (!ocrResponse.ok) {
-      throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
-    }
+  if (!ocrResponse.ok) {
+    throw new Error(`OCR.space falhou: ${ocrResponse.status}`);
+  }
 
-    const ocrData = await ocrResponse.json();
-    console.log('📥 Resposta recebida do OCR.space');
+  const ocrData = await ocrResponse.json();
+  console.log('📥 Resposta recebida do OCR.space');
   
   // ✅ IMPORTANTE: Processar TODAS as páginas disponíveis
   let extractedText = '';
@@ -913,8 +919,8 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
       
             // ✅ CORREÇÃO CRÍTICA: SEMPRE limpar prefixos "Endereço:" (não apenas quando necessário)
       if (addr.endereco.includes('Endereço:') || addr.endereco.includes('ndereço:')) {
-        
-        // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
+      
+              // ✅ REMOVER TODOS OS PREFIXOS DE ENDEREÇO (com ou sem tabulações)
         const addressPrefixes = [
           'ndereço:\t', 'ndereço:', 'ndereço',
           'Endereço:\t', 'Endereço:', 'Endereço',
@@ -948,7 +954,7 @@ function extractAddressesFromText(text: string): CarteiroAddress[] {
         // ✅ APLICAR ENDEREÇO LIMPO
         addr.endereco = cleanAddress;
         console.log(`✅ Endereço ${index + 1} limpo: "${cleanAddress}"`);
-      }
+        }
       
       // ✅ SE AINDA TEM "ser extraído", usar fallback
       if (addr.endereco.includes('ser extraído')) {
