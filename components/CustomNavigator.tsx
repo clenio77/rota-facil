@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 interface NavigationPoint {
@@ -372,38 +373,106 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
           )}
 
           {/* ✅ PONTOS DE ENTREGA (ordenados por sequência) */}
-          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => (
-            <Marker
-              key={point.id}
-              position={[point.lat, point.lng]}
-              eventHandlers={{
-                click: () => navigateToStop(index)
-              }}
-            >
-              <Popup>
-                <div className="text-center">
-                  <h4 className="font-bold">
-                    {index === currentStopIndex ? '🎯' : index < currentStopIndex ? '✅' : '⏳'} 
-                    Parada {point.sequence}
-                  </h4>
-                  <p className="text-sm">{point.address}</p>
-                  <p className="text-xs text-gray-500">ID: {point.id}</p>
-                  <button
-                    onClick={() => navigateToStop(index)}
-                    className={`mt-2 px-3 py-1 rounded text-sm ${
-                      index === currentStopIndex 
-                        ? 'bg-blue-500 text-white' 
-                        : index < currentStopIndex 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-gray-500 text-white'
-                    }`}
-                  >
-                    {index === currentStopIndex ? '🎯 Parada Atual' : index < currentStopIndex ? '✅ Concluído' : '🧭 Navegar'}
-                  </button>
+          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => {
+            // ✅ DETERMINAR STATUS E COR DO MARCADOR
+            const isCurrent = index === currentStopIndex;
+            const isCompleted = index < currentStopIndex;
+            const isPending = index > currentStopIndex;
+            
+            // ✅ CRIAR ÍCONE PERSONALIZADO
+            const customIcon = L.divIcon({
+              html: `
+                <div style="
+                  background: ${isCurrent ? '#3B82F6' : isCompleted ? '#10B981' : '#6B7280'};
+                  color: white;
+                  border-radius: 50%;
+                  width: 30px;
+                  height: 30px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  font-size: 12px;
+                  border: 2px solid white;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                ">
+                  ${isCurrent ? '🎯' : isCompleted ? '✅' : index + 1}
                 </div>
-              </Popup>
-            </Marker>
-          ))}
+              `,
+              className: 'custom-marker',
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
+            });
+
+            return (
+              <Marker
+                key={point.id}
+                position={[point.lat, point.lng]}
+                icon={customIcon}
+                eventHandlers={{
+                  click: () => navigateToStop(index)
+                }}
+              >
+                <Popup maxWidth={300}>
+                  <div className="p-2">
+                    {/* ✅ CABEÇALHO COM STATUS */}
+                    <div className={`text-center p-2 rounded-t mb-2 ${
+                      isCurrent ? 'bg-blue-100 text-blue-800' : 
+                      isCompleted ? 'bg-green-100 text-green-800' : 
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      <h4 className="font-bold text-lg">
+                        {isCurrent ? '🎯 PARADA ATUAL' : isCompleted ? '✅ CONCLUÍDA' : '⏳ PENDENTE'}
+                      </h4>
+                      <p className="text-sm">
+                        {index + 1}º de {points.length} paradas
+                      </p>
+                    </div>
+
+                    {/* ✅ INFORMAÇÕES DO OBJETO ECT */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">📦 Objeto ECT:</h5>
+                      <p className="font-mono text-sm bg-gray-100 p-2 rounded">
+                        {point.id}
+                      </p>
+                    </div>
+
+                    {/* ✅ ENDEREÇO COMPLETO */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">🏠 Endereço:</h5>
+                      <p className="text-sm bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                        {point.address}
+                      </p>
+                    </div>
+
+                    {/* ✅ COORDENADAS */}
+                    <div className="mb-3">
+                      <h5 className="font-bold text-gray-700 mb-1">📍 Coordenadas:</h5>
+                      <p className="text-xs text-gray-600 font-mono">
+                        {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                      </p>
+                    </div>
+
+                    {/* ✅ AÇÕES */}
+                    <div className="text-center">
+                      <button
+                        onClick={() => navigateToStop(index)}
+                        className={`px-4 py-2 rounded font-bold text-sm ${
+                          isCurrent 
+                            ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                            : isCompleted 
+                            ? 'bg-green-500 text-white hover:bg-green-600' 
+                            : 'bg-gray-500 text-white hover:bg-gray-600'
+                        }`}
+                      >
+                        {isCurrent ? '🎯 Ver Rota Atual' : isCompleted ? '🔄 Revisar Entrega' : '🧭 Navegar Para Aqui'}
+                      </button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
 
           {/* ✅ ROTA OTIMIZADA COMPLETA (em azul claro) */}
           {completeOptimizedRoute.length > 0 ? (
@@ -438,32 +507,73 @@ export default function CustomNavigator({ points, userLocation, onStopCompleted 
       <div className="bg-white border-t p-4 max-h-48 overflow-y-auto">
         <h3 className="font-bold mb-2">📋 Rota Otimizada (Sequência de Entrega):</h3>
         <div className="space-y-2">
-          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => (
-            <div
-              key={point.id}
-              className={`p-2 rounded-lg border cursor-pointer ${
-                index === currentStopIndex
-                  ? 'bg-blue-100 border-blue-500'
-                  : index < currentStopIndex
-                  ? 'bg-green-100 border-green-500'
-                  : 'bg-gray-50 border-gray-300'
-              }`}
-              onClick={() => navigateToStop(index)}
-            >
-              <div className="flex justify-between items-center">
-                <span className="font-medium">
-                  {index < currentStopIndex ? '✅' : index === currentStopIndex ? '🎯' : '⏳'} 
-                  {index + 1}º → {point.address}
-                </span>
-                <span className="text-sm text-gray-500">#{point.sequence}</span>
-              </div>
-              {index === currentStopIndex && (
-                <div className="mt-1 text-xs text-blue-600">
-                  📍 Próxima entrega na sequência otimizada
+          {[...points].sort((a, b) => a.sequence - b.sequence).map((point, index) => {
+            const isCurrent = index === currentStopIndex;
+            const isCompleted = index < currentStopIndex;
+            
+            return (
+              <div
+                key={point.id}
+                className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                  isCurrent
+                    ? 'bg-blue-100 border-blue-500 shadow-md'
+                    : isCompleted
+                    ? 'bg-green-100 border-green-500'
+                    : 'bg-gray-50 border-gray-300 hover:bg-gray-100'
+                }`}
+                onClick={() => navigateToStop(index)}
+              >
+                {/* ✅ LINHA PRINCIPAL */}
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">
+                        {isCompleted ? '✅' : isCurrent ? '🎯' : '⏳'}
+                      </span>
+                      <span className="font-bold text-gray-800">
+                        {index + 1}º Parada
+                      </span>
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        isCurrent ? 'bg-blue-500 text-white' :
+                        isCompleted ? 'bg-green-500 text-white' :
+                        'bg-gray-400 text-white'
+                      }`}>
+                        {isCurrent ? 'ATUAL' : isCompleted ? 'FEITO' : 'PENDENTE'}
+                      </span>
+                    </div>
+                    
+                    {/* ✅ ENDEREÇO */}
+                    <p className="text-sm text-gray-700 mb-1">
+                      🏠 {point.address}
+                    </p>
+                    
+                    {/* ✅ OBJETO ECT */}
+                    <p className="text-xs font-mono text-gray-600 bg-gray-200 px-2 py-1 rounded">
+                      📦 {point.id}
+                    </p>
+                  </div>
+                  
+                  <div className="text-right text-xs text-gray-500">
+                    <div>#{point.sequence}</div>
+                    <div className="mt-1">
+                      {point.lat.toFixed(4)}<br/>
+                      {point.lng.toFixed(4)}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+                
+                {/* ✅ INFO ADICIONAL PARA PARADA ATUAL */}
+                {isCurrent && (
+                  <div className="mt-2 pt-2 border-t border-blue-300">
+                    <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded">
+                      📍 <strong>Próxima entrega na sequência otimizada</strong><br/>
+                      🧭 Clique para ver detalhes da rota
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
