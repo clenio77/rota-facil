@@ -75,6 +75,25 @@ async function validateAndNormalizeAddress(address: string, cep?: string) {
   }
 }
 
+// ✅ FUNÇÃO: VALIDAR SE COORDENADAS ESTÃO EM UBERLÂNDIA
+function isValidUberlandiaCoordinate(lat: number, lng: number): boolean {
+  // ✅ LIMITES GEOGRÁFICOS DE UBERLÂNDIA (com margem de segurança)
+  const UBERLANDIA_BOUNDS = {
+    north: -18.8500,  // Limite norte
+    south: -19.0500,  // Limite sul  
+    east: -48.2000,   // Limite leste
+    west: -48.3500    // Limite oeste
+  };
+  
+  const isValid = lat >= UBERLANDIA_BOUNDS.south && 
+                  lat <= UBERLANDIA_BOUNDS.north && 
+                  lng >= UBERLANDIA_BOUNDS.west && 
+                  lng <= UBERLANDIA_BOUNDS.east;
+  
+  console.log(`🌍 Validando coordenadas: ${lat}, ${lng} - ${isValid ? 'VÁLIDA' : 'INVÁLIDA'} para Uberlândia`);
+  return isValid;
+}
+
 // ✅ FUNÇÃO: GEOCODIFICAR ENDEREÇO COM MÚLTIPLAS APIS
 async function geocodeAddress(addressData: any) {
   const { fullAddress } = addressData;
@@ -94,14 +113,24 @@ async function geocodeAddress(addressData: any) {
     
     if (data && data.length > 0) {
       const result = data[0];
+      const lat = parseFloat(result.lat);
+      const lng = parseFloat(result.lon);
+      
       console.log(`✅ Nominatim encontrou:`, result);
       
-      return {
-        lat: parseFloat(result.lat),
-        lng: parseFloat(result.lon),
-        city: result.address?.city || result.address?.town || 'Uberlândia',
-        accuracy: 'high'
-      };
+      // ✅ VALIDAR SE AS COORDENADAS ESTÃO EM UBERLÂNDIA
+      if (isValidUberlandiaCoordinate(lat, lng)) {
+        console.log(`✅ Coordenadas válidas para Uberlândia: ${lat}, ${lng}`);
+        return {
+          lat: lat,
+          lng: lng,
+          city: result.address?.city || result.address?.town || 'Uberlândia',
+          accuracy: 'high'
+        };
+      } else {
+        console.log(`❌ Coordenadas FORA de Uberlândia rejeitadas: ${lat}, ${lng}`);
+        // ✅ REJEITAR COORDENADAS INVÁLIDAS - CONTINUAR PARA PRÓXIMA OPÇÃO
+      }
     }
   } catch (error) {
     console.log(`⚠️ Erro no Nominatim:`, error);
@@ -118,14 +147,23 @@ async function geocodeAddress(addressData: any) {
       
       if (data.features && data.features.length > 0) {
         const result = data.features[0];
+        const lat = result.center[1];
+        const lng = result.center[0];
+        
         console.log(`✅ Mapbox encontrou:`, result);
         
-        return {
-          lat: result.center[1],
-          lng: result.center[0],
-          city: result.place_name.includes('Uberlândia') ? 'Uberlândia' : 'Unknown',
-          accuracy: 'high'
-        };
+        // ✅ VALIDAR SE AS COORDENADAS ESTÃO EM UBERLÂNDIA
+        if (isValidUberlandiaCoordinate(lat, lng)) {
+          console.log(`✅ Coordenadas Mapbox válidas para Uberlândia: ${lat}, ${lng}`);
+          return {
+            lat: lat,
+            lng: lng,
+            city: result.place_name.includes('Uberlândia') ? 'Uberlândia' : 'Unknown',
+            accuracy: 'high'
+          };
+        } else {
+          console.log(`❌ Coordenadas Mapbox FORA de Uberlândia rejeitadas: ${lat}, ${lng}`);
+        }
       }
     }
   } catch (error) {
