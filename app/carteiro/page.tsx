@@ -927,7 +927,9 @@ export default function CarteiroPage() {
                     </button>
                     <button 
                       onClick={() => {
-                        // ✅ FUNÇÃO: Abrir DIRETAMENTE no Google Maps com ROTA COMPLETA
+                        // ⚠️ AVISO: Google Maps reordena automaticamente
+                        alert('⚠️ AVISO IMPORTANTE:\n\nGoogle Maps REORDENA os pontos automaticamente!\nEle não respeita nossa sequência otimizada.\n\n✅ RECOMENDAÇÃO:\nUse "📱 Links Ponto-a-Ponto" para navegação correta!\n\nContinuar mesmo assim?');
+                        
                         const coords = processedData.customMapData.coordinates;
                         if (coords && coords.length > 0) {
                           const origin = coords[0];
@@ -935,19 +937,14 @@ export default function CarteiroPage() {
                           const waypoints = coords.slice(1, -1);
                           const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
                           
-                          // ✅ GOOGLE MAPS COM TODA A ROTA OTIMIZADA
+                          // ⚠️ GOOGLE MAPS (com limitações conhecidas)
                           const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
-                          
-                          // ✅ ABRIR DIRETAMENTE - SEM PERGUNTAS
                           window.open(googleMapsUrl, '_blank');
-                          
-                          // ✅ FEEDBACK VISUAL
-                          console.log(`🗺️ Abrindo Google Maps com rota completa: ${coords.length} pontos`);
                         }
                       }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                      className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-colors opacity-75"
                     >
-                      🗺️ Google Maps
+                      ⚠️ Google Maps (não recomendado)
                     </button>
                     <button 
                       onClick={() => {
@@ -956,13 +953,13 @@ export default function CarteiroPage() {
                         if (coords && coords.length > 0) {
                           const linksList = coords.map((coord, index) => {
                             const googleMapsLink = `https://maps.google.com/?q=${coord.lat},${coord.lng}`;
-                            return `${index + 1}. ${coord.address}\n   🗺️ ${googleMapsLink}`;
+                            return `📍 PARADA ${index + 1}:\n${coord.address}\n🗺️ ${googleMapsLink}`;
                           }).join('\n\n');
                           
-                          const fullText = `📱 ROTA PONTO-A-PONTO - ${coords.length} PARADAS\n\n${linksList}\n\n💡 COMO USAR:\n- Toque em cada link na sequência\n- Abre direto no Google Maps\n- Sem apps extras necessários!`;
+                          const fullText = `🚚 ROTA OTIMIZADA DO CARTEIRO\n📅 ${new Date().toLocaleDateString()}\n🎯 ${coords.length} PARADAS NA SEQUÊNCIA CORRETA\n\n${linksList}\n\n💡 INSTRUÇÕES:\n✅ Cole esta lista no WhatsApp ou Bloco de Notas\n✅ Toque nos links 🗺️ na sequência (1→2→3...)\n✅ Cada link abre o Google Maps no ponto exato\n✅ NÃO precisa baixar apps extras!\n\n🎊 ROTA OTIMIZADA PELO ROTA FÁCIL`;
                           
                           navigator.clipboard.writeText(fullText).then(() => {
-                            alert('📋 Lista com links copiada!\n\n💡 Cole no WhatsApp ou Notas\nToque nos links para navegar ponto-a-ponto!');
+                            alert('🎉 SUCESSO!\n\n📋 Lista de navegação copiada!\n\n📱 PRÓXIMOS PASSOS:\n1. Abra WhatsApp ou Notas\n2. Cole a lista (Ctrl+V)\n3. Toque nos links 🗺️ na ordem\n4. Google Maps abre cada ponto!\n\n✅ Navegação perfeita garantida!');
                           }).catch(() => {
                             // ✅ FALLBACK se clipboard não funcionar
                             const textArea = document.createElement('textarea');
@@ -971,13 +968,13 @@ export default function CarteiroPage() {
                             textArea.select();
                             document.execCommand('copy');
                             document.body.removeChild(textArea);
-                            alert('📋 Lista com links copiada!\n\n💡 Cole no WhatsApp ou Notas\nToque nos links para navegar!');
+                            alert('🎉 SUCESSO!\n\n📋 Lista copiada para navegação!\n\n📱 Cole no WhatsApp e toque nos links 🗺️!');
                           });
                         }
                       }}
-                      className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors"
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors font-bold border-2 border-green-400"
                     >
-                      📱 Links Ponto-a-Ponto
+                      🎯 NAVEGAÇÃO CORRETA
                     </button>
                   </div>
                 </div>
