@@ -951,17 +951,18 @@ export default function CarteiroPage() {
                     </button>
                     <button 
                       onClick={() => {
-                        // ✅ FUNÇÃO: Copiar coordenadas para outros apps
+                        // ✅ FUNÇÃO: Gerar links individuais do Google Maps
                         const coords = processedData.customMapData.coordinates;
                         if (coords && coords.length > 0) {
-                          const coordsList = coords.map((coord, index) => 
-                            `${index + 1}. ${coord.address}\n   📍 ${coord.lat}, ${coord.lng}`
-                          ).join('\n\n');
+                          const linksList = coords.map((coord, index) => {
+                            const googleMapsLink = `https://maps.google.com/?q=${coord.lat},${coord.lng}`;
+                            return `${index + 1}. ${coord.address}\n   🗺️ ${googleMapsLink}`;
+                          }).join('\n\n');
                           
-                          const fullText = `🗺️ ROTA OTIMIZADA - ${coords.length} PONTOS\n\n${coordsList}`;
+                          const fullText = `📱 ROTA PONTO-A-PONTO - ${coords.length} PARADAS\n\n${linksList}\n\n💡 COMO USAR:\n- Toque em cada link na sequência\n- Abre direto no Google Maps\n- Sem apps extras necessários!`;
                           
                           navigator.clipboard.writeText(fullText).then(() => {
-                            alert('📋 Lista de coordenadas copiada!\nCole em qualquer app de navegação.');
+                            alert('📋 Lista com links copiada!\n\n💡 Cole no WhatsApp ou Notas\nToque nos links para navegar ponto-a-ponto!');
                           }).catch(() => {
                             // ✅ FALLBACK se clipboard não funcionar
                             const textArea = document.createElement('textarea');
@@ -970,13 +971,13 @@ export default function CarteiroPage() {
                             textArea.select();
                             document.execCommand('copy');
                             document.body.removeChild(textArea);
-                            alert('📋 Lista de coordenadas copiada!\nCole em qualquer app de navegação.');
+                            alert('📋 Lista com links copiada!\n\n💡 Cole no WhatsApp ou Notas\nToque nos links para navegar!');
                           });
                         }
                       }}
                       className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors"
                     >
-                      📋 Copiar Coordenadas
+                      📱 Links Ponto-a-Ponto
                     </button>
                   </div>
                 </div>
