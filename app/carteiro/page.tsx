@@ -206,8 +206,74 @@ const generateGPX = (coordinates: any[], userLocation?: {lat: number; lng: numbe
 </gpx>`;
 };
 
-// ✅ FUNÇÃO REMOVIDA: generateWazeUrl() - Waze não suporta múltiplos waypoints adequadamente
-// Focamos apenas em soluções que realmente funcionam para carteiros profissionais
+// ✅ FUNÇÃO KML para Google Earth e aplicativos profissionais
+const generateKML = (coordinates: any[], userLocation?: {lat: number; lng: number}) => {
+  const startPoint = userLocation || { lat: -18.9203, lng: -48.2782 };
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Rota Otimizada Carteiro</name>
+    <description>Rota gerada pelo Rota Fácil - ${new Date().toLocaleDateString()}</description>
+    
+    <Style id="routeStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+    
+    <Style id="waypointStyle">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    
+    <Placemark>
+      <name>Início</name>
+      <description>Ponto de partida</description>
+      <styleUrl>#waypointStyle</styleUrl>
+      <Point>
+        <coordinates>${startPoint.lng},${startPoint.lat},0</coordinates>
+      </Point>
+    </Placemark>
+    
+    ${coordinates.map((coord, index) => `
+    <Placemark>
+      <name>Parada ${coord.sequence}</name>
+      <description>${coord.address}</description>
+      <styleUrl>#waypointStyle</styleUrl>
+      <Point>
+        <coordinates>${coord.lng},${coord.lat},0</coordinates>
+      </Point>
+    </Placemark>`).join('')}
+    
+    <Placemark>
+      <name>Fim</name>
+      <description>Ponto de chegada</description>
+      <styleUrl>#waypointStyle</styleUrl>
+      <Point>
+        <coordinates>${startPoint.lng},${startPoint.lat},0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Rota Otimizada</name>
+      <description>Trajeto completo otimizado</description>
+      <styleUrl>#routeStyle</styleUrl>
+      <LineString>
+        <coordinates>
+          ${startPoint.lng},${startPoint.lat},0
+          ${coordinates.map(coord => `${coord.lng},${coord.lat},0`).join('\n          ')}
+          ${startPoint.lng},${startPoint.lat},0
+        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>`;
+};
 
 const downloadFile = (content: string, filename: string, contentType: string) => {
   const blob = new Blob([content], { type: contentType });
@@ -911,71 +977,100 @@ export default function CarteiroPage() {
                     </div>
                   </div>
                   
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button 
-                      onClick={() => {
-                        // ✅ FUNÇÃO: Gerar arquivo GPX para GPS/Celular
-                        const coords = processedData.customMapData.coordinates;
-                        if (coords) {
-                          const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
-                          downloadFile(gpxData, 'rota-carteiro-otimizada.gpx', 'application/gpx+xml');
-                        }
-                      }}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors"
-                    >
-                      📱 Download GPX
-                    </button>
-                    <button 
-                      onClick={() => {
-                        // ⚠️ AVISO: Google Maps reordena automaticamente
-                        alert('⚠️ AVISO IMPORTANTE:\n\nGoogle Maps REORDENA os pontos automaticamente!\nEle não respeita nossa sequência otimizada.\n\n✅ RECOMENDAÇÃO:\nUse "📱 Links Ponto-a-Ponto" para navegação correta!\n\nContinuar mesmo assim?');
-                        
-                        const coords = processedData.customMapData.coordinates;
-                        if (coords && coords.length > 0) {
-                          const origin = coords[0];
-                          const destination = coords[coords.length - 1];
-                          const waypoints = coords.slice(1, -1);
-                          const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
-                          
-                          // ⚠️ GOOGLE MAPS (com limitações conhecidas)
-                          const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
-                          window.open(googleMapsUrl, '_blank');
-                        }
-                      }}
-                      className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-colors opacity-75"
-                    >
-                      ⚠️ Google Maps (não recomendado)
-                    </button>
-                    <button 
-                      onClick={() => {
-                        // ✅ FUNÇÃO: Gerar links individuais do Google Maps
-                        const coords = processedData.customMapData.coordinates;
-                        if (coords && coords.length > 0) {
-                          const linksList = coords.map((coord, index) => {
-                            const googleMapsLink = `https://maps.google.com/?q=${coord.lat},${coord.lng}`;
-                            return `📍 PARADA ${index + 1}:\n${coord.address}\n🗺️ ${googleMapsLink}`;
-                          }).join('\n\n');
-                          
-                          const fullText = `🚚 ROTA OTIMIZADA DO CARTEIRO\n📅 ${new Date().toLocaleDateString()}\n🎯 ${coords.length} PARADAS NA SEQUÊNCIA CORRETA\n\n${linksList}\n\n💡 INSTRUÇÕES:\n✅ Cole esta lista no WhatsApp ou Bloco de Notas\n✅ Toque nos links 🗺️ na sequência (1→2→3...)\n✅ Cada link abre o Google Maps no ponto exato\n✅ NÃO precisa baixar apps extras!\n\n🎊 ROTA OTIMIZADA PELO ROTA FÁCIL`;
-                          
-                          navigator.clipboard.writeText(fullText).then(() => {
-                            alert('🎉 SUCESSO!\n\n📋 Lista de navegação copiada!\n\n📱 PRÓXIMOS PASSOS:\n1. Abra WhatsApp ou Notas\n2. Cole a lista (Ctrl+V)\n3. Toque nos links 🗺️ na ordem\n4. Google Maps abre cada ponto!\n\n✅ Navegação perfeita garantida!');
-                          }).catch(() => {
-                            // ✅ FALLBACK se clipboard não funcionar
-                            const textArea = document.createElement('textarea');
-                            textArea.value = fullText;
-                            document.body.appendChild(textArea);
-                            textArea.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(textArea);
-                            alert('🎉 SUCESSO!\n\n📋 Lista copiada para navegação!\n\n📱 Cole no WhatsApp e toque nos links 🗺️!');
-                          });
-                        }
-                      }}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors font-bold border-2 border-green-400"
-                    >
-                      🎯 NAVEGAÇÃO CORRETA
-                    </button>
+                  <div className="mt-4 space-y-3">
+                    {/* Navegação Profissional */}
+                    <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+                      <h4 className="text-blue-800 font-bold mb-2">🚀 NAVEGAÇÃO PROFISSIONAL</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => {
+                            // ✅ HERE MAPS - SEM LIMITAÇÕES DE WAYPOINTS
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords && coords.length > 0) {
+                              const waypoints = coords.map(coord => `${coord.lat},${coord.lng}`).join(',');
+                              const hereMapsUrl = `https://wego.here.com/directions/mix/${waypoints}/?map=0,0,2,normal`;
+                              window.open(hereMapsUrl, '_blank');
+                            }
+                          }}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors font-bold"
+                        >
+                          🗺️ HERE Maps (ILIMITADO)
+                        </button>
+                        <button 
+                          onClick={() => {
+                            // ✅ MAPBOX - ROTA PROFISSIONAL
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords && coords.length > 0) {
+                              const waypointsStr = coords.map(coord => `${coord.lng},${coord.lat}`).join(';');
+                              const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${waypointsStr}?geometries=geojson&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
+                              // Redirecionar para Mapbox web app
+                              const mapboxWebUrl = `https://www.mapbox.com/directions/#profile=driving&waypoints=${coords.map(c => `${c.lng},${c.lat}`).join(';')}`;
+                              window.open(mapboxWebUrl, '_blank');
+                            }
+                          }}
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors font-bold"
+                        >
+                          🎯 Mapbox (PRO)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Export e Backup */}
+                    <div className="bg-green-50 p-3 rounded-lg border-l-4 border-green-500">
+                      <h4 className="text-green-800 font-bold mb-2">📱 EXPORT & BACKUP</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => {
+                            // ✅ GPX para GPS profissional
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords) {
+                              const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
+                              downloadFile(gpxData, 'rota-carteiro-otimizada.gpx', 'application/gpx+xml');
+                            }
+                          }}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                        >
+                          📱 Download GPX
+                        </button>
+                        <button 
+                          onClick={() => {
+                            // ✅ KML para Google Earth
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords) {
+                              const kmlData = generateKML(coords, processedData.customMapData.userLocation);
+                              downloadFile(kmlData, 'rota-carteiro-otimizada.kml', 'application/vnd.google-earth.kml+xml');
+                            }
+                          }}
+                          className="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-700 transition-colors"
+                        >
+                          🌍 Download KML
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Alternativas (menos recomendadas) */}
+                    <div className="bg-gray-50 p-3 rounded-lg border-l-4 border-gray-400">
+                      <h4 className="text-gray-700 font-bold mb-2">⚠️ ALTERNATIVAS (LIMITADAS)</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => {
+                            alert('⚠️ AVISO:\nGoogle Maps reordena pontos automaticamente!\nUse HERE Maps ou Mapbox para rota correta.');
+                            const coords = processedData.customMapData.coordinates;
+                            if (coords && coords.length > 0) {
+                              const origin = coords[0];
+                              const destination = coords[coords.length - 1];
+                              const waypoints = coords.slice(1, -1);
+                              const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
+                              const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
+                              window.open(googleMapsUrl, '_blank');
+                            }
+                          }}
+                          className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600 transition-colors opacity-75"
+                        >
+                          ⚠️ Google Maps (máx 23)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
