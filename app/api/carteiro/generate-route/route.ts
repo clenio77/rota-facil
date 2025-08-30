@@ -322,25 +322,66 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // ✅ MAPEAMENTO ESPECÍFICO POR ENDEREÇO COMPLETO (número + rua)
+      const specificAddressMappings: {[key: string]: {lat: number; lng: number; region: string}} = {
+        // Rio Grande do Sul - números específicos
+        'rio grande do sul, 956': { lat: -18.9150, lng: -48.2765, region: 'Centro-Leste' }, // ✅ Logo após esquina com Amazonas
+        'rio grande do sul, 908': { lat: -18.9145, lng: -48.2760, region: 'Centro-Leste' }, // ✅ Próximo ao 956
+        
+        // Avenida Amazonas - números específicos
+        'amazonas, 232': { lat: -18.9158, lng: -48.2758, region: 'Centro-Sul' }, // ✅ Entre Osório José da Cunha e Rio Grande do Sul
+        
+        // Rua Jataí - números específicos
+        'jatai, 740': { lat: -18.9205, lng: -48.2795, region: 'Centro-Norte' }, // ✅ Entre Av. Brasil e Av. João Pinheiro
+        'jatai, 1150': { lat: -18.9210, lng: -48.2800, region: 'Centro-Norte' }, // ✅ Mais próximo da João Pinheiro
+        
+        // João Pinheiro - números específicos para maior precisão
+        'joão pinheiro, 4020': { lat: -18.9185, lng: -48.2785, region: 'Centro-Norte' },
+        'joão pinheiro, 3532': { lat: -18.9190, lng: -48.2780, region: 'Centro-Norte' },
+        'joão pinheiro, 2687': { lat: -18.9195, lng: -48.2775, region: 'Centro-Norte' },
+        'joão pinheiro, 1783': { lat: -18.9200, lng: -48.2770, region: 'Centro-Norte' },
+        'joão pinheiro, 1180': { lat: -18.9205, lng: -48.2765, region: 'Centro-Norte' }
+      };
+
+      // ✅ VERIFICAR PRIMEIRO POR ENDEREÇO ESPECÍFICO
+      const addressLower = address.toLowerCase().replace(/\s+/g, ' ').trim();
+      
+      // Extrair número e rua do endereço
+      const numberMatch = addressLower.match(/(\d+)/);
+      const streetName = addressLower.replace(/,?\s*\d+.*/, '').replace(/^(rua|avenida|av\.?)\s+/i, '');
+      
+      if (numberMatch) {
+        const number = numberMatch[1];
+        const specificKey = `${streetName}, ${number}`;
+        
+        console.log(`🔍 Buscando mapeamento específico para: "${specificKey}"`);
+        
+        if (specificAddressMappings[specificKey]) {
+          const coords = specificAddressMappings[specificKey];
+          console.log(`🎯 ENDEREÇO ESPECÍFICO mapeado: ${specificKey} → ${coords.lat}, ${coords.lng} (${coords.region})`);
+          return coords;
+        }
+      }
+
+      // ✅ FALLBACK: MAPEAMENTO GENÉRICO POR RUA
       const streetMappings = {
-        'joão pinheiro': { lat: -18.9190, lng: -48.2780, region: 'Centro-Norte' }, // ✅ CORRIGIDO: Posição mais central
+        'joão pinheiro': { lat: -18.9190, lng: -48.2780, region: 'Centro-Norte' },
         'cesário alvim': { lat: -18.9250, lng: -48.2840, region: 'Tibery' },
-        'afonso pena': { lat: -18.9187, lng: -48.2775, region: 'Centro' }, // ✅ CORRIGIDO: Centro real
+        'afonso pena': { lat: -18.9187, lng: -48.2775, region: 'Centro' },
         'brasil': { lat: -18.9230, lng: -48.2820, region: 'Norte' },
-        'floriano peixoto': { lat: -18.9192, lng: -48.2781, region: 'Centro' }, // ✅ CORRIGIDO
-        'amazonas': { lat: -18.9165, lng: -48.2760, region: 'Centro-Sul' }, // ✅ CORRIGIDO: Entre Osório José da Cunha e Rio Grande do Sul
+        'floriano peixoto': { lat: -18.9192, lng: -48.2781, region: 'Centro' },
+        'amazonas': { lat: -18.9165, lng: -48.2760, region: 'Centro-Sul' },
         'rio grande do sul': { lat: -18.9140, lng: -48.2730, region: 'Centro-Leste' },
         'artur gonçalves': { lat: -18.9240, lng: -48.2830, region: 'Tibery' },
-        'jatai': { lat: -18.9200, lng: -48.2800, region: 'Centro-Norte' }, // ✅ CORRIGIDO: Entre Av. Brasil e Av. João Pinheiro
+        'jatai': { lat: -18.9200, lng: -48.2800, region: 'Centro-Norte' },
         'buriti alegre': { lat: -18.9150, lng: -48.2740, region: 'Jardim Brasília' },
         'itumbiara': { lat: -18.9130, lng: -48.2720, region: 'Bom Jesus' },
         'orozimbo': { lat: -18.9120, lng: -48.2710, region: 'Segismundo Pereira' }
       };
 
-      const addressLower = address.toLowerCase();
       for (const [street, coords] of Object.entries(streetMappings)) {
         if (addressLower.includes(street)) {
-          console.log(`🛣️ Rua "${street}" mapeada para região ${coords.region}`);
+          console.log(`🛣️ Rua "${street}" mapeada genericamente para região ${coords.region}`);
           return coords;
         }
       }
