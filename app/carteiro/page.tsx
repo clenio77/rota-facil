@@ -206,25 +206,8 @@ const generateGPX = (coordinates: any[], userLocation?: {lat: number; lng: numbe
 </gpx>`;
 };
 
-const generateWazeUrl = (coordinates: any[]) => {
-  if (coordinates.length === 0) return '';
-  
-  // ✅ CRIAR URL COM MÚLTIPLOS WAYPOINTS PARA WAZE
-  // Formato: https://waze.com/ul?ll=lat,lng&navigate=yes
-  // Para múltiplos pontos, vamos usar Google Maps que funciona melhor
-  const origin = coordinates[0];
-  const destination = coordinates[coordinates.length - 1];
-  const waypoints = coordinates.slice(1, -1); // Pontos intermediários
-  
-  if (coordinates.length === 1) {
-    // ✅ APENAS UM PONTO: Usar Waze direto
-    return `https://waze.com/ul?ll=${origin.lat}%2C${origin.lng}&navigate=yes`;
-  } else {
-    // ✅ MÚLTIPLOS PONTOS: Usar Google Maps que suporta melhor waypoints
-    const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
-    return `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
-  }
-};
+// ✅ FUNÇÃO REMOVIDA: generateWazeUrl() - Waze não suporta múltiplos waypoints adequadamente
+// Focamos apenas em soluções que realmente funcionam para carteiros profissionais
 
 const downloadFile = (content: string, filename: string, contentType: string) => {
   const blob = new Blob([content], { type: contentType });
@@ -931,33 +914,20 @@ export default function CarteiroPage() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button 
                       onClick={() => {
-                        // ✅ FUNÇÃO: Exportar coordenadas para GPS
+                        // ✅ FUNÇÃO: Gerar arquivo GPX para GPS/Celular
                         const coords = processedData.customMapData.coordinates;
                         if (coords) {
                           const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
-                          downloadFile(gpxData, 'rota-carteiro.gpx', 'application/gpx+xml');
+                          downloadFile(gpxData, 'rota-carteiro-otimizada.gpx', 'application/gpx+xml');
                         }
                       }}
                       className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors"
                     >
-                      📱 Exportar para GPS
+                      📱 Download GPX
                     </button>
                     <button 
                       onClick={() => {
-                        // ✅ FUNÇÃO: Gerar arquivo GPX
-                        const coords = processedData.customMapData.coordinates;
-                        if (coords) {
-                          const gpxData = generateGPX(coords, processedData.customMapData.userLocation);
-                          downloadFile(gpxData, 'rota-otimizada.gpx', 'application/gpx+xml');
-                        }
-                      }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-                    >
-                      📄 Gerar GPX
-                    </button>
-                    <button 
-                      onClick={() => {
-                        // ✅ FUNÇÃO: Abrir em app de navegação com MÚLTIPLAS OPÇÕES
+                        // ✅ FUNÇÃO: Abrir DIRETAMENTE no Google Maps com ROTA COMPLETA
                         const coords = processedData.customMapData.coordinates;
                         if (coords && coords.length > 0) {
                           const origin = coords[0];
@@ -965,25 +935,48 @@ export default function CarteiroPage() {
                           const waypoints = coords.slice(1, -1);
                           const waypointsStr = waypoints.map(coord => `${coord.lat},${coord.lng}`).join('|');
                           
-                          // ✅ GOOGLE MAPS COM TODA A ROTA
+                          // ✅ GOOGLE MAPS COM TODA A ROTA OTIMIZADA
                           const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypointsStr}&travelmode=driving`;
                           
-                          // ✅ MOSTRAR OPÇÕES PARA O USUÁRIO
-                          const userChoice = confirm(`🗺️ ESCOLHA SEU APP DE NAVEGAÇÃO:\n\n✅ OK = Google Maps (rota completa com ${coords.length} pontos)\n❌ Cancelar = Waze (apenas primeiro ponto)\n\nRecomendado: Google Maps para rota completa!`);
+                          // ✅ ABRIR DIRETAMENTE - SEM PERGUNTAS
+                          window.open(googleMapsUrl, '_blank');
                           
-                          if (userChoice) {
-                            // ✅ GOOGLE MAPS - ROTA COMPLETA
-                            window.open(googleMapsUrl, '_blank');
-                          } else {
-                            // ✅ WAZE - PRIMEIRO PONTO
-                            const wazeUrl = `https://waze.com/ul?ll=${origin.lat}%2C${origin.lng}&navigate=yes`;
-                            window.open(wazeUrl, '_blank');
-                          }
+                          // ✅ FEEDBACK VISUAL
+                          console.log(`🗺️ Abrindo Google Maps com rota completa: ${coords.length} pontos`);
                         }
                       }}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
                     >
-                      🌐 Abrir em App de Navegação
+                      🗺️ Google Maps
+                    </button>
+                    <button 
+                      onClick={() => {
+                        // ✅ FUNÇÃO: Copiar coordenadas para outros apps
+                        const coords = processedData.customMapData.coordinates;
+                        if (coords && coords.length > 0) {
+                          const coordsList = coords.map((coord, index) => 
+                            `${index + 1}. ${coord.address}\n   📍 ${coord.lat}, ${coord.lng}`
+                          ).join('\n\n');
+                          
+                          const fullText = `🗺️ ROTA OTIMIZADA - ${coords.length} PONTOS\n\n${coordsList}`;
+                          
+                          navigator.clipboard.writeText(fullText).then(() => {
+                            alert('📋 Lista de coordenadas copiada!\nCole em qualquer app de navegação.');
+                          }).catch(() => {
+                            // ✅ FALLBACK se clipboard não funcionar
+                            const textArea = document.createElement('textarea');
+                            textArea.value = fullText;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            alert('📋 Lista de coordenadas copiada!\nCole em qualquer app de navegação.');
+                          });
+                        }
+                      }}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors"
+                    >
+                      📋 Copiar Coordenadas
                     </button>
                   </div>
                 </div>
