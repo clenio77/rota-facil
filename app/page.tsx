@@ -1107,19 +1107,25 @@ export default function HomePage() {
             Adicionar Parada
           </button>
           <button
-            onMouseDown={startListening}
-            onMouseUp={stopListening}
-            onTouchStart={startListening}
-            onTouchEnd={stopListening}
-            className="btn-secondary w-full flex items-center justify-center gap-2"
+            onMouseDown={deviceLocation ? startListening : undefined}
+            onMouseUp={deviceLocation ? stopListening : undefined}
+            onTouchStart={deviceLocation ? startListening : undefined}
+            onTouchEnd={deviceLocation ? stopListening : undefined}
+            onClick={!deviceLocation ? () => alert('🌍 Ative a localização para usar busca por voz. A busca é restrita à sua cidade atual.') : undefined}
+            className={`w-full flex items-center justify-center gap-2 ${
+              deviceLocation 
+                ? 'btn-secondary' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
             aria-pressed={isListening}
-            title="Segure para falar o endereço"
+            disabled={!deviceLocation}
+            title={deviceLocation ? 'Segure para falar o endereço (busca apenas na sua cidade)' : 'Ative localização para usar busca por voz'}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14a3 3 0 003-3V7a3 3 0 10-6 0v4a3 3 0 003 3z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0M12 18v3m-4 0h8" />
             </svg>
-            {isListening ? 'Gravando...' : 'Falar endereço'}
+            {!deviceLocation ? '🌍 Ative localização' : (isListening ? 'Gravando...' : '🎤 Falar endereço')}
           </button>
           
           {confirmedStops.length >= 2 && (

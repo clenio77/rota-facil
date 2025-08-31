@@ -116,9 +116,17 @@ export default function AddressSearch({
   }, [debouncedStreetQuery, debouncedNumberQuery, userLocation]);
 
   const searchAddresses = async (searchQuery: string, mode: 'street' | 'number' | 'combined') => {
+    // ❌ BLOQUEAR BUSCA SEM LOCALIZAÇÃO
+    if (!userLocation) {
+      console.error('❌ BUSCA BLOQUEADA: Localização obrigatória para buscar endereços');
+      setResults([]);
+      setIsOpen(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      console.log('🔍 Buscando endereços:', { searchQuery, userLocation, mode });
+      console.log('🔍 Buscando endereços LOCALMENTE:', { searchQuery, userLocation, mode });
       
       const response = await fetch('/api/address-search', {
         method: 'POST',
@@ -324,7 +332,7 @@ export default function AddressSearch({
             onChange={handleStreetChange}
             onKeyDown={handleKeyDown}
             onFocus={() => streetQuery.length >= 2 && setIsOpen(true)}
-            placeholder="Nome da rua (ex: Rua Principal)"
+            placeholder={userLocation ? "🎤 Digite ou fale o nome da rua" : "⚠️ Ative localização para buscar"}
             className="w-full px-4 py-3 pl-12 pr-16 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent border-gray-300 focus:ring-blue-500"
           />
           

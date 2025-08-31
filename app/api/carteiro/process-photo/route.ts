@@ -1,8 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeOCRWithFallback } from '../../../../lib/ocrFallbackSystem';
+import sharp from 'sharp';
 import { extractAddressIntelligently } from '../../../../lib/smartAddressExtractor';
 import { enhanceECTImageForOCR } from '../../../../lib/imagePreprocessing';
 import { parseECTAddresses, isECTList } from '../../../../lib/ectParser';
+
+// 🔧 FUNÇÃO: Otimizar imagem de alta resolução para OCR
+async function optimizeHighResolutionImage(imageBuffer: Buffer): Promise<Buffer> {
+  try {
+    const image = sharp(imageBuffer);
+    const metadata = await image.metadata();
+    
+    console.log('📊 Metadados da imagem:', {
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+      size: metadata.size
+    });
+
+    // 🎯 OTIMIZAÇÃO INTELIGENTE baseada no tamanho
+    let targetWidth = 2048; // Largura ideal para OCR
+    
+    if (metadata.width && metadata.width > 4000) {
+      targetWidth = 2048; // Reduzir imagens muito grandes
+    } else if (metadata.width && metadata.width > 2000) {
+      targetWidth = 1600; // Reduzir moderadamente
+    } else {
+      // Imagem já no tamanho adequado
+      return imageBuffer;
+    }
+
+    const optimizedBuffer = await image
+      .resize({ width: targetWidth, withoutEnlargement: true })
+      .sharpen() // Melhorar nitidez para OCR
+      .normalize() // Normalizar contraste
+      .png({ quality: 90, compressionLevel: 6 }) // PNG de alta qualidade
+      .toBuffer();
+
+    const reduction = ((imageBuffer.length - optimizedBuffer.length) / imageBuffer.length * 100).toFixed(1);
+    console.log(`✅ Imagem otimizada: ${imageBuffer.length} → ${optimizedBuffer.length} bytes (${reduction}% redução)`);
+
+    return optimizedBuffer;
+  } catch (error) {
+    console.error('❌ Erro na otimização da imagem:', error);
+    throw error;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,10 +78,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Validar tamanho (máximo 10MB)
-    if (photo.size > 10 * 1024 * 1024) {
+    // 📷 AUMENTAR LIMITE PARA FOTOS DE ALTA RESOLUÇÃO (50MB)
+    if (photo.size > 50 * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'Arquivo muito grande. Máximo 10MB permitido.' },
+        { error: 'Foto muito grande. Máximo 50MB permitido para alta resolução.' },
         { status: 400 }
       );
     }
@@ -51,9 +94,20 @@ export async function POST(request: NextRequest) {
 
     // Converter foto para buffer
     const arrayBuffer = await photo.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
+    let imageBuffer = Buffer.from(arrayBuffer);
 
     console.log('Iniciando processamento inteligente da imagem...');
+
+    // 🔧 OTIMIZAÇÃO AUTOMÁTICA DE ALTA RESOLUÇÃO
+    if (photo.size > 5 * 1024 * 1024) { // > 5MB
+      console.log('📸 Foto de alta resolução detectada, otimizando...');
+      try {
+        imageBuffer = await optimizeHighResolutionImage(imageBuffer);
+        console.log('✅ Otimização de resolução concluída');
+      } catch (optimizeError) {
+        console.log('⚠️ Falha na otimização, usando imagem original:', optimizeError);
+      }
+    }
 
     // 1. Pré-processar imagem para melhor OCR (especialmente para listas ECT)
     let processedImageUrl: string;
