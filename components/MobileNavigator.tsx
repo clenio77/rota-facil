@@ -29,54 +29,212 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
   const [currentLocation, setCurrentLocation] = useState(userLocation);
   const [completedStops, setCompletedStops] = useState<Set<string>>(new Set());
   const [showStopsList, setShowStopsList] = useState(false);
+  
+  // 🧭 ESTADOS PARA NAVEGAÇÃO TURN-BY-TURN
+  const [routeInstructions, setRouteInstructions] = useState<any[]>([]);
+  const [currentInstructionIndex, setCurrentInstructionIndex] = useState(0);
+  const [distanceToNextManeuver, setDistanceToNextManeuver] = useState<number>(0);
+  const [userHeading, setUserHeading] = useState<number>(0);
+  const [isFollowingUser, setIsFollowingUser] = useState(false);
 
-  // ✅ GPS EM TEMPO REAL
+  // ✅ GPS EM TEMPO REAL COM NAVEGAÇÃO TURN-BY-TURN
   useEffect(() => {
     if ('geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
         (position) => {
-          setCurrentLocation({
+          const newLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setCurrentLocation(newLocation);
+          
+          // 🧭 Atualizar orientação do usuário
+          if (position.coords.heading !== null) {
+            setUserHeading(position.coords.heading);
+          }
+          
+          // 🧭 Calcular distância até próxima manobra
+          if (isNavigating && routeInstructions.length > 0) {
+            updateNavigationProgress(newLocation);
+          }
         },
         (error) => console.error('Erro GPS:', error),
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, []);
+  }, [isNavigating, routeInstructions, currentInstructionIndex]);
 
-  // ✅ CALCULAR ROTA ATUAL
-  const calculateCurrentRoute = async (from: {lat: number; lng: number}, to: {lat: number; lng: number}) => {
-    try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
-      const response = await fetch(osrmUrl);
-      const data = await response.json();
+  // 🧭 FUNÇÃO PARA CALCULAR DISTÂNCIA ENTRE DOIS PONTOS (HAVERSINE)
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371e3; // raio da Terra em metros
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lng2-lng1) * Math.PI/180;
 
-      if (data.routes && data.routes[0]) {
-        const coordinates = data.routes[0].geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
-        setCurrentRouteCoordinates(coordinates);
-      } else {
-        setCurrentRouteCoordinates([[from.lat, from.lng], [to.lat, to.lng]]);
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // distância em metros
+  };
+
+  // 🧭 ATUALIZAR PROGRESSO DA NAVEGAÇÃO
+  const updateNavigationProgress = (userLocation: {lat: number; lng: number}) => {
+    if (currentInstructionIndex < routeInstructions.length) {
+      const currentInstruction = routeInstructions[currentInstructionIndex];
+      const distanceToManeuver = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        currentInstruction.location[0],
+        currentInstruction.location[1]
+      );
+      
+      setDistanceToNextManeuver(distanceToManeuver);
+      
+      // 🧭 Se chegou perto da manobra (30m), avançar para próxima instrução
+      if (distanceToManeuver < 30 && currentInstructionIndex < routeInstructions.length - 1) {
+        setCurrentInstructionIndex(currentInstructionIndex + 1);
+        
+        // 🔊 Anunciar próxima instrução (se houver)
+        if (currentInstructionIndex + 1 < routeInstructions.length) {
+          const nextInstruction = routeInstructions[currentInstructionIndex + 1];
+          announceInstruction(nextInstruction.direction);
+        }
       }
-    } catch (error) {
-      setCurrentRouteCoordinates([[from.lat, from.lng], [to.lat, to.lng]]);
     }
   };
 
-  // ✅ INICIAR NAVEGAÇÃO
+  // 🔊 FUNÇÃO PARA ANUNCIAR INSTRUÇÕES (SÍNTESE DE VOZ)
+  const announceInstruction = (instruction: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(instruction);
+      utterance.lang = 'pt-BR';
+      utterance.volume = 0.8;
+      utterance.rate = 0.9;
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  // 🧭 CALCULAR ROTA COM INSTRUÇÕES TURN-BY-TURN
+  const calculateCurrentRoute = async (from: {lat: number; lng: number}, to: {lat: number; lng: number}) => {
+    try {
+      // ✅ Usar OSRM com steps=true para obter instruções detalhadas
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&annotations=true`;
+      const response = await fetch(osrmUrl);
+      const data = await response.json();
+
+      console.log('🧭 OSRM Response com instruções:', data);
+
+      if (data.routes && data.routes[0]) {
+        const route = data.routes[0];
+        
+        // ✅ Coordenadas da rota
+        const coordinates = route.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+        setCurrentRouteCoordinates(coordinates);
+        
+        // 🧭 Extrair instruções de navegação
+        const instructions: any[] = [];
+        if (route.legs && route.legs[0] && route.legs[0].steps) {
+          route.legs[0].steps.forEach((step: any, index: number) => {
+            const maneuver = step.maneuver;
+            const instruction = {
+              index,
+              distance: step.distance,
+              duration: step.duration,
+              instruction: step.name || 'Continue em frente',
+              maneuver: maneuver.type,
+              modifier: maneuver.modifier,
+              location: [maneuver.location[1], maneuver.location[0]], // lat, lng
+              icon: getManeuverIcon(maneuver.type, maneuver.modifier),
+              direction: getManeuverDirection(maneuver.type, maneuver.modifier)
+            };
+            instructions.push(instruction);
+          });
+        }
+        
+        console.log('🧭 Instruções extraídas:', instructions);
+        setRouteInstructions(instructions);
+        setCurrentInstructionIndex(0);
+        setIsFollowingUser(true);
+        
+      } else {
+        // Fallback para linha reta
+        setCurrentRouteCoordinates([[from.lat, from.lng], [to.lat, to.lng]]);
+        setRouteInstructions([]);
+      }
+    } catch (error) {
+      console.error('Erro ao calcular rota:', error);
+      setCurrentRouteCoordinates([[from.lat, from.lng], [to.lat, to.lng]]);
+      setRouteInstructions([]);
+    }
+  };
+
+  // 🧭 FUNÇÃO PARA OBTER ÍCONE DA MANOBRA
+  const getManeuverIcon = (type: string, modifier?: string) => {
+    switch (type) {
+      case 'depart': return '🚀';
+      case 'arrive': return '🏁';
+      case 'turn':
+        if (modifier === 'left') return '↰';
+        if (modifier === 'right') return '↱';
+        if (modifier === 'sharp left') return '⬅️';
+        if (modifier === 'sharp right') return '➡️';
+        if (modifier === 'slight left') return '↖️';
+        if (modifier === 'slight right') return '↗️';
+        return '↑';
+      case 'merge': return '🔀';
+      case 'on ramp': return '🛣️';
+      case 'off ramp': return '🛤️';
+      case 'fork': return '🍴';
+      case 'continue': return '↑';
+      case 'roundabout': return '🔄';
+      default: return '↑';
+    }
+  };
+
+  // 🧭 FUNÇÃO PARA OBTER DIREÇÃO EM PORTUGUÊS
+  const getManeuverDirection = (type: string, modifier?: string) => {
+    switch (type) {
+      case 'depart': return 'Iniciar rota';
+      case 'arrive': return 'Chegada ao destino';
+      case 'turn':
+        if (modifier === 'left') return 'Vire à esquerda';
+        if (modifier === 'right') return 'Vire à direita';
+        if (modifier === 'sharp left') return 'Vire fortemente à esquerda';
+        if (modifier === 'sharp right') return 'Vire fortemente à direita';
+        if (modifier === 'slight left') return 'Mantenha-se à esquerda';
+        if (modifier === 'slight right') return 'Mantenha-se à direita';
+        return 'Continue em frente';
+      case 'merge': return 'Entre na via';
+      case 'on ramp': return 'Entre na rampa';
+      case 'off ramp': return 'Saia da rampa';
+      case 'fork': return 'Mantenha-se na pista';
+      case 'continue': return 'Continue em frente';
+      case 'roundabout': return 'Entre na rotatória';
+      default: return 'Continue em frente';
+    }
+  };
+
+  // ✅ INICIAR NAVEGAÇÃO COM TURN-BY-TURN
   const startNavigation = () => {
     setIsNavigating(true);
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
     setCurrentStopIndex(0);
+    setCurrentInstructionIndex(0);
+    setRouteInstructions([]);
     
     if (currentLocation && orderedPoints[0]) {
       calculateCurrentRoute(currentLocation, orderedPoints[0]);
+      
+      // 🔊 Anunciar início da navegação
+      announceInstruction("Navegação iniciada. Siga as instruções.");
     }
   };
 
-  // ✅ PRÓXIMA PARADA
+  // ✅ PRÓXIMA PARADA COM TURN-BY-TURN
   const nextStop = () => {
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
     
@@ -88,6 +246,10 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
       setCurrentStopIndex(newIndex);
       setCompletedStops(prev => new Set([...prev, currentPoint.id]));
       
+      // 🧭 Resetar instruções para nova rota
+      setCurrentInstructionIndex(0);
+      setRouteInstructions([]);
+      
       if (onStopCompleted) {
         onStopCompleted(currentPoint.id);
       }
@@ -96,10 +258,18 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
         { lat: currentPoint.lat, lng: currentPoint.lng }, 
         { lat: nextPoint.lat, lng: nextPoint.lng }
       );
+      
+      // 🔊 Anunciar nova parada
+      announceInstruction(`Navegando para próxima parada: ${nextPoint.address}`);
+      
     } else {
       // Retornar ao início
       const lastPoint = orderedPoints[currentStopIndex];
       setCompletedStops(prev => new Set([...prev, lastPoint.id]));
+      
+      // 🧭 Resetar instruções para retorno
+      setCurrentInstructionIndex(0);
+      setRouteInstructions([]);
       
       if (currentLocation) {
         calculateCurrentRoute(
@@ -107,6 +277,9 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           { lat: currentLocation.lat, lng: currentLocation.lng }
         );
         setCurrentStopIndex(-1);
+        
+        // 🔊 Anunciar retorno
+        announceInstruction("Retornando ao ponto de partida.");
       } else {
         setIsNavigating(false);
       }
@@ -175,8 +348,138 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
 
   return (
     <div className="h-screen w-full bg-gray-100 relative flex flex-col overflow-hidden">
-      {/* ✅ MAPA PRINCIPAL - OCUPA TODA A TELA */}
-      <div className="flex-1 relative" style={{ height: 'calc(100vh - env(safe-area-inset-bottom))' }}>
+      
+      {/* ✅ HEADER COM BOTÕES - SEMPRE NO TOPO */}
+      <div className="bg-white border-b border-gray-200 p-3 shadow-lg z-50">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowStopsList(!showStopsList)}
+              className="bg-blue-500 text-white p-2 rounded-lg flex items-center justify-center"
+              style={{ minWidth: '40px', minHeight: '40px' }}
+            >
+              📋
+            </button>
+            <div>
+              <h3 className="font-semibold text-sm text-gray-800">Rota Fácil</h3>
+              <p className="text-xs text-gray-500">
+                {isNavigating ? `Navegando ${currentStopIndex + 1}/${points.length}` : 'Pronto para iniciar'}
+              </p>
+            </div>
+          </div>
+          
+          {/* BOTÕES DE AÇÃO NO TOPO */}
+          <div className="flex gap-2">
+            {!isNavigating ? (
+              <button
+                onClick={startNavigation}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1"
+                style={{ minHeight: '40px' }}
+              >
+                <span>🚀</span>
+                <span>INICIAR</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={nextStop}
+                  disabled={currentStopIndex >= points.length - 1 && currentStopIndex !== -1}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-bold text-sm disabled:opacity-50 flex items-center gap-1"
+                  style={{ minHeight: '40px' }}
+                >
+                  <span>✅</span>
+                  <span>PRÓXIMA</span>
+                </button>
+                <button
+                  onClick={() => setIsNavigating(false)}
+                  className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg font-bold"
+                  style={{ minHeight: '40px', minWidth: '40px' }}
+                >
+                  ⏹️
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ SIDEBAR LISTA DE PARADAS */}
+      <div className={`fixed top-0 left-0 h-full bg-white shadow-2xl transition-transform duration-300 z-40 ${
+        showStopsList ? 'translate-x-0' : '-translate-x-full'
+      } w-80 md:w-96`}>
+        <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-bold">📋 Lista de Entregas</h3>
+            <p className="text-blue-100 text-sm">
+              {completedStops.size} de {points.length} concluídas
+            </p>
+          </div>
+          <button
+            onClick={() => setShowStopsList(false)}
+            className="bg-blue-700 hover:bg-blue-800 p-2 rounded-lg"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <div className="overflow-y-auto h-full pb-20">
+          {[...points].sort((a, b) => a.sequence - b.sequence).map((stop, index) => {
+            const isCompleted = completedStops.has(stop.id);
+            const isCurrent = index === currentStopIndex && isNavigating;
+            
+            return (
+              <div
+                key={stop.id}
+                className={`p-4 border-b cursor-pointer transition-colors ${
+                  isCurrent ? 'bg-orange-100 border-orange-200' :
+                  isCompleted ? 'bg-green-50 border-green-200' :
+                  'bg-white hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      isCurrent ? 'bg-orange-500 text-white' :
+                      isCompleted ? 'bg-green-500 text-white' :
+                      'bg-gray-300 text-gray-700'
+                    }`}>
+                      {isCurrent ? '🎯' : isCompleted ? '✅' : stop.sequence}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-gray-800">
+                        {stop.address}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        📦 {stop.objectCode || stop.id}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-xs px-2 py-1 rounded ${
+                      isCurrent ? 'bg-orange-200 text-orange-800' :
+                      isCompleted ? 'bg-green-200 text-green-800' :
+                      'bg-gray-200 text-gray-600'
+                    }`}>
+                      {isCurrent ? 'Atual' : isCompleted ? 'OK' : 'Pendente'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* OVERLAY PARA FECHAR SIDEBAR */}
+      {showStopsList && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setShowStopsList(false)}
+        />
+      )}
+
+      {/* ✅ MAPA PRINCIPAL */}
+      <div className="flex-1 relative">
         <MapContainer
           center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
           zoom={isNavigating && currentStop ? 17 : 14}
@@ -228,100 +531,53 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           )}
         </MapContainer>
 
-        {/* ✅ CONTROLES FLUTUANTES ESTILO WAZE */}
-        <div className="absolute top-2 left-2 right-2 z-20">
-          {/* Header Compacto - Estilo Waze */}
-          <div className="bg-white rounded-xl shadow-lg p-3 mb-2">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🚚</span>
-                <div>
-                  <h3 className="font-semibold text-sm text-gray-800">Rota Fácil</h3>
-                  <p className="text-xs text-gray-500">
-                    {isNavigating ? `Navegando` : 'Pronto para iniciar'}
-                  </p>
+        {/* 🧭 PAINEL DE NAVEGAÇÃO TURN-BY-TURN - ESTILO WAZE/MAPS */}
+        {isNavigating && currentStop && (
+          <div className="absolute top-4 left-4 right-4 z-20 space-y-3">
+            {/* INSTRUÇÃO DE NAVEGAÇÃO ATUAL */}
+            {routeInstructions.length > 0 && currentInstructionIndex < routeInstructions.length && (
+              <div className="bg-white rounded-xl shadow-xl p-4 border-l-4 border-orange-500">
+                <div className="flex items-center gap-4">
+                  <div className="bg-orange-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl">
+                    {routeInstructions[currentInstructionIndex].icon}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-orange-600 uppercase">EM {Math.round(distanceToNextManeuver)}M</p>
+                    <h2 className="font-bold text-lg text-gray-800 leading-tight">
+                      {routeInstructions[currentInstructionIndex].direction}
+                    </h2>
+                    {routeInstructions[currentInstructionIndex].instruction && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {routeInstructions[currentInstructionIndex].instruction}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="bg-gray-100 rounded-lg px-3 py-1">
+                      <p className="text-xs text-gray-500 font-semibold">INSTRUÇÃO</p>
+                      <p className="text-sm font-bold text-gray-800">{currentInstructionIndex + 1}/{routeInstructions.length}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowStopsList(!showStopsList)}
-                  className="bg-blue-500 text-white p-2 rounded-lg text-xs flex items-center justify-center"
-                  style={{ minWidth: '36px', minHeight: '36px' }}
-                >
-                  📋
-                </button>
+            )}
+
+            {/* DESTINO ATUAL */}
+            <div className="bg-blue-600 text-white rounded-xl shadow-xl p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎯</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold opacity-90 uppercase">DESTINO</p>
+                  <h2 className="font-bold text-lg leading-tight">{currentStop.address}</h2>
+                  <p className="text-sm mt-1">📦 {currentStop.objectCode || currentStop.id}</p>
+                </div>
+                <div className="bg-white text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                  {currentStop.sequence}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Painel de Navegação - ESTILO WAZE/MAPS */}
-          {isNavigating && currentStop && (
-            <div className="bg-blue-600 text-white rounded-xl shadow-xl p-4 mb-2">
-              <div className="flex items-start gap-3">
-                <div className="bg-white text-blue-600 rounded-full w-12 h-12 flex items-center justify-center">
-                  <span className="text-2xl">🧭</span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">PRÓXIMA PARADA</p>
-                  <h2 className="font-bold text-lg leading-tight mt-1">{currentStop.address}</h2>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-lg">📦</span>
-                    <p className="text-sm font-semibold">{currentStop.objectCode || currentStop.id}</p>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="bg-white text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm mb-1">
-                    {currentStop.sequence}
-                  </div>
-                  <p className="text-xs opacity-75">{currentStopIndex + 1}/{points.length}</p>
-                </div>
-              </div>
-              
-              {/* Barra de Instrução */}
-              <div className="mt-3 pt-3 border-t border-blue-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">📍</span>
-                  <p className="text-sm font-semibold">Procure pelo endereço e entregue o objeto ECT</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-
-          {/* Lista de Paradas - Expansível */}
-          {showStopsList && (
-            <div className="bg-white rounded-xl shadow-lg max-h-60 overflow-y-auto mt-3">
-              {orderedPoints.map((stop, index) => {
-                const isCompleted = completedStops.has(stop.id);
-                const isCurrent = index === currentStopIndex && isNavigating;
-                
-                return (
-                  <div
-                    key={stop.id}
-                    className={`p-3 border-b last:border-b-0 ${
-                      isCurrent ? 'bg-orange-50' : isCompleted ? 'bg-green-50' : 'bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isCurrent ? 'bg-orange-500 text-white' :
-                        isCompleted ? 'bg-green-500 text-white' :
-                        'bg-gray-300 text-gray-700'
-                      }`}>
-                        {isCurrent ? '🎯' : isCompleted ? '✅' : stop.sequence}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{stop.address}</p>
-                        <p className="text-xs text-gray-500">{stop.objectCode}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* ✅ CONTROLES DE ZOOM - LATERAL */}
         <div className="absolute bottom-20 right-2 z-20">
