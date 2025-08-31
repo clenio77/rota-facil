@@ -608,20 +608,42 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           )}
         </MapContainer>
 
-        {/* 🎯 DESTINO - SUPER MINIMALISTA */}
-        {isNavigating && currentStop && (
-          <div className="absolute top-4 left-4 right-4 z-20">
-            <div className="bg-blue-600 text-white rounded-lg shadow-lg p-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">
-                  {currentStop.sequence}
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-bold text-sm leading-tight">{currentStop.address}</h2>
-                  <p className="text-xs opacity-90">📦 {currentStop.objectCode || currentStop.id}</p>
+        {/* 🧭 NAVEGAÇÃO TURN-BY-TURN MINIMALISTA */}
+        {isNavigating && (
+          <div className="absolute top-4 left-4 right-4 z-20 space-y-2">
+            {/* INSTRUÇÃO ATUAL - ESTILO MAPS */}
+            {routeInstructions.length > 0 && currentInstructionIndex < routeInstructions.length && (
+              <div className="bg-white rounded-lg shadow-lg p-3 border-l-4 border-blue-500">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">
+                    {routeInstructions[currentInstructionIndex].icon}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-gray-800">
+                      {routeInstructions[currentInstructionIndex].direction}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      em {Math.round(distanceToNextManeuver)}m
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* DESTINO ATUAL */}
+            {currentStop && (
+              <div className="bg-blue-600 text-white rounded-lg shadow-lg p-3">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">
+                    {currentStop.sequence}
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-bold text-sm leading-tight">{currentStop.address}</h2>
+                    <p className="text-xs opacity-90">📦 {currentStop.objectCode || currentStop.id}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
