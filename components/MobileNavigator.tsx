@@ -92,30 +92,22 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
     }
   }, [isNavigating, routeInstructions, currentInstructionIndex, lastUserPosition, isFollowingUser]);
 
-  // 🗺️ FUNÇÃO PARA AJUSTAR ZOOM BASEADO NA VELOCIDADE E CONTEXTO
+  // 🗺️ ZOOM INTELIGENTE ESTILO MAPS/WAZE
   const updateMapZoom = (userLocation: {lat: number; lng: number}, speed: number) => {
-    let newZoom = 17; // zoom padrão para navegação
+    let newZoom = 18; // zoom padrão mais próximo
     
-    // 🚗 Ajustar zoom baseado na velocidade
-    if (speed > 50) {
-      newZoom = 15; // rodovia
-    } else if (speed > 30) {
-      newZoom = 16; // avenida
-    } else if (speed > 10) {
-      newZoom = 17; // rua normal
+    // 🚗 Zoom baseado na velocidade (mais agressivo)
+    if (speed > 40) {
+      newZoom = 16; // velocidade alta
+    } else if (speed > 20) {
+      newZoom = 17; // velocidade média
+    } else if (speed > 5) {
+      newZoom = 18; // velocidade baixa
     } else {
-      newZoom = 18; // parado/devagar
+      newZoom = 19; // parado - máximo detalhe
     }
     
-    // 🎯 Zoom extra quando próximo de manobra
-    if (distanceToNextManeuver < 100) {
-      newZoom = Math.max(newZoom, 18);
-    }
-    if (distanceToNextManeuver < 50) {
-      newZoom = Math.max(newZoom, 19);
-    }
-    
-    // 🔄 Aplicar zoom suavemente
+    // 🔄 Aplicar zoom suavemente apenas com mudanças significativas
     if (Math.abs(newZoom - mapZoom) >= 1) {
       setMapZoom(newZoom);
     }
@@ -282,9 +274,9 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
     setCurrentInstructionIndex(0);
     setRouteInstructions([]);
     
-    // 🗺️ ATIVAR SEGUIMENTO AUTOMÁTICO E ZOOM NAVEGAÇÃO
+    // 🗺️ ATIVAR SEGUIMENTO AUTOMÁTICO PERMANENTE
     setIsFollowingUser(true);
-    setMapZoom(17);
+    setMapZoom(18); // zoom mais próximo para navegação
     
     if (currentLocation) {
       setMapCenter([currentLocation.lat, currentLocation.lng]);
@@ -444,16 +436,7 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
             <div>
               <h3 className="font-semibold text-sm text-gray-800">Rota Fácil</h3>
               <p className="text-xs text-gray-500">
-                {isNavigating ? (
-                  <>
-                    Navegando {currentStopIndex + 1}/{points.length}
-                    {userSpeed > 1 && (
-                      <span className="ml-2 text-blue-600 font-semibold">
-                        🚗 {Math.round(userSpeed)} km/h
-                      </span>
-                    )}
-                  </>
-                ) : 'Pronto para iniciar'}
+                {isNavigating ? `${currentStopIndex + 1}/${points.length}` : 'Pronto'}
               </p>
             </div>
           </div>
@@ -625,89 +608,42 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           )}
         </MapContainer>
 
-        {/* 🧭 PAINEL DE NAVEGAÇÃO TURN-BY-TURN - ESTILO WAZE/MAPS */}
+        {/* 🎯 DESTINO - SUPER MINIMALISTA */}
         {isNavigating && currentStop && (
-          <div className="absolute top-4 left-4 right-4 z-20 space-y-3">
-            {/* INSTRUÇÃO DE NAVEGAÇÃO ATUAL */}
-            {routeInstructions.length > 0 && currentInstructionIndex < routeInstructions.length && (
-              <div className="bg-white rounded-xl shadow-xl p-4 border-l-4 border-orange-500">
-                <div className="flex items-center gap-4">
-                  <div className="bg-orange-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl">
-                    {routeInstructions[currentInstructionIndex].icon}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-orange-600 uppercase">EM {Math.round(distanceToNextManeuver)}M</p>
-                    <h2 className="font-bold text-lg text-gray-800 leading-tight">
-                      {routeInstructions[currentInstructionIndex].direction}
-                    </h2>
-                    {routeInstructions[currentInstructionIndex].instruction && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {routeInstructions[currentInstructionIndex].instruction}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="bg-gray-100 rounded-lg px-3 py-1">
-                      <p className="text-xs text-gray-500 font-semibold">INSTRUÇÃO</p>
-                      <p className="text-sm font-bold text-gray-800">{currentInstructionIndex + 1}/{routeInstructions.length}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DESTINO ATUAL */}
-            <div className="bg-blue-600 text-white rounded-xl shadow-xl p-4">
+          <div className="absolute top-4 left-4 right-4 z-20">
+            <div className="bg-blue-600 text-white rounded-lg shadow-lg p-3">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🎯</span>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold opacity-90 uppercase">DESTINO</p>
-                  <h2 className="font-bold text-lg leading-tight">{currentStop.address}</h2>
-                  <p className="text-sm mt-1">📦 {currentStop.objectCode || currentStop.id}</p>
-                </div>
-                <div className="bg-white text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                <div className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">
                   {currentStop.sequence}
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-bold text-sm leading-tight">{currentStop.address}</h2>
+                  <p className="text-xs opacity-90">📦 {currentStop.objectCode || currentStop.id}</p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ✅ CONTROLES DE ZOOM E SEGUIMENTO - LATERAL */}
-        <div className="absolute bottom-20 right-2 z-20 space-y-2">
-          {/* CONTROLE DE SEGUIMENTO */}
-          {isNavigating && (
+        {/* ✅ ZOOM MÍNIMO - APENAS SE NECESSÁRIO */}
+        {!isNavigating && (
+          <div className="absolute bottom-20 right-2 z-20">
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               <button
-                className={`block w-10 h-10 text-sm font-bold ${
-                  isFollowingUser 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-                onClick={() => setIsFollowingUser(!isFollowingUser)}
-                title={isFollowingUser ? 'Desativar seguimento' : 'Ativar seguimento'}
+                onClick={() => setMapZoom(prev => Math.min(prev + 1, 19))}
+                className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
               >
-                🎯
+                <span className="text-sm font-bold text-gray-600">+</span>
+              </button>
+              <button
+                onClick={() => setMapZoom(prev => Math.max(prev - 1, 10))}
+                className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center"
+              >
+                <span className="text-sm font-bold text-gray-600">−</span>
               </button>
             </div>
-          )}
-          
-          {/* CONTROLES DE ZOOM */}
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <button
-              onClick={() => setMapZoom(prev => Math.min(prev + 1, 19))}
-              className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
-            >
-              <span className="text-sm font-bold text-gray-600">+</span>
-            </button>
-            <button
-              onClick={() => setMapZoom(prev => Math.max(prev - 1, 10))}
-              className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center"
-            >
-              <span className="text-sm font-bold text-gray-600">−</span>
-            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ✅ BOTÕES FIXOS NO BOTTOM - SEMPRE VISÍVEIS */}
