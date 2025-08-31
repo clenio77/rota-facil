@@ -226,40 +226,75 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
 
         {/* ✅ CONTROLES FLUTUANTES ESTILO WAZE */}
         <div className="absolute top-4 left-4 right-4 z-20">
-          {/* Header Compacto */}
-          <div className="bg-white rounded-xl shadow-lg p-3 mb-3">
+          {/* Header Compacto - Estilo Waze */}
+          <div className="bg-white rounded-xl shadow-lg p-3 mb-2">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">🚚</span>
+                <span className="text-lg">🚚</span>
                 <div>
-                  <h3 className="font-bold text-sm text-gray-800">Navegação Carteiro</h3>
+                  <h3 className="font-semibold text-sm text-gray-800">Rota Fácil</h3>
                   <p className="text-xs text-gray-500">
-                    {isNavigating ? `${currentStopIndex + 1}/${points.length}` : 'Pronto'}
+                    {isNavigating ? `Navegando` : 'Pronto para iniciar'}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowStopsList(!showStopsList)}
-                className="bg-blue-500 text-white p-2 rounded-lg text-xs"
-              >
-                📋
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowStopsList(!showStopsList)}
+                  className="bg-blue-500 text-white p-2 rounded-lg text-xs flex items-center justify-center"
+                  style={{ minWidth: '36px', minHeight: '36px' }}
+                >
+                  📋
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Info da Parada Atual - Estilo Waze */}
+          {/* Painel de Navegação - Estilo Waze/Maps */}
           {isNavigating && currentStop && (
-            <div className="bg-blue-600 text-white rounded-xl shadow-lg p-4">
-              <div className="flex justify-between items-start">
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center">
+                  <span className="text-xl">🧭</span>
+                </div>
                 <div className="flex-1">
-                  <p className="text-xs opacity-80">PRÓXIMA PARADA</p>
-                  <h2 className="font-bold text-lg leading-tight">{currentStop.address}</h2>
-                  <p className="text-xs opacity-90 mt-1">📦 {currentStop.objectCode || currentStop.id}</p>
+                  <p className="text-sm font-semibold text-gray-800">Siga em direção a:</p>
+                  <p className="text-lg font-bold text-blue-600">{currentStop.address}</p>
                 </div>
                 <div className="text-right">
-                  <div className="bg-white text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                  <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
                     {currentStop.sequence}
                   </div>
+                </div>
+              </div>
+              
+              {/* Instruções de Navegação */}
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📍</span>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-600">Objeto para entrega:</p>
+                    <p className="font-semibold text-gray-800">📦 {currentStop.objectCode || currentStop.id}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Resumo da Rota - Compacto */}
+          {isNavigating && (
+            <div className="bg-orange-500 text-white rounded-xl shadow-lg p-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🚚</span>
+                  <div>
+                    <p className="text-xs opacity-90">PARADA</p>
+                    <p className="font-bold">{currentStopIndex + 1} de {points.length}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs opacity-90">CONCLUÍDAS</p>
+                  <p className="font-bold">{completedStops.size}</p>
                 </div>
               </div>
             </div>
@@ -299,28 +334,60 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           )}
         </div>
 
-        {/* ✅ BOTÕES DE AÇÃO - ESTILO WAZE (BOTTOM) */}
+        {/* ✅ CONTROLES DE ZOOM - ESTILO MAPS */}
+        <div className="absolute bottom-24 right-4 z-20">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <button
+              onClick={() => {
+                const map = document.querySelector('.leaflet-container');
+                if (map) {
+                  // @ts-ignore
+                  map._leaflet_map?.zoomIn();
+                }
+              }}
+              className="block w-10 h-10 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
+            >
+              <span className="text-lg font-bold text-gray-600">+</span>
+            </button>
+            <button
+              onClick={() => {
+                const map = document.querySelector('.leaflet-container');
+                if (map) {
+                  // @ts-ignore
+                  map._leaflet_map?.zoomOut();
+                }
+              }}
+              className="block w-10 h-10 bg-white hover:bg-gray-50 flex items-center justify-center"
+            >
+              <span className="text-lg font-bold text-gray-600">−</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ✅ BOTÕES DE AÇÃO - ESTILO WAZE COMPACTO */}
         <div className="absolute bottom-6 left-4 right-4 z-20">
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {!isNavigating ? (
               <button
                 onClick={startNavigation}
-                className="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg"
+                className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg flex items-center justify-center gap-2"
               >
-                🚀 INICIAR NAVEGAÇÃO
+                <span>🚀</span>
+                <span>INICIAR</span>
               </button>
             ) : (
               <>
                 <button
                   onClick={nextStop}
                   disabled={currentStopIndex >= points.length - 1 && currentStopIndex !== -1}
-                  className="flex-1 bg-orange-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-50"
+                  className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  ✅ PRÓXIMA PARADA
+                  <span>✅</span>
+                  <span>PRÓXIMA</span>
                 </button>
                 <button
                   onClick={() => setIsNavigating(false)}
-                  className="bg-red-500 text-white px-6 py-4 rounded-xl font-bold shadow-lg"
+                  className="bg-red-500 text-white px-4 py-3 rounded-lg font-semibold shadow-lg"
                 >
                   ⏹️
                 </button>
