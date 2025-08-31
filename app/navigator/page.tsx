@@ -4,15 +4,15 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-// ✅ IMPORT DINÂMICO DO NAVEGADOR COM SIDEBAR
-const CustomNavigatorSidebar = dynamic(() => import('../../components/CustomNavigatorSidebar'), {
+// ✅ IMPORT DINÂMICO DO NAVEGADOR MOBILE (ESTILO WAZE/MAPS)
+const MobileNavigator = dynamic(() => import('../../components/MobileNavigator'), {
   ssr: false,
   loading: () => (
     <div className="h-screen flex items-center justify-center bg-blue-600 text-white">
       <div className="text-center">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
         <h2 className="text-2xl font-bold">🚚 Carregando Navegador...</h2>
-        <p className="text-blue-200">Preparando interface mobile-friendly</p>
+        <p className="text-blue-200">Preparando interface estilo Maps/Waze</p>
       </div>
     </div>
   )
@@ -85,7 +85,7 @@ function NavigatorContent() {
   }
 
   return (
-    <CustomNavigatorSidebar
+    <MobileNavigator
       points={navigationData.points}
       userLocation={navigationData.userLocation}
       onStopCompleted={(stopId) => {
