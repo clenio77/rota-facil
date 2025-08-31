@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -36,8 +36,14 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
   const [distanceToNextManeuver, setDistanceToNextManeuver] = useState<number>(0);
   const [userHeading, setUserHeading] = useState<number>(0);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
+  
+  // 🗺️ ESTADOS PARA ZOOM DINÂMICO
+  const [mapZoom, setMapZoom] = useState(14);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [lastUserPosition, setLastUserPosition] = useState<{lat: number; lng: number} | null>(null);
+  const [userSpeed, setUserSpeed] = useState<number>(0);
 
-  // ✅ GPS EM TEMPO REAL COM NAVEGAÇÃO TURN-BY-TURN
+  // ✅ GPS EM TEMPO REAL COM ZOOM DINÂMICO
   useEffect(() => {
     if ('geolocation' in navigator) {
       const watchId = navigator.geolocation.watchPosition(
@@ -47,6 +53,27 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
             lng: position.coords.longitude
           };
           setCurrentLocation(newLocation);
+          
+          // 🗺️ CALCULAR VELOCIDADE E ZOOM DINÂMICO
+          if (lastUserPosition && isNavigating) {
+            const distance = calculateDistance(
+              lastUserPosition.lat, lastUserPosition.lng,
+              newLocation.lat, newLocation.lng
+            );
+            const timeElapsed = 1; // assumindo 1 segundo entre updates
+            const speed = (distance / timeElapsed) * 3.6; // converter para km/h
+            setUserSpeed(speed);
+            
+            // 🗺️ AJUSTAR ZOOM BASEADO NA VELOCIDADE E PROXIMIDADE
+            updateMapZoom(newLocation, speed);
+          }
+          
+          setLastUserPosition(newLocation);
+          
+          // 🗺️ CENTRALIZAR MAPA NO USUÁRIO DURANTE NAVEGAÇÃO
+          if (isNavigating && isFollowingUser) {
+            setMapCenter([newLocation.lat, newLocation.lng]);
+          }
           
           // 🧭 Atualizar orientação do usuário
           if (position.coords.heading !== null) {
@@ -63,7 +90,36 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [isNavigating, routeInstructions, currentInstructionIndex]);
+  }, [isNavigating, routeInstructions, currentInstructionIndex, lastUserPosition, isFollowingUser]);
+
+  // 🗺️ FUNÇÃO PARA AJUSTAR ZOOM BASEADO NA VELOCIDADE E CONTEXTO
+  const updateMapZoom = (userLocation: {lat: number; lng: number}, speed: number) => {
+    let newZoom = 17; // zoom padrão para navegação
+    
+    // 🚗 Ajustar zoom baseado na velocidade
+    if (speed > 50) {
+      newZoom = 15; // rodovia
+    } else if (speed > 30) {
+      newZoom = 16; // avenida
+    } else if (speed > 10) {
+      newZoom = 17; // rua normal
+    } else {
+      newZoom = 18; // parado/devagar
+    }
+    
+    // 🎯 Zoom extra quando próximo de manobra
+    if (distanceToNextManeuver < 100) {
+      newZoom = Math.max(newZoom, 18);
+    }
+    if (distanceToNextManeuver < 50) {
+      newZoom = Math.max(newZoom, 19);
+    }
+    
+    // 🔄 Aplicar zoom suavemente
+    if (Math.abs(newZoom - mapZoom) >= 1) {
+      setMapZoom(newZoom);
+    }
+  };
 
   // 🧭 FUNÇÃO PARA CALCULAR DISTÂNCIA ENTRE DOIS PONTOS (HAVERSINE)
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -218,7 +274,7 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
     }
   };
 
-  // ✅ INICIAR NAVEGAÇÃO COM TURN-BY-TURN
+  // ✅ INICIAR NAVEGAÇÃO COM ZOOM DINÂMICO
   const startNavigation = () => {
     setIsNavigating(true);
     const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
@@ -226,11 +282,19 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
     setCurrentInstructionIndex(0);
     setRouteInstructions([]);
     
-    if (currentLocation && orderedPoints[0]) {
-      calculateCurrentRoute(currentLocation, orderedPoints[0]);
+    // 🗺️ ATIVAR SEGUIMENTO AUTOMÁTICO E ZOOM NAVEGAÇÃO
+    setIsFollowingUser(true);
+    setMapZoom(17);
+    
+    if (currentLocation) {
+      setMapCenter([currentLocation.lat, currentLocation.lng]);
       
-      // 🔊 Anunciar início da navegação
-      announceInstruction("Navegação iniciada. Siga as instruções.");
+      if (orderedPoints[0]) {
+        calculateCurrentRoute(currentLocation, orderedPoints[0]);
+        
+        // 🔊 Anunciar início da navegação
+        announceInstruction("Navegação iniciada. Siga as instruções.");
+      }
     }
   };
 
@@ -346,6 +410,23 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
   const orderedPoints = [...points].sort((a, b) => a.sequence - b.sequence);
   const currentStop = orderedPoints[currentStopIndex];
 
+  // 🗺️ COMPONENTE PARA ATUALIZAR MAPA DINAMICAMENTE
+  const MapUpdater = () => {
+    const map = useMap();
+    
+    useEffect(() => {
+      if (isNavigating && mapCenter && isFollowingUser) {
+        // 🎯 CENTRALIZAR SUAVEMENTE NO USUÁRIO
+        map.setView(mapCenter, mapZoom, {
+          animate: true,
+          duration: 0.5
+        });
+      }
+    }, [map, mapCenter, mapZoom, isNavigating, isFollowingUser]);
+    
+    return null;
+  };
+
   return (
     <div className="h-screen w-full bg-gray-100 relative flex flex-col overflow-hidden">
       
@@ -363,7 +444,16 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
             <div>
               <h3 className="font-semibold text-sm text-gray-800">Rota Fácil</h3>
               <p className="text-xs text-gray-500">
-                {isNavigating ? `Navegando ${currentStopIndex + 1}/${points.length}` : 'Pronto para iniciar'}
+                {isNavigating ? (
+                  <>
+                    Navegando {currentStopIndex + 1}/{points.length}
+                    {userSpeed > 1 && (
+                      <span className="ml-2 text-blue-600 font-semibold">
+                        🚗 {Math.round(userSpeed)} km/h
+                      </span>
+                    )}
+                  </>
+                ) : 'Pronto para iniciar'}
               </p>
             </div>
           </div>
@@ -481,15 +571,19 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
       {/* ✅ MAPA PRINCIPAL */}
       <div className="flex-1 relative">
         <MapContainer
-          center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
-          zoom={isNavigating && currentStop ? 17 : 14}
+          center={mapCenter || (currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773])}
+          zoom={mapZoom}
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
+          key={mapCenter ? `${mapCenter[0]}-${mapCenter[1]}-${mapZoom}` : 'default'}
         >
           <TileLayer
             attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          
+          {/* 🗺️ ATUALIZADOR DINÂMICO DO MAPA */}
+          <MapUpdater />
 
           {/* ✅ LOCALIZAÇÃO DO USUÁRIO */}
           {currentLocation && (
@@ -579,29 +673,35 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           </div>
         )}
 
-        {/* ✅ CONTROLES DE ZOOM - LATERAL */}
-        <div className="absolute bottom-20 right-2 z-20">
+        {/* ✅ CONTROLES DE ZOOM E SEGUIMENTO - LATERAL */}
+        <div className="absolute bottom-20 right-2 z-20 space-y-2">
+          {/* CONTROLE DE SEGUIMENTO */}
+          {isNavigating && (
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <button
+                className={`block w-10 h-10 text-sm font-bold ${
+                  isFollowingUser 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+                onClick={() => setIsFollowingUser(!isFollowingUser)}
+                title={isFollowingUser ? 'Desativar seguimento' : 'Ativar seguimento'}
+              >
+                🎯
+              </button>
+            </div>
+          )}
+          
+          {/* CONTROLES DE ZOOM */}
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             <button
-              onClick={() => {
-                const map = document.querySelector('.leaflet-container');
-                if (map) {
-                  // @ts-ignore
-                  map._leaflet_map?.zoomIn();
-                }
-              }}
+              onClick={() => setMapZoom(prev => Math.min(prev + 1, 19))}
               className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
             >
               <span className="text-sm font-bold text-gray-600">+</span>
             </button>
             <button
-              onClick={() => {
-                const map = document.querySelector('.leaflet-container');
-                if (map) {
-                  // @ts-ignore
-                  map._leaflet_map?.zoomOut();
-                }
-              }}
+              onClick={() => setMapZoom(prev => Math.max(prev - 1, 10))}
               className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center"
             >
               <span className="text-sm font-bold text-gray-600">−</span>
