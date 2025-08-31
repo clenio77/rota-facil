@@ -170,9 +170,9 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
   const currentStop = orderedPoints[currentStopIndex];
 
   return (
-    <div className="h-screen w-full bg-gray-100 relative flex flex-col">
+    <div className="h-screen w-full bg-gray-100 relative flex flex-col overflow-hidden">
       {/* ✅ MAPA PRINCIPAL - OCUPA TODA A TELA */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" style={{ height: 'calc(100vh - env(safe-area-inset-bottom))' }}>
         <MapContainer
           center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
           zoom={16}
@@ -225,7 +225,7 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
         </MapContainer>
 
         {/* ✅ CONTROLES FLUTUANTES ESTILO WAZE */}
-        <div className="absolute top-4 left-4 right-4 z-20">
+        <div className="absolute top-2 left-2 right-2 z-20">
           {/* Header Compacto - Estilo Waze */}
           <div className="bg-white rounded-xl shadow-lg p-3 mb-2">
             <div className="flex justify-between items-center">
@@ -250,55 +250,27 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
             </div>
           </div>
 
-          {/* Painel de Navegação - Estilo Waze/Maps */}
+          {/* Painel de Navegação - COMPACTO */}
           {isNavigating && currentStop && (
-            <div className="bg-white rounded-xl shadow-lg p-4 mb-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center">
-                  <span className="text-xl">🧭</span>
-                </div>
+            <div className="bg-blue-500 text-white rounded-lg shadow-lg p-3 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🧭</span>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-800">Siga em direção a:</p>
-                  <p className="text-lg font-bold text-blue-600">{currentStop.address}</p>
+                  <p className="text-xs opacity-90">SIGA PARA:</p>
+                  <p className="font-bold text-sm leading-tight">{currentStop.address}</p>
                 </div>
-                <div className="text-right">
-                  <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
-                    {currentStop.sequence}
-                  </div>
+                <div className="bg-white text-blue-500 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">
+                  {currentStop.sequence}
                 </div>
               </div>
-              
-              {/* Instruções de Navegação */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">📍</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600">Objeto para entrega:</p>
-                    <p className="font-semibold text-gray-800">📦 {currentStop.objectCode || currentStop.id}</p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm">📦</span>
+                <p className="text-xs opacity-90">{currentStop.objectCode || currentStop.id}</p>
               </div>
             </div>
           )}
 
-          {/* Resumo da Rota - Compacto */}
-          {isNavigating && (
-            <div className="bg-orange-500 text-white rounded-xl shadow-lg p-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🚚</span>
-                  <div>
-                    <p className="text-xs opacity-90">PARADA</p>
-                    <p className="font-bold">{currentStopIndex + 1} de {points.length}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs opacity-90">CONCLUÍDAS</p>
-                  <p className="font-bold">{completedStops.size}</p>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* Lista de Paradas - Expansível */}
           {showStopsList && (
@@ -334,8 +306,8 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           )}
         </div>
 
-        {/* ✅ CONTROLES DE ZOOM - ESTILO MAPS */}
-        <div className="absolute bottom-24 right-4 z-20">
+        {/* ✅ CONTROLES DE ZOOM - LATERAL */}
+        <div className="absolute bottom-20 right-2 z-20">
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
             <button
               onClick={() => {
@@ -345,9 +317,9 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
                   map._leaflet_map?.zoomIn();
                 }
               }}
-              className="block w-10 h-10 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
+              className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200"
             >
-              <span className="text-lg font-bold text-gray-600">+</span>
+              <span className="text-sm font-bold text-gray-600">+</span>
             </button>
             <button
               onClick={() => {
@@ -357,43 +329,43 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
                   map._leaflet_map?.zoomOut();
                 }
               }}
-              className="block w-10 h-10 bg-white hover:bg-gray-50 flex items-center justify-center"
+              className="block w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center"
             >
-              <span className="text-lg font-bold text-gray-600">−</span>
+              <span className="text-sm font-bold text-gray-600">−</span>
             </button>
           </div>
         </div>
+      </div>
 
-        {/* ✅ BOTÕES DE AÇÃO - ESTILO WAZE COMPACTO */}
-        <div className="absolute bottom-6 left-4 right-4 z-20">
-          <div className="flex gap-2">
-            {!isNavigating ? (
+      {/* ✅ BOTÕES FIXOS NO BOTTOM - SEM ABSOLUTE */}
+      <div className="bg-white border-t border-gray-200 p-3 safe-area-bottom">
+        <div className="flex gap-2">
+          {!isNavigating ? (
+            <button
+              onClick={startNavigation}
+              className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg flex items-center justify-center gap-2"
+            >
+              <span>🚀</span>
+              <span>INICIAR</span>
+            </button>
+          ) : (
+            <>
               <button
-                onClick={startNavigation}
-                className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg flex items-center justify-center gap-2"
+                onClick={nextStop}
+                disabled={currentStopIndex >= points.length - 1 && currentStopIndex !== -1}
+                className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <span>🚀</span>
-                <span>INICIAR</span>
+                <span>✅</span>
+                <span>PRÓXIMA</span>
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={nextStop}
-                  disabled={currentStopIndex >= points.length - 1 && currentStopIndex !== -1}
-                  className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <span>✅</span>
-                  <span>PRÓXIMA</span>
-                </button>
-                <button
-                  onClick={() => setIsNavigating(false)}
-                  className="bg-red-500 text-white px-4 py-3 rounded-lg font-semibold shadow-lg"
-                >
-                  ⏹️
-                </button>
-              </>
-            )}
-          </div>
+              <button
+                onClick={() => setIsNavigating(false)}
+                className="bg-red-500 text-white px-4 py-3 rounded-lg font-semibold shadow-lg"
+              >
+                ⏹️
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
