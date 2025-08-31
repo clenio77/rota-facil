@@ -435,6 +435,218 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
   }
 }
 
+// 🎯 FUNÇÃO: Validar e filtrar localizações reais do endereço
+async function validateAndFilterRealLocations(results: SearchResult[], query: string, userLocation?: { lat: number; lng: number; city?: string; state?: string }): Promise<SearchResult[]> {
+  if (results.length <= 1) return results;
+
+  const { street, number } = extractAddressNumber(query);
+  console.log(`🔍 Validando localizações para: "${street}" número "${number}"`);
+
+  // 🎯 ESTRATÉGIA 1: Se tem número, buscar CEP específico
+  if (number && userLocation?.city) {
+    try {
+      const cepValidatedResults = await validateByCEP(results, street, number, userLocation.city);
+      if (cepValidatedResults.length > 0) {
+        console.log(`✅ Validação por CEP: ${cepValidatedResults.length} resultados válidos`);
+        return cepValidatedResults;
+      }
+    } catch (error) {
+      console.log('⚠️ Validação por CEP falhou:', error);
+    }
+  }
+
+  // 🎯 ESTRATÉGIA 2: Filtrar por bairro mais provável
+  const neighborhoodFiltered = filterByMostLikelyNeighborhood(results, street, number, userLocation);
+  if (neighborhoodFiltered.length > 0 && neighborhoodFiltered.length < results.length) {
+    console.log(`✅ Filtro por bairro: ${neighborhoodFiltered.length} resultados (era ${results.length})`);
+    return neighborhoodFiltered;
+  }
+
+  // 🎯 ESTRATÉGIA 3: Filtrar por proximidade ao centro da cidade
+  const proximityFiltered = filterByProximityToCenter(results, userLocation);
+  if (proximityFiltered.length > 0 && proximityFiltered.length < results.length) {
+    console.log(`✅ Filtro por proximidade: ${proximityFiltered.length} resultados (era ${results.length})`);
+    return proximityFiltered;
+  }
+
+  // 🎯 Fallback: retornar apenas os 3 melhores por confiança
+  const topResults = results
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+    .slice(0, 3);
+  
+  console.log(`⚠️ Usando fallback: ${topResults.length} melhores resultados por confiança`);
+  return topResults;
+}
+
+// 🏛️ FUNÇÃO: Validar endereço por CEP (ViaCEP)
+async function validateByCEP(results: SearchResult[], street: string, number: string, city: string): Promise<SearchResult[]> {
+  try {
+    // Buscar CEP do endereço no ViaCEP
+    const viaCepUrl = `https://viacep.com.br/ws/${city.replace(/\s+/g, '%20')}/${street.replace(/\s+/g, '%20')}/json/`;
+    console.log(`🔍 Buscando CEP: ${viaCepUrl}`);
+    
+    const response = await fetch(viaCepUrl, { 
+      signal: AbortSignal.timeout(5000) // 5s timeout
+    });
+    
+    if (!response.ok) throw new Error('ViaCEP falhou');
+    
+    const cepData = await response.json();
+    
+    if (Array.isArray(cepData) && cepData.length > 0) {
+      const validCEP = cepData[0].cep;
+      const validNeighborhood = cepData[0].bairro;
+      
+      console.log(`✅ CEP encontrado: ${validCEP} - Bairro: ${validNeighborhood}`);
+      
+      // Filtrar resultados que coincidem com CEP ou bairro
+      const validResults = results.filter(result => {
+        const resultNeighborhood = result.address.neighbourhood?.toLowerCase();
+        const validNeighborhoodLower = validNeighborhood?.toLowerCase();
+        
+        const neighborhoodMatch = resultNeighborhood && validNeighborhoodLower &&
+          (resultNeighborhood.includes(validNeighborhoodLower) || 
+           validNeighborhoodLower.includes(resultNeighborhood));
+        
+        if (neighborhoodMatch) {
+          result.confidence += 0.4; // Grande bonus para bairro correto
+          console.log(`🎯 Bairro correto: ${result.display_name}`);
+        }
+        
+        return neighborhoodMatch;
+      });
+      
+      return validResults;
+    }
+  } catch (error) {
+    console.log('⚠️ Erro na validação por CEP:', error);
+  }
+  
+  return [];
+}
+
+// 🗺️ BASE DE CONHECIMENTO: Endereços específicos de Uberlândia
+const UBERLANDIA_ADDRESS_KNOWLEDGE: { [key: string]: { neighborhood: string; cep?: string; description: string } } = {
+  'afonso pena': {
+    neighborhood: 'centro',
+    cep: '38400',
+    description: 'Avenida principal do centro de Uberlândia'
+  },
+  'joão pinheiro': {
+    neighborhood: 'centro',
+    cep: '38400', 
+    description: 'Avenida central histórica'
+  },
+  'cesário alvim': {
+    neighborhood: 'tibery',
+    cep: '38400',
+    description: 'Avenida do bairro Tibery'
+  },
+  'floriano peixoto': {
+    neighborhood: 'centro',
+    cep: '38400',
+    description: 'Rua do centro comercial'
+  },
+  'santos dumont': {
+    neighborhood: 'centro',
+    cep: '38400',
+    description: 'Praça central'
+  }
+};
+
+// 🏘️ FUNÇÃO: Filtrar por bairro mais provável
+function filterByMostLikelyNeighborhood(results: SearchResult[], street: string, number?: string, userLocation?: { lat: number; lng: number; city?: string }): SearchResult[] {
+  // 🎯 PRIMEIRO: Verificar conhecimento específico de Uberlândia
+  const streetKey = street.toLowerCase().replace(/rua|avenida|alameda/g, '').trim();
+  const knownAddress = Object.entries(UBERLANDIA_ADDRESS_KNOWLEDGE).find(([key]) => 
+    streetKey.includes(key) || key.includes(streetKey)
+  );
+  
+  if (knownAddress) {
+    const [, info] = knownAddress;
+    console.log(`🧠 Conhecimento local: "${street}" deve estar em "${info.neighborhood}"`);
+    
+    // Filtrar resultados que coincidem com o bairro conhecido
+    const knownResults = results.filter(result => {
+      const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
+      const city = result.address.city?.toLowerCase() || '';
+      
+      const isCorrectNeighborhood = neighborhood.includes(info.neighborhood) || 
+                                   city.includes(info.neighborhood) ||
+                                   result.display_name.toLowerCase().includes(info.neighborhood);
+      
+      if (isCorrectNeighborhood) {
+        result.confidence += 0.5; // Grande bonus para conhecimento local
+        console.log(`🎯 Bairro correto por conhecimento: ${result.display_name}`);
+      }
+      
+      return isCorrectNeighborhood;
+    });
+    
+    if (knownResults.length > 0) {
+      console.log(`✅ Conhecimento local aplicado: ${knownResults.length} resultados corretos`);
+      return knownResults;
+    }
+  }
+  // Agrupar por bairro
+  const byNeighborhood: { [key: string]: SearchResult[] } = {};
+  
+  results.forEach(result => {
+    const neighborhood = result.address.neighbourhood || result.address.city || 'unknown';
+    const key = neighborhood.toLowerCase();
+    
+    if (!byNeighborhood[key]) byNeighborhood[key] = [];
+    byNeighborhood[key].push(result);
+  });
+  
+  // Encontrar bairro com maior confiança média
+  let bestNeighborhood = '';
+  let bestConfidence = 0;
+  
+  Object.entries(byNeighborhood).forEach(([neighborhood, neighborhoodResults]) => {
+    const avgConfidence = neighborhoodResults.reduce((sum, r) => sum + (r.confidence || 0), 0) / neighborhoodResults.length;
+    const hasExactNumber = number ? neighborhoodResults.some(r => r.address.house_number === number) : false;
+    
+    // Bonus para bairro com número exato
+    const finalConfidence = avgConfidence + (hasExactNumber ? 0.3 : 0);
+    
+    console.log(`🏘️ Bairro "${neighborhood}": ${neighborhoodResults.length} resultados, confiança ${finalConfidence.toFixed(3)}`);
+    
+    if (finalConfidence > bestConfidence) {
+      bestConfidence = finalConfidence;
+      bestNeighborhood = neighborhood;
+    }
+  });
+  
+  if (bestNeighborhood && byNeighborhood[bestNeighborhood]) {
+    console.log(`🏆 Melhor bairro: "${bestNeighborhood}" com confiança ${bestConfidence.toFixed(3)}`);
+    return byNeighborhood[bestNeighborhood];
+  }
+  
+  return results;
+}
+
+// 📏 FUNÇÃO: Filtrar por proximidade ao centro da cidade
+function filterByProximityToCenter(results: SearchResult[], userLocation?: { lat: number; lng: number }): SearchResult[] {
+  if (!userLocation) return results;
+  
+  // Calcular distância de cada resultado ao centro (posição do usuário)
+  const withDistance = results.map(result => ({
+    ...result,
+    distanceToCenter: haversineKm(userLocation.lat, userLocation.lng, result.lat, result.lng)
+  }));
+  
+  // Ordenar por proximidade
+  withDistance.sort((a, b) => a.distanceToCenter - b.distanceToCenter);
+  
+  // Retornar apenas os mais próximos (dentro de 5km do centro)
+  const nearCenter = withDistance.filter(result => result.distanceToCenter <= 5);
+  
+  console.log(`📏 Proximidade: ${nearCenter.length} resultados dentro de 5km do centro`);
+  
+  return nearCenter;
+}
+
 // Função para extrair número do endereço - MELHORADA
 function extractAddressNumber(query: string): { street: string; number?: string } {
   const cleaned = query.trim();
@@ -897,10 +1109,13 @@ export async function POST(request: NextRequest) {
       return firstIndex === index;
     });
 
-    // Limitar resultados
-    const limitedResults = uniqueResults.slice(0, limit);
+    // 🎯 VALIDAÇÃO INTELIGENTE DE LOCALIZAÇÃO - FILTRAR DUPLICATAS POR ENDEREÇO REAL
+    const validatedResults = await validateAndFilterRealLocations(uniqueResults, query, userLocation);
 
-    console.log(`✅ Encontrados ${limitedResults.length} resultados únicos`);
+    // Limitar resultados após validação
+    const limitedResults = validatedResults.slice(0, limit);
+
+    console.log(`✅ Encontrados ${limitedResults.length} resultados únicos (${uniqueResults.length} antes da validação)`);
     
     // ✅ NOVO: Log detalhado dos resultados
     limitedResults.forEach((result, index) => {
