@@ -809,35 +809,62 @@ export async function POST(request: NextRequest) {
       results = cityFilteredResults;
     }
 
-    // ✅ NOVA LÓGICA: VALIDAR NÚMEROS REAIS
+    // 🔧 FLEXIBILIZAR VALIDAÇÃO DE NÚMEROS - PERMITIR RESULTADOS SEM NÚMERO QUANDO NECESSÁRIO
     if (number) {
       const validatedResults = results.filter(result => {
         const resultNumber = result.address.house_number;
         
-        if (!resultNumber) {
-          console.log(`❌ ${result.display_name} - SEM NÚMERO`);
-          return false;
-        }
-        
-        // ✅ VALIDAÇÃO: Número deve ser real (não vazio, não apenas texto)
-        const isValidNumber = /^\d+$/.test(resultNumber) && resultNumber.length <= 5;
-        
-        if (!isValidNumber) {
-          console.log(`❌ ${result.display_name} - NÚMERO INVÁLIDO: ${resultNumber}`);
-          return false;
-        }
-        
-        // ✅ BONUS: Se é o número exato que procuramos, priorizar
+        // ✅ PRIORIDADE 1: Se tem o número exato, sempre manter
         if (resultNumber === number) {
           console.log(`🎯 ${result.display_name} - NÚMERO EXATO: ${resultNumber}`);
-          result.confidence += 0.2; // Bonus de confiança
+          result.confidence += 0.3; // Grande bonus
+          return true;
         }
         
-        return true;
+        // ✅ PRIORIDADE 2: Se tem qualquer número válido na mesma rua
+        if (resultNumber && /^\d+$/.test(resultNumber) && resultNumber.length <= 5) {
+          const street = result.address.road?.toLowerCase() || '';
+          const searchStreet = extractAddressNumber(query).street.toLowerCase();
+          
+          if (street.includes(searchStreet) || searchStreet.includes(street)) {
+            console.log(`✅ ${result.display_name} - MESMA RUA COM NÚMERO: ${resultNumber}`);
+            result.confidence += 0.1;
+            return true;
+          }
+        }
+        
+        // ✅ PRIORIDADE 3: Se é da mesma rua mesmo sem número (FALLBACK)
+        const street = result.address.road?.toLowerCase() || '';
+        const searchStreet = extractAddressNumber(query).street.toLowerCase();
+        
+        if (street.includes(searchStreet) || searchStreet.includes(street)) {
+          console.log(`⚠️ ${result.display_name} - MESMA RUA SEM NÚMERO (fallback permitido)`);
+          result.confidence += 0.05; // Bonus menor
+          return true;
+        }
+        
+        console.log(`❌ ${result.display_name} - NÃO RELACIONADO`);
+        return false;
       });
       
-      console.log(`🔢 Validação de números: ${results.length} → ${validatedResults.length} resultados válidos`);
+      console.log(`🔢 Validação FLEXÍVEL: ${results.length} → ${validatedResults.length} resultados válidos`);
       results = validatedResults;
+      
+      // ✅ Se não encontrou nada, ser ainda mais flexível
+      if (validatedResults.length === 0) {
+        console.log('🆘 NENHUM RESULTADO - sendo mais flexível...');
+        
+        const fallbackResults = results.filter(result => {
+          const street = result.address.road?.toLowerCase() || result.display_name.toLowerCase();
+          const searchStreet = extractAddressNumber(query).street.toLowerCase();
+          
+          // Aceitar qualquer resultado da mesma rua
+          return street.includes(searchStreet) || searchStreet.includes(street);
+        });
+        
+        console.log(`🆘 Fallback: ${fallbackResults.length} resultados encontrados`);
+        results = fallbackResults;
+      }
     }
     
     // ✅ NOVA LÓGICA: PRIORIZAR RESULTADOS DA CIDADE DO USUÁRIO

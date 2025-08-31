@@ -893,24 +893,15 @@ export default function HomePage() {
         return;
       }
 
-      // ✅ NOVO: Filtrar apenas resultados da cidade correta
-      const cityFilteredResults = data.results.filter(result => {
-        if (!result.address.city) return false;
-        
-        const cityMatch = result.address.city.toLowerCase().includes(currentLocation.city.toLowerCase()) ||
-                         currentLocation.city.toLowerCase().includes(result.address.city.toLowerCase());
-        
-        const stateMatch = result.address.state && currentLocation.state &&
-                          (result.address.state.toLowerCase().includes(currentLocation.state.toLowerCase()) ||
-                           currentLocation.state.toLowerCase().includes(result.address.state.toLowerCase()));
-        
-        return cityMatch && stateMatch;
-      });
-
-      if (cityFilteredResults.length === 0) {
-        alert(`❌ Nenhum endereço encontrado em ${currentLocation.city}.\n\n💡 O endereço "${voiceText}" pode estar em outra cidade.`);
+      // ✅ A API já filtrou por cidade, usar resultados diretamente
+      console.log(`✅ API retornou ${data.results.length} resultados já filtrados por cidade`);
+      
+      if (data.results.length === 0) {
+        alert(`❌ Nenhum endereço encontrado em ${currentLocation.city}.\n\n💡 O endereço "${voiceText}" pode estar em outra cidade ou ser muito específico. Tente um nome mais simples da rua.`);
         return;
       }
+
+      const cityFilteredResults = data.results; // API já filtrou
 
       // Pegar o melhor resultado da cidade correta
       const bestResult = cityFilteredResults[0];
