@@ -113,9 +113,12 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
     }
   };
 
-  // ✅ ÍCONES CUSTOMIZADOS
+  // ✅ ÍCONES CUSTOMIZADOS - MELHOR VISIBILIDADE
   const createCustomIcon = (sequence: number, isCompleted: boolean, isCurrent: boolean) => {
+    const size = isCurrent ? 36 : 28;
     const color = isCurrent ? '#f97316' : isCompleted ? '#22c55e' : '#3b82f6';
+    const borderColor = isCurrent ? '#fed7aa' : 'white';
+    const fontSize = isCurrent ? '16px' : '12px';
     
     return L.divIcon({
       html: `
@@ -123,22 +126,23 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
           background-color: ${color};
           color: white;
           border-radius: 50%;
-          width: 24px;
-          height: 24px;
+          width: ${size}px;
+          height: ${size}px;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: bold;
-          font-size: 11px;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          font-size: ${fontSize};
+          border: 3px solid ${borderColor};
+          box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+          ${isCurrent ? 'animation: pulse 2s infinite;' : ''}
         ">
           ${isCurrent ? '🎯' : isCompleted ? '✅' : sequence}
         </div>
       `,
       className: 'custom-div-icon',
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2]
     });
   };
 
@@ -175,7 +179,7 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
       <div className="flex-1 relative" style={{ height: 'calc(100vh - env(safe-area-inset-bottom))' }}>
         <MapContainer
           center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [-18.9185, -48.2773]}
-          zoom={16}
+          zoom={isNavigating && currentStop ? 17 : 14}
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
@@ -250,22 +254,35 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
             </div>
           </div>
 
-          {/* Painel de Navegação - COMPACTO */}
+          {/* Painel de Navegação - ESTILO WAZE/MAPS */}
           {isNavigating && currentStop && (
-            <div className="bg-blue-500 text-white rounded-lg shadow-lg p-3 mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🧭</span>
-                <div className="flex-1">
-                  <p className="text-xs opacity-90">SIGA PARA:</p>
-                  <p className="font-bold text-sm leading-tight">{currentStop.address}</p>
+            <div className="bg-blue-600 text-white rounded-xl shadow-xl p-4 mb-2">
+              <div className="flex items-start gap-3">
+                <div className="bg-white text-blue-600 rounded-full w-12 h-12 flex items-center justify-center">
+                  <span className="text-2xl">🧭</span>
                 </div>
-                <div className="bg-white text-blue-500 rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">
-                  {currentStop.sequence}
+                <div className="flex-1">
+                  <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">PRÓXIMA PARADA</p>
+                  <h2 className="font-bold text-lg leading-tight mt-1">{currentStop.address}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-lg">📦</span>
+                    <p className="text-sm font-semibold">{currentStop.objectCode || currentStop.id}</p>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="bg-white text-blue-600 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm mb-1">
+                    {currentStop.sequence}
+                  </div>
+                  <p className="text-xs opacity-75">{currentStopIndex + 1}/{points.length}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-sm">📦</span>
-                <p className="text-xs opacity-90">{currentStop.objectCode || currentStop.id}</p>
+              
+              {/* Barra de Instrução */}
+              <div className="mt-3 pt-3 border-t border-blue-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📍</span>
+                  <p className="text-sm font-semibold">Procure pelo endereço e entregue o objeto ECT</p>
+                </div>
               </div>
             </div>
           )}
@@ -337,36 +354,51 @@ export default function MobileNavigator({ points, userLocation, onStopCompleted 
         </div>
       </div>
 
-      {/* ✅ BOTÕES FIXOS NO BOTTOM - SEM ABSOLUTE */}
-      <div className="bg-white border-t border-gray-200 p-3 safe-area-bottom">
-        <div className="flex gap-2">
+      {/* ✅ BOTÕES FIXOS NO BOTTOM - SEMPRE VISÍVEIS */}
+      <div className="bg-white border-t border-gray-200 p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+        <div className="flex gap-3">
           {!isNavigating ? (
             <button
               onClick={startNavigation}
-              className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg flex items-center justify-center gap-2"
+              className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold text-base shadow-xl flex items-center justify-center gap-2"
+              style={{ minHeight: '56px' }}
             >
-              <span>🚀</span>
-              <span>INICIAR</span>
+              <span className="text-xl">🚀</span>
+              <span>INICIAR NAVEGAÇÃO</span>
             </button>
           ) : (
             <>
               <button
                 onClick={nextStop}
                 disabled={currentStopIndex >= points.length - 1 && currentStopIndex !== -1}
-                className="flex-1 bg-orange-500 text-white py-3 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold text-base shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ minHeight: '56px' }}
               >
-                <span>✅</span>
-                <span>PRÓXIMA</span>
+                <span className="text-xl">✅</span>
+                <span>PRÓXIMA PARADA</span>
               </button>
               <button
                 onClick={() => setIsNavigating(false)}
-                className="bg-red-500 text-white px-4 py-3 rounded-lg font-semibold shadow-lg"
+                className="bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-xl font-bold text-base shadow-xl"
+                style={{ minHeight: '56px' }}
               >
-                ⏹️
+                <span className="text-xl">⏹️</span>
               </button>
             </>
           )}
         </div>
+        
+        {/* Indicador de Progresso */}
+        {isNavigating && (
+          <div className="mt-3 text-center">
+            <p className="text-sm text-gray-600">
+              Parada <span className="font-bold text-blue-600">{currentStopIndex + 1}</span> de <span className="font-bold">{points.length}</span>
+              {completedStops.size > 0 && (
+                <span className="ml-2 text-green-600">• {completedStops.size} concluídas</span>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
