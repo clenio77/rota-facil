@@ -525,38 +525,62 @@ async function validateByCEP(results: SearchResult[], street: string, number: st
   return [];
 }
 
-// 🗺️ BASE DE CONHECIMENTO: Endereços específicos de Uberlândia
-const UBERLANDIA_ADDRESS_KNOWLEDGE: { [key: string]: { neighborhood: string; cep?: string; description: string } } = {
+// 🗺️ BASE DE CONHECIMENTO: Endereços específicos de Uberlândia - CORRIGIDA E EXPANDIDA
+const UBERLANDIA_ADDRESS_KNOWLEDGE: { [key: string]: { 
+  neighborhood: string; 
+  coords: { lat: number; lng: number }; 
+  description: string;
+  numberRanges?: { min: number; max: number; coords: { lat: number; lng: number } }[];
+} } = {
   'afonso pena': {
     neighborhood: 'centro',
-    cep: '38400',
-    description: 'Avenida principal do centro de Uberlândia'
+    coords: { lat: -18.9186, lng: -48.2774 },
+    description: 'Avenida principal do centro de Uberlândia',
+    numberRanges: [
+      { min: 1, max: 3000, coords: { lat: -18.9186, lng: -48.2774 } } // Centro
+    ]
   },
   'joão pinheiro': {
     neighborhood: 'centro',
-    cep: '38400', 
-    description: 'Avenida central histórica'
+    coords: { lat: -18.9190, lng: -48.2780 },
+    description: 'Avenida central histórica - SEMPRE no centro',
+    numberRanges: [
+      { min: 1, max: 2500, coords: { lat: -18.9190, lng: -48.2780 } },     // Centro
+      { min: 2501, max: 5000, coords: { lat: -18.9200, lng: -48.2790 } }    // Centro-Norte
+    ]
   },
   'cesário alvim': {
-    neighborhood: 'tibery',
-    cep: '38400',
-    description: 'Avenida do bairro Tibery'
+    neighborhood: 'centro',
+    coords: { lat: -18.9195, lng: -48.2748 },
+    description: 'Avenida Cesário Alvim - atravessa vários bairros',
+    numberRanges: [
+      { min: 1, max: 1405, coords: { lat: -18.9195, lng: -48.2748 } },      // Centro
+      { min: 1406, max: 2876, coords: { lat: -18.9165, lng: -48.2726 } },   // Nossa Sra. Aparecida  
+      { min: 2877, max: 4313, coords: { lat: -18.9135, lng: -48.2705 } },   // Brasil
+      { min: 4314, max: 5099, coords: { lat: -18.9105, lng: -48.2685 } },   // Custódio Pereira
+      { min: 5100, max: 5599, coords: { lat: -18.9075, lng: -48.2665 } }    // Alto Umuarama
+    ]
   },
   'floriano peixoto': {
     neighborhood: 'centro',
-    cep: '38400',
+    coords: { lat: -18.9195, lng: -48.2783 },
     description: 'Rua do centro comercial'
   },
   'santos dumont': {
     neighborhood: 'centro',
-    cep: '38400',
+    coords: { lat: -18.9188, lng: -48.2776 },
     description: 'Praça central'
+  },
+  'amazonas': {
+    neighborhood: 'centro',
+    coords: { lat: -18.9175, lng: -48.2763 },
+    description: 'Avenida Amazonas - Centro'
   }
 };
 
 // 🏘️ FUNÇÃO: Filtrar por bairro mais provável
 function filterByMostLikelyNeighborhood(results: SearchResult[], street: string, number?: string, userLocation?: { lat: number; lng: number; city?: string }): SearchResult[] {
-  // 🎯 PRIMEIRO: Verificar conhecimento específico de Uberlândia
+  // 🎯 VERIFICAR CONHECIMENTO ESPECÍFICO DE UBERLÂNDIA
   const streetKey = street.toLowerCase().replace(/rua|avenida|alameda/g, '').trim();
   const knownAddress = Object.entries(UBERLANDIA_ADDRESS_KNOWLEDGE).find(([key]) => 
     streetKey.includes(key) || key.includes(streetKey)
@@ -566,26 +590,90 @@ function filterByMostLikelyNeighborhood(results: SearchResult[], street: string,
     const [, info] = knownAddress;
     console.log(`🧠 Conhecimento local: "${street}" deve estar em "${info.neighborhood}"`);
     
-    // Filtrar resultados que coincidem com o bairro conhecido
-    const knownResults = results.filter(result => {
+    // 🎯 FILTRAR RESULTADOS INCORRETOS baseado no conhecimento local
+    const filteredResults = results.filter(result => {
       const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
       const city = result.address.city?.toLowerCase() || '';
+      const displayName = result.display_name.toLowerCase();
       
-      const isCorrectNeighborhood = neighborhood.includes(info.neighborhood) || 
-                                   city.includes(info.neighborhood) ||
-                                   result.display_name.toLowerCase().includes(info.neighborhood);
+      // ✅ ACEITAR se bairro correto (baseado no número)
+      let isCorrectNeighborhood = false;
       
-      if (isCorrectNeighborhood) {
-        result.confidence += 0.5; // Grande bonus para conhecimento local
-        console.log(`🎯 Bairro correto por conhecimento: ${result.display_name}`);
+      // 🎯 VERIFICAR BAIRRO CORRETO BASEADO NO NÚMERO
+      if (number && info.numberRanges) {
+        const numberValue = parseInt(number);
+        const correctRange = info.numberRanges.find(r => numberValue >= r.min && numberValue <= r.max);
+        
+        if (correctRange) {
+          // Determinar bairro esperado baseado na faixa
+          let expectedNeighborhood = '';
+          if (streetKey.includes('cesário alvim')) {
+            if (numberValue >= 1 && numberValue <= 1405) expectedNeighborhood = 'centro';
+            else if (numberValue >= 1406 && numberValue <= 2876) expectedNeighborhood = 'nossa';
+            else if (numberValue >= 2877 && numberValue <= 4313) expectedNeighborhood = 'brasil';
+            else expectedNeighborhood = 'custódio';
+          } else {
+            expectedNeighborhood = info.neighborhood;
+          }
+          
+          // Verificar se o bairro do resultado bate com o esperado
+          isCorrectNeighborhood = neighborhood.includes(expectedNeighborhood) || 
+                                 city.includes(expectedNeighborhood) ||
+                                 displayName.includes(expectedNeighborhood);
+          
+          console.log(`🎯 Número ${number}: esperado="${expectedNeighborhood}", encontrado="${neighborhood}", correto=${isCorrectNeighborhood}`);
+        }
+      } else {
+        // Sem número específico - usar bairro geral
+        isCorrectNeighborhood = neighborhood.includes(info.neighborhood) || 
+                               city.includes(info.neighborhood) ||
+                               displayName.includes(info.neighborhood);
       }
       
-      return isCorrectNeighborhood;
+      // ❌ REJEITAR bairros explicitamente incorretos para esta rua (baseado no número)
+      let isIncorrectNeighborhood = false;
+      
+      // 🎯 REGRAS ESPECÍFICAS POR RUA E NÚMERO
+      if (streetKey.includes('joão pinheiro')) {
+        // João Pinheiro deve estar no Centro ou Centro-Norte (nunca Nossa Sra. Aparecida)
+        const wrongForJoaoPinheiro = ['nossa sra aparecida', 'nossa senhora aparecida', 'aparecida'];
+        isIncorrectNeighborhood = wrongForJoaoPinheiro.some(wrong => 
+          neighborhood.includes(wrong) || displayName.includes(wrong)
+        );
+      } else if (streetKey.includes('cesário alvim')) {
+        // Cesário Alvim: depende do número
+        const numberValue = number ? parseInt(number) : 0;
+        if (numberValue >= 1 && numberValue <= 1405) {
+          // Centro
+          isIncorrectNeighborhood = !neighborhood.includes('centro');
+        } else if (numberValue >= 1406 && numberValue <= 2876) {
+          // Nossa Sra. Aparecida - CORRETO!
+          isIncorrectNeighborhood = false; // Aceitar Nossa Sra. Aparecida para essa faixa
+        } else {
+          // Outras faixas (Brasil, Custódio Pereira, etc.)
+          isIncorrectNeighborhood = neighborhood.includes('centro');
+        }
+      }
+      
+      if (isCorrectNeighborhood) {
+        result.confidence += 0.5; // Bonus para bairro correto
+        console.log(`✅ Bairro correto: ${result.display_name}`);
+        return true;
+      } else if (isIncorrectNeighborhood) {
+        console.log(`❌ Bairro incorreto REJEITADO: ${result.display_name}`);
+        return false;
+      }
+      
+      // 🤔 Casos duvidosos - manter mas com baixa confiança
+      result.confidence -= 0.2;
+      return true;
     });
     
-    if (knownResults.length > 0) {
-      console.log(`✅ Conhecimento local aplicado: ${knownResults.length} resultados corretos`);
-      return knownResults;
+    if (filteredResults.length > 0) {
+      console.log(`✅ Filtro por conhecimento local: ${filteredResults.length} resultados (era ${results.length})`);
+      return filteredResults;
+    } else {
+      console.log(`⚠️ Nenhum resultado válido encontrado - usar Google Maps como referência`);
     }
   }
   // Agrupar por bairro
