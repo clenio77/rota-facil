@@ -769,14 +769,32 @@ function validateBySpecificNumber(results: SearchResult[], query: string): Searc
     
     console.log(`🎯 Número ${numberValue} deve estar em: ${expectedNeighborhood}`);
     
-    // 🚨 SE NÃO ENCONTROU O BAIRRO CORRETO, CRIAR RESULTADO FORÇADO
-    const hasCorrectNeighborhood = results.some(result => {
+    // 🎯 ENCONTRAR RESULTADO COM BAIRRO CORRETO E PRIORIZAR
+    const correctResults = results.filter(result => {
       const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
       const displayName = result.display_name.toLowerCase();
       return neighborhood.includes(expectedNeighborhood) || displayName.includes(expectedNeighborhood);
     });
     
-    if (!hasCorrectNeighborhood) {
+    const incorrectResults = results.filter(result => {
+      const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
+      const displayName = result.display_name.toLowerCase();
+      return !(neighborhood.includes(expectedNeighborhood) || displayName.includes(expectedNeighborhood));
+    });
+    
+    if (correctResults.length > 0) {
+      console.log(`✅ PRIORIZANDO ${correctResults.length} resultados corretos para ${expectedNeighborhood}`);
+      
+      // Dar boost de confiança para resultados corretos
+      correctResults.forEach(result => {
+        result.confidence += 1.0;
+        result.importance += 1.0;
+        console.log(`🎯 BOOST: ${result.display_name}`);
+      });
+      
+      // Retornar resultados corretos primeiro
+      return [...correctResults, ...incorrectResults];
+    } else {
       console.log(`🚨 CRIANDO RESULTADO FORÇADO para ${street}, ${number} em ${expectedNeighborhood}`);
       
       const forcedResult: SearchResult = {
