@@ -59,7 +59,7 @@ declare global {
 
 interface OptimizeResponse {
   success: boolean;
-  optimizedStops: any[];
+  optimizedStops: { id: number, sequence: number }[];
   distance?: number;
   duration?: number;
   geometry?: {
@@ -119,13 +119,14 @@ export default function HomePage() {
   const [uploadType, setUploadType] = useState<'simple' | 'carteiro'>('simple');
 
   // 📋 ESTADOS PARA FUNCIONALIDADE DO CARTEIRO
-  const [carteiroAddresses, setCarteiroAddresses] = useState<any[]>([]);
+  const [carteiroAddresses, setCarteiroAddresses] = useState<unknown[]>([]);
   // showCarteiroPanel removido - funcionalidade movida para página dedicada
 
   // 📸 PROOF OF DELIVERY
   const { proofs, loadProofs } = useProofOfDelivery();
 
   // 📋 FUNÇÃO PARA PROCESSAR ENDEREÇOS DO CARTEIRO
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCarteiroAddresses = (addresses: any[], mapData: any) => {
     console.log('📋 Endereços do carteiro recebidos:', addresses.length);
 
@@ -486,11 +487,12 @@ export default function HomePage() {
   useVoiceCommands(voiceCommandHandlers);
 
   // 📸 HANDLER DE COMPROVAÇÃO CAPTURADA
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleProofCaptured = async (proof: any) => {
     if (!currentProofStop) return;
 
     // Marcar parada como entregue
-    updateStop(currentProofStop.id, { status: 'delivered' as any });
+    updateStop(currentProofStop.id, { status: 'delivered' });
 
     // 🔄 QUEUE OFFLINE ACTION
     await queueAction('delivery_update', {
@@ -637,8 +639,9 @@ export default function HomePage() {
         // ✅ NOVO: Mostrar confirmação
         alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${stopsWithCoords.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
 
-        // ✅ NOVO: Registrar no analytics
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (typeof window !== 'undefined' && (window as any).gtag) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).gtag('event', 'route_started', {
             event_category: 'navigation',
             event_label: 'google_maps',
@@ -1185,7 +1188,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <p className="text-xs text-blue-600 mt-1">
-                  Diga apenas o nome da rua ou local (ex: "Centro", "Rua Principal, 123")
+                  Diga apenas o nome da rua ou local (ex: &quot;Centro&quot;, &quot;Rua Principal, 123&quot;)
                 </p>
               </div>
             )}

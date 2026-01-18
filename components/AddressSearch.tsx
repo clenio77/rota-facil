@@ -50,6 +50,7 @@ export default function AddressSearch({
   const streetInputRef = useRef<HTMLInputElement>(null);
   const numberInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
   // Debounce da query para evitar muitas requisições
@@ -71,6 +72,7 @@ export default function AddressSearch({
         console.log('🎤 Reconhecimento de voz iniciado');
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         console.log('🎤 Voz capturada:', transcript);
@@ -90,6 +92,7 @@ export default function AddressSearch({
         }
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognitionRef.current.onerror = (event: any) => {
         console.error('❌ Erro no reconhecimento de voz:', event.error);
         setIsListening(false);
@@ -358,8 +361,8 @@ export default function AddressSearch({
                 <button
                   onClick={isListening ? stopListening : startListening}
                   className={`p-1 rounded-full transition-colors ${isListening
-                      ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                      : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
+                    ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                    : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
                     }`}
                   title={isListening ? 'Parar gravação' : 'Falar endereço'}
                 >
@@ -473,7 +476,7 @@ export default function AddressSearch({
       {/* ✅ NOVA: Dicas de uso */}
       <div className="mt-2 text-xs text-gray-500 space-y-1">
         <p>💡 <strong>Dica:</strong> Digite o nome da rua primeiro, depois o número</p>
-        <p>🎤 <strong>Voz:</strong> Fale "Rua Principal, 123" para preenchimento automático</p>
+        <p>🎤 <strong>Voz:</strong> Fale &quot;Rua Principal, 123&quot; para preenchimento automático</p>
         {numberQuery && (
           <p className="text-blue-600">
             🔍 Buscando em <strong>{userLocation?.city ? userLocation.city.charAt(0).toUpperCase() + userLocation.city.slice(1) : 'sua região'}</strong>:
