@@ -51,7 +51,7 @@ export default function AddressSearch({
   const numberInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  
+
   // Debounce da query para evitar muitas requisições
   const debouncedStreetQuery = useDebounce(streetQuery, 300);
   const debouncedNumberQuery = useDebounce(numberQuery, 300);
@@ -74,15 +74,15 @@ export default function AddressSearch({
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         console.log('🎤 Voz capturada:', transcript);
-        
+
         // ✅ PROCESSAR TRANSCRITO E SEPARAR RUA/NÚMERO
         const { street, number } = parseVoiceInput(transcript);
-        
+
         setStreetQuery(street);
         if (number) {
           setNumberQuery(number);
         }
-        
+
         // ✅ BUSCAR AUTOMATICAMENTE
         if (street.length >= 2) {
           const searchQuery = number ? `${street}, ${number}` : street;
@@ -127,7 +127,7 @@ export default function AddressSearch({
     setIsLoading(true);
     try {
       console.log('🔍 Buscando endereços LOCALMENTE:', { searchQuery, userLocation, mode });
-      
+
       const response = await fetch('/api/address-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,16 +143,16 @@ export default function AddressSearch({
 
       const data = await response.json();
       console.log('📥 Resposta da API:', data);
-      
+
       if (data.success && data.results) {
         // ✅ PRIORIZAR resultados com número quando disponível
         const prioritizedResults = data.results.sort((a: AddressResult, b: AddressResult) => {
           const aHasNumber = a.address.house_number && a.address.house_number === numberQuery;
           const bHasNumber = b.address.house_number && b.address.house_number === numberQuery;
-          
+
           if (aHasNumber && !bHasNumber) return -1;
           if (!aHasNumber && bHasNumber) return 1;
-          
+
           return (b.importance || 0) - (a.importance || 0);
         });
 
@@ -223,14 +223,14 @@ export default function AddressSearch({
   };
 
   const handleResultClick = (result: AddressResult) => {
-    const displayAddress = numberQuery 
+    const displayAddress = numberQuery
       ? `${result.address.road || streetQuery}, ${numberQuery}`
       : result.display_name;
-    
+
     setStreetQuery(result.address.road || streetQuery);
     setNumberQuery(result.address.house_number || numberQuery);
     setIsOpen(false);
-    
+
     // Criar resultado com endereço completo
     const completeResult = {
       ...result,
@@ -240,7 +240,7 @@ export default function AddressSearch({
         house_number: result.address.house_number || numberQuery
       }
     };
-    
+
     onAddressSelect(completeResult);
     console.log('✅ Endereço selecionado:', completeResult);
   };
@@ -251,7 +251,7 @@ export default function AddressSearch({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < results.length - 1 ? prev + 1 : prev
         );
         break;
@@ -275,7 +275,7 @@ export default function AddressSearch({
   const formatAddress = (result: AddressResult) => {
     const addr = result.address;
     const parts = [];
-    
+
     // ✅ PRIORIZAR: Mostrar rua + número primeiro
     if (addr.road) {
       const number = addr.house_number || numberQuery;
@@ -285,11 +285,11 @@ export default function AddressSearch({
         parts.push(addr.road);
       }
     }
-    
+
     if (addr.neighbourhood) parts.push(addr.neighbourhood);
     if (addr.city) parts.push(addr.city);
     if (addr.state) parts.push(addr.state);
-    
+
     return parts.join(' - ');
   };
 
@@ -335,14 +335,14 @@ export default function AddressSearch({
             placeholder={userLocation ? "🎤 Digite ou fale o nome da rua" : "⚠️ Ative localização para buscar"}
             className="w-full px-4 py-3 pl-12 pr-16 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent border-gray-300 focus:ring-blue-500"
           />
-          
+
           {/* Ícone de busca */}
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          
+
           {/* Loading spinner */}
           {isLoading && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
@@ -357,17 +357,16 @@ export default function AddressSearch({
               {speechSupported && (
                 <button
                   onClick={isListening ? stopListening : startListening}
-                  className={`p-1 rounded-full transition-colors ${
-                    isListening
+                  className={`p-1 rounded-full transition-colors ${isListening
                       ? 'text-red-500 bg-red-50 hover:bg-red-100'
                       : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'
-                  }`}
+                    }`}
                   title={isListening ? 'Parar gravação' : 'Falar endereço'}
                 >
                   {isListening ? (
                     <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                     </svg>
                   ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -403,12 +402,12 @@ export default function AddressSearch({
             placeholder="Número (opcional)"
             className="w-full px-4 py-3 pl-12 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent border-gray-300 focus:ring-blue-500"
           />
-          
+
           {/* Ícone de número */}
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
             <span className="text-gray-400 text-lg">🔢</span>
           </div>
-          
+
           {/* Dica de uso */}
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
             <span className="text-xs text-gray-400">Opcional</span>
@@ -418,7 +417,7 @@ export default function AddressSearch({
 
       {/* Resultados da busca */}
       {isOpen && results.length > 0 && (
-        <div 
+        <div
           ref={resultsRef}
           className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto"
         >
@@ -426,9 +425,8 @@ export default function AddressSearch({
             <div
               key={result.id || index}
               onClick={() => handleResultClick(result)}
-              className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${
-                index === selectedIndex ? 'bg-blue-50 border-blue-200' : ''
-              }`}
+              className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${index === selectedIndex ? 'bg-blue-50 border-blue-200' : ''
+                }`}
             >
               <div className="flex items-start space-x-3">
                 <span className="text-lg mt-0.5">{getResultIcon(result.type)}</span>
@@ -456,7 +454,7 @@ export default function AddressSearch({
           ))}
         </div>
       )}
-      
+
       {/* Mensagem quando não há resultados */}
       {isOpen && !isLoading && streetQuery.length >= 2 && results.length === 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
@@ -477,8 +475,18 @@ export default function AddressSearch({
         <p>💡 <strong>Dica:</strong> Digite o nome da rua primeiro, depois o número</p>
         <p>🎤 <strong>Voz:</strong> Fale "Rua Principal, 123" para preenchimento automático</p>
         {numberQuery && (
-          <p className="text-blue-600">🔍 Buscando por: <strong>{streetQuery}, {numberQuery}</strong></p>
+          <p className="text-blue-600">
+            🔍 Buscando em <strong>{userLocation?.city ? userLocation.city.charAt(0).toUpperCase() + userLocation.city.slice(1) : 'sua região'}</strong>:
+            <strong> {streetQuery}, {numberQuery}</strong>
+          </p>
         )}
+        {!numberQuery && streetQuery && (
+          <p className="text-blue-600">
+            🔍 Buscando em <strong>{userLocation?.city ? userLocation.city.charAt(0).toUpperCase() + userLocation.city.slice(1) : 'sua região'}</strong>:
+            <strong> {streetQuery}</strong>
+          </p>
+        )}
+
       </div>
     </div>
   );

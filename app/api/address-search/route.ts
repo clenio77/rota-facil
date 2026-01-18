@@ -25,10 +25,10 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const R = 6371; // Raio da Terra em km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
@@ -142,8 +142,8 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
         .filter((feature: PhotonFeature) => {
           const props = feature.properties;
           return props?.countrycode === 'BR' ||
-                 props?.country === 'Brasil' ||
-                 props?.country === 'Brazil';
+            props?.country === 'Brasil' ||
+            props?.country === 'Brazil';
         })
         .map((feature: PhotonFeature) => {
           const [lng, lat] = feature.geometry.coordinates;
@@ -207,8 +207,8 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
           if (number) {
             // Manter resultados com número exato OU da mesma rua
             return result.address.house_number === number ||
-                   result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
-                   result.display_name.toLowerCase().includes(street.toLowerCase());
+              result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+              result.display_name.toLowerCase().includes(street.toLowerCase());
           }
           return true;
         });
@@ -219,12 +219,12 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
         if (Math.abs(a.confidence - b.confidence) > 0.1) {
           return b.confidence - a.confidence;
         }
-        
+
         // Prioridade 2: Proximidade (se temos localização)
         if (a.distance !== undefined && b.distance !== undefined) {
           return a.distance - b.distance;
         }
-        
+
         // Prioridade 3: Importância
         return (b.importance || 0) - (a.importance || 0);
       });
@@ -234,12 +234,12 @@ async function searchPhotonOptimized(query: string, userLocation?: { lat: number
 
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      
+
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         console.warn('⚠️ Timeout na chamada do Photon');
         return [];
       }
-      
+
       throw fetchError;
     }
   } catch (error) {
@@ -308,26 +308,26 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
         const props = feature.properties;
         // ✅ CORRIGIDO: Filtro mais rigoroso por cidade e estado
         const isBrazil = props?.countrycode === 'BR' ||
-                        props?.country === 'Brasil' ||
-                        props?.country === 'Brazil';
-        
+          props?.country === 'Brasil' ||
+          props?.country === 'Brazil';
+
         // ✅ NOVO: Filtro rigoroso por cidade - deve conter exatamente a cidade do usuário
-        const isSameCity = props?.city && 
-                          (props.city.toLowerCase() === userLocation!.city!.toLowerCase() ||
-                           props.city.toLowerCase().includes(userLocation!.city!.toLowerCase()) ||
-                           userLocation!.city!.toLowerCase().includes(props.city.toLowerCase()));
-        
+        const isSameCity = props?.city &&
+          (props.city.toLowerCase() === userLocation!.city!.toLowerCase() ||
+            props.city.toLowerCase().includes(userLocation!.city!.toLowerCase()) ||
+            userLocation!.city!.toLowerCase().includes(props.city.toLowerCase()));
+
         // ✅ NOVO: Filtro por estado também
         const isSameState = props?.state && userLocation!.state &&
-                          (props.state.toLowerCase() === userLocation!.state.toLowerCase() ||
-                           props.state.toLowerCase().includes(userLocation!.state.toLowerCase()));
-        
+          (props.state.toLowerCase() === userLocation!.state.toLowerCase() ||
+            props.state.toLowerCase().includes(userLocation!.state.toLowerCase()));
+
         // ✅ NOVO: Log detalhado do filtro
         if (props?.city && props?.state) {
           console.log(`🔍 Filtro cidade: "${props.city}" vs "${userLocation!.city}" = ${isSameCity}`);
           console.log(`🔍 Filtro estado: "${props.state}" vs "${userLocation!.state}" = ${isSameState}`);
         }
-        
+
         return isBrazil && isSameCity && isSameState;
       })
       .map((feature: PhotonFeature) => {
@@ -392,20 +392,20 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
         // ✅ NOVO: Filtro adicional para garantir que está na cidade correta
         if (userLocation?.city && result.address.city) {
           const cityMatch = result.address.city.toLowerCase().includes(userLocation.city.toLowerCase()) ||
-                           userLocation.city.toLowerCase().includes(result.address.city.toLowerCase());
-          
+            userLocation.city.toLowerCase().includes(result.address.city.toLowerCase());
+
           if (!cityMatch) {
             console.log(`❌ Filtro adicional: "${result.address.city}" não corresponde a "${userLocation.city}"`);
             return false;
           }
         }
-        
+
         // Se procuramos um número específico, priorizar resultados com números
         if (number) {
           // Manter resultados com número exato OU resultados da mesma rua
           return result.address.house_number === number ||
-                 result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
-                 result.display_name.toLowerCase().includes(street.toLowerCase());
+            result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+            result.display_name.toLowerCase().includes(street.toLowerCase());
         }
         return true;
       });
@@ -416,12 +416,12 @@ async function searchPhotonWithCityFilter(query: string, userLocation?: { lat: n
       if (Math.abs(a.confidence - b.confidence) > 0.1) {
         return b.confidence - a.confidence;
       }
-      
+
       // Prioridade 2: Proximidade (se temos localização)
       if (a.distance !== undefined && b.distance !== undefined) {
         return a.distance - b.distance;
       }
-      
+
       // Prioridade 3: Importância
       return (b.importance || 0) - (a.importance || 0);
     });
@@ -473,7 +473,7 @@ async function validateAndFilterRealLocations(results: SearchResult[], query: st
   const topResults = results
     .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
     .slice(0, 3);
-  
+
   console.log(`⚠️ Usando fallback: ${topResults.length} melhores resultados por confiança`);
   return topResults;
 }
@@ -484,54 +484,56 @@ async function validateByCEP(results: SearchResult[], street: string, number: st
     // Buscar CEP do endereço no ViaCEP
     const viaCepUrl = `https://viacep.com.br/ws/${city.replace(/\s+/g, '%20')}/${street.replace(/\s+/g, '%20')}/json/`;
     console.log(`🔍 Buscando CEP: ${viaCepUrl}`);
-    
-    const response = await fetch(viaCepUrl, { 
+
+    const response = await fetch(viaCepUrl, {
       signal: AbortSignal.timeout(5000) // 5s timeout
     });
-    
+
     if (!response.ok) throw new Error('ViaCEP falhou');
-    
+
     const cepData = await response.json();
-    
+
     if (Array.isArray(cepData) && cepData.length > 0) {
       const validCEP = cepData[0].cep;
       const validNeighborhood = cepData[0].bairro;
-      
+
       console.log(`✅ CEP encontrado: ${validCEP} - Bairro: ${validNeighborhood}`);
-      
+
       // Filtrar resultados que coincidem com CEP ou bairro
       const validResults = results.filter(result => {
         const resultNeighborhood = result.address.neighbourhood?.toLowerCase();
         const validNeighborhoodLower = validNeighborhood?.toLowerCase();
-        
+
         const neighborhoodMatch = resultNeighborhood && validNeighborhoodLower &&
-          (resultNeighborhood.includes(validNeighborhoodLower) || 
-           validNeighborhoodLower.includes(resultNeighborhood));
-        
+          (resultNeighborhood.includes(validNeighborhoodLower) ||
+            validNeighborhoodLower.includes(resultNeighborhood));
+
         if (neighborhoodMatch) {
           result.confidence += 0.4; // Grande bonus para bairro correto
           console.log(`🎯 Bairro correto: ${result.display_name}`);
         }
-        
+
         return neighborhoodMatch;
       });
-      
+
       return validResults;
     }
   } catch (error) {
     console.log('⚠️ Erro na validação por CEP:', error);
   }
-  
+
   return [];
 }
 
 // 🗺️ BASE DE CONHECIMENTO: Endereços específicos de Uberlândia - CORRIGIDA E EXPANDIDA
-const UBERLANDIA_ADDRESS_KNOWLEDGE: { [key: string]: { 
-  neighborhood: string; 
-  coords: { lat: number; lng: number }; 
-  description: string;
-  numberRanges?: { min: number; max: number; coords: { lat: number; lng: number } }[];
-} } = {
+const UBERLANDIA_ADDRESS_KNOWLEDGE: {
+  [key: string]: {
+    neighborhood: string;
+    coords: { lat: number; lng: number };
+    description: string;
+    numberRanges?: { min: number; max: number; coords: { lat: number; lng: number } }[];
+  }
+} = {
   'afonso pena': {
     neighborhood: 'centro',
     coords: { lat: -18.9186, lng: -48.2774 },
@@ -582,28 +584,28 @@ const UBERLANDIA_ADDRESS_KNOWLEDGE: { [key: string]: {
 function filterByMostLikelyNeighborhood(results: SearchResult[], street: string, number?: string, userLocation?: { lat: number; lng: number; city?: string }): SearchResult[] {
   // 🎯 VERIFICAR CONHECIMENTO ESPECÍFICO DE UBERLÂNDIA
   const streetKey = street.toLowerCase().replace(/rua|avenida|alameda/g, '').trim();
-  const knownAddress = Object.entries(UBERLANDIA_ADDRESS_KNOWLEDGE).find(([key]) => 
+  const knownAddress = Object.entries(UBERLANDIA_ADDRESS_KNOWLEDGE).find(([key]) =>
     streetKey.includes(key) || key.includes(streetKey)
   );
-  
+
   if (knownAddress) {
     const [, info] = knownAddress;
     console.log(`🧠 Conhecimento local: "${street}" deve estar em "${info.neighborhood}"`);
-    
+
     // 🎯 FILTRAR RESULTADOS INCORRETOS baseado no conhecimento local
     const filteredResults = results.filter(result => {
       const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
       const city = result.address.city?.toLowerCase() || '';
       const displayName = result.display_name.toLowerCase();
-      
+
       // ✅ ACEITAR se bairro correto (baseado no número)
       let isCorrectNeighborhood = false;
-      
+
       // 🎯 VERIFICAR BAIRRO CORRETO BASEADO NO NÚMERO
       if (number && info.numberRanges) {
         const numberValue = parseInt(number);
         const correctRange = info.numberRanges.find(r => numberValue >= r.min && numberValue <= r.max);
-        
+
         if (correctRange) {
           // Determinar bairro esperado baseado na faixa
           let expectedNeighborhood = '';
@@ -615,29 +617,29 @@ function filterByMostLikelyNeighborhood(results: SearchResult[], street: string,
           } else {
             expectedNeighborhood = info.neighborhood;
           }
-          
+
           // Verificar se o bairro do resultado bate com o esperado
-          isCorrectNeighborhood = neighborhood.includes(expectedNeighborhood) || 
-                                 city.includes(expectedNeighborhood) ||
-                                 displayName.includes(expectedNeighborhood);
-          
+          isCorrectNeighborhood = neighborhood.includes(expectedNeighborhood) ||
+            city.includes(expectedNeighborhood) ||
+            displayName.includes(expectedNeighborhood);
+
           console.log(`🎯 Número ${number}: esperado="${expectedNeighborhood}", encontrado="${neighborhood}", correto=${isCorrectNeighborhood}`);
         }
       } else {
         // Sem número específico - usar bairro geral
-        isCorrectNeighborhood = neighborhood.includes(info.neighborhood) || 
-                               city.includes(info.neighborhood) ||
-                               displayName.includes(info.neighborhood);
+        isCorrectNeighborhood = neighborhood.includes(info.neighborhood) ||
+          city.includes(info.neighborhood) ||
+          displayName.includes(info.neighborhood);
       }
-      
+
       // ❌ REJEITAR bairros explicitamente incorretos para esta rua (baseado no número)
       let isIncorrectNeighborhood = false;
-      
+
       // 🎯 REGRAS ESPECÍFICAS POR RUA E NÚMERO
       if (streetKey.includes('joão pinheiro')) {
         // João Pinheiro deve estar no Centro ou Centro-Norte (nunca Nossa Sra. Aparecida)
         const wrongForJoaoPinheiro = ['nossa sra aparecida', 'nossa senhora aparecida', 'aparecida'];
-        isIncorrectNeighborhood = wrongForJoaoPinheiro.some(wrong => 
+        isIncorrectNeighborhood = wrongForJoaoPinheiro.some(wrong =>
           neighborhood.includes(wrong) || displayName.includes(wrong)
         );
       } else if (streetKey.includes('cesário alvim')) {
@@ -654,7 +656,7 @@ function filterByMostLikelyNeighborhood(results: SearchResult[], street: string,
           isIncorrectNeighborhood = neighborhood.includes('centro');
         }
       }
-      
+
       if (isCorrectNeighborhood) {
         result.confidence += 0.5; // Bonus para bairro correto
         console.log(`✅ Bairro correto: ${result.display_name}`);
@@ -663,12 +665,12 @@ function filterByMostLikelyNeighborhood(results: SearchResult[], street: string,
         console.log(`❌ Bairro incorreto REJEITADO: ${result.display_name}`);
         return false;
       }
-      
+
       // 🤔 Casos duvidosos - manter mas com baixa confiança
       result.confidence -= 0.2;
       return true;
     });
-    
+
     if (filteredResults.length > 0) {
       console.log(`✅ Filtro por conhecimento local: ${filteredResults.length} resultados (era ${results.length})`);
       return filteredResults;
@@ -678,81 +680,81 @@ function filterByMostLikelyNeighborhood(results: SearchResult[], street: string,
   }
   // Agrupar por bairro
   const byNeighborhood: { [key: string]: SearchResult[] } = {};
-  
+
   results.forEach(result => {
     const neighborhood = result.address.neighbourhood || result.address.city || 'unknown';
     const key = neighborhood.toLowerCase();
-    
+
     if (!byNeighborhood[key]) byNeighborhood[key] = [];
     byNeighborhood[key].push(result);
   });
-  
+
   // Encontrar bairro com maior confiança média
   let bestNeighborhood = '';
   let bestConfidence = 0;
-  
+
   Object.entries(byNeighborhood).forEach(([neighborhood, neighborhoodResults]) => {
     const avgConfidence = neighborhoodResults.reduce((sum, r) => sum + (r.confidence || 0), 0) / neighborhoodResults.length;
     const hasExactNumber = number ? neighborhoodResults.some(r => r.address.house_number === number) : false;
-    
+
     // Bonus para bairro com número exato
     const finalConfidence = avgConfidence + (hasExactNumber ? 0.3 : 0);
-    
+
     console.log(`🏘️ Bairro "${neighborhood}": ${neighborhoodResults.length} resultados, confiança ${finalConfidence.toFixed(3)}`);
-    
+
     if (finalConfidence > bestConfidence) {
       bestConfidence = finalConfidence;
       bestNeighborhood = neighborhood;
     }
   });
-  
+
   if (bestNeighborhood && byNeighborhood[bestNeighborhood]) {
     console.log(`🏆 Melhor bairro: "${bestNeighborhood}" com confiança ${bestConfidence.toFixed(3)}`);
     return byNeighborhood[bestNeighborhood];
   }
-  
+
   return results;
 }
 
 // 📏 FUNÇÃO: Filtrar por proximidade ao centro da cidade
 function filterByProximityToCenter(results: SearchResult[], userLocation?: { lat: number; lng: number }): SearchResult[] {
   if (!userLocation) return results;
-  
+
   // Calcular distância de cada resultado ao centro (posição do usuário)
   const withDistance = results.map(result => ({
     ...result,
     distanceToCenter: haversineKm(userLocation.lat, userLocation.lng, result.lat, result.lng)
   }));
-  
+
   // Ordenar por proximidade
   withDistance.sort((a, b) => a.distanceToCenter - b.distanceToCenter);
-  
+
   // Retornar apenas os mais próximos (dentro de 5km do centro)
   const nearCenter = withDistance.filter(result => result.distanceToCenter <= 5);
-  
+
   console.log(`📏 Proximidade: ${nearCenter.length} resultados dentro de 5km do centro`);
-  
+
   return nearCenter;
 }
 
 // 🎯 FUNÇÃO: Validação AGRESSIVA por número específico
 function validateBySpecificNumber(results: SearchResult[], query: string): SearchResult[] {
   const { street, number } = extractAddressNumber(query);
-  
+
   if (!number) return results;
-  
+
   const streetKey = street.toLowerCase().replace(/rua|avenida|alameda/g, '').trim();
   const numberValue = parseInt(number);
-  
+
   console.log(`🔢 VALIDAÇÃO POR NÚMERO: "${street}", número ${number}`);
-  
+
   // 🎯 REGRAS ESPECÍFICAS CESÁRIO ALVIM
   if (streetKey.includes('cesário alvim')) {
     console.log(`🧠 Aplicando regras Cesário Alvim para número ${numberValue}`);
-    
+
     let expectedNeighborhood = '';
     let expectedCoords = { lat: 0, lng: 0 };
-    
+
     if (numberValue >= 1 && numberValue <= 1405) {
       expectedNeighborhood = 'centro';
       expectedCoords = { lat: -18.9195, lng: -48.2748 };
@@ -766,37 +768,37 @@ function validateBySpecificNumber(results: SearchResult[], query: string): Searc
       expectedNeighborhood = 'custódio pereira';
       expectedCoords = { lat: -18.9105, lng: -48.2685 };
     }
-    
+
     console.log(`🎯 Número ${numberValue} deve estar em: ${expectedNeighborhood}`);
-    
+
     // 🎯 ENCONTRAR RESULTADO COM BAIRRO CORRETO E PRIORIZAR
     const correctResults = results.filter(result => {
       const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
       const displayName = result.display_name.toLowerCase();
       return neighborhood.includes(expectedNeighborhood) || displayName.includes(expectedNeighborhood);
     });
-    
+
     const incorrectResults = results.filter(result => {
       const neighborhood = result.address.neighbourhood?.toLowerCase() || '';
       const displayName = result.display_name.toLowerCase();
       return !(neighborhood.includes(expectedNeighborhood) || displayName.includes(expectedNeighborhood));
     });
-    
+
     if (correctResults.length > 0) {
       console.log(`✅ PRIORIZANDO ${correctResults.length} resultados corretos para ${expectedNeighborhood}`);
-      
+
       // Dar boost de confiança para resultados corretos
       correctResults.forEach(result => {
         result.confidence += 1.0;
         result.importance += 1.0;
         console.log(`🎯 BOOST: ${result.display_name}`);
       });
-      
+
       // Retornar resultados corretos primeiro
       return [...correctResults, ...incorrectResults];
     } else {
       console.log(`🚨 CRIANDO RESULTADO FORÇADO para ${street}, ${number} em ${expectedNeighborhood}`);
-      
+
       const forcedResult: SearchResult = {
         lat: expectedCoords.lat,
         lng: expectedCoords.lng,
@@ -815,12 +817,12 @@ function validateBySpecificNumber(results: SearchResult[], query: string): Searc
         type: 'forced_correction',
         id: `forced_${Date.now()}`
       };
-      
+
       // Adicionar resultado forçado no início
       return [forcedResult, ...results];
     }
   }
-  
+
   return results;
 }
 
@@ -833,25 +835,25 @@ function extractAddressNumber(query: string): { street: string; number?: string 
   const patterns = [
     // Padrão 1: "Rua ABC, 123" ou "Rua ABC 123"
     /^(.+?)\s*,?\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
-    
+
     // Padrão 2: "123 Rua ABC" (número primeiro)
     /^(\d{1,6})\s+(.+)$/i,
-    
+
     // Padrão 3: "Rua ABC nº 123" ou "Rua ABC n° 123"
     /^(.+?)\s+n[°º]?\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
-    
+
     // Padrão 4: "Rua ABC número 123"
     /^(.+?)\s+número\s+(\d{1,6})(?:\s*[^\d].*)?$/i,
-    
+
     // Padrão 5: "Rua ABC - 123" (com hífen)
     /^(.+?)\s*-\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
-    
+
     // Padrão 6: "Rua ABC / 123" (com barra)
     /^(.+?)\s*\/\s*(\d{1,6})(?:\s*[^\d].*)?$/i,
-    
+
     // Padrão 7: "Rua ABC, 123, Bairro" (com vírgulas extras)
     /^(.+?)\s*,\s*(\d{1,6})\s*,.*$/i,
-    
+
     // Padrão 8: "Rua ABC 123 Bairro" (sem separador)
     /^(.+?)\s+(\d{1,6})\s+[^\d]+$/i
   ];
@@ -860,10 +862,10 @@ function extractAddressNumber(query: string): { street: string; number?: string 
     const match = cleaned.match(pattern);
     if (match) {
       const [, part1, part2] = match;
-      
+
       // Determinar qual é rua e qual é número
       let street: string, number: string;
-      
+
       if (/^\d{1,6}$/.test(part1)) {
         // Primeiro grupo é número
         number = part1;
@@ -998,16 +1000,16 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
         confidence
       };
     })
-    .filter((result: SearchResult) => {
-      // Se procuramos um número específico, priorizar resultados com números
-      if (number) {
-        // Manter resultados com número exato OU resultados da mesma rua
-        return result.address.house_number === number ||
-               result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
-               result.display_name.toLowerCase().includes(street.toLowerCase());
-      }
-      return true;
-    });
+      .filter((result: SearchResult) => {
+        // Se procuramos um número específico, priorizar resultados com números
+        if (number) {
+          // Manter resultados com número exato OU resultados da mesma rua
+          return result.address.house_number === number ||
+            result.address.road?.toLowerCase().includes(street.toLowerCase()) ||
+            result.display_name.toLowerCase().includes(street.toLowerCase());
+        }
+        return true;
+      });
 
     // Ordenar por confiança e proximidade
     results.sort((a, b) => {
@@ -1015,12 +1017,12 @@ async function searchNominatim(query: string, userLocation?: { lat: number; lng:
       if (Math.abs(a.confidence - b.confidence) > 0.1) {
         return b.confidence - a.confidence;
       }
-      
+
       // Prioridade 2: Proximidade (se temos localização)
       if (a.distance !== undefined && b.distance !== undefined) {
         return a.distance - b.distance;
       }
-      
+
       // Prioridade 3: Importância
       return (b.importance || 0) - (a.importance || 0);
     });
@@ -1042,18 +1044,18 @@ export async function POST(request: NextRequest) {
       requestBody = await request.json();
     } catch (parseError) {
       console.error('❌ Erro ao parsear JSON do request:', parseError);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Request JSON inválido' 
+      return NextResponse.json({
+        success: false,
+        error: 'Request JSON inválido'
       }, { status: 400 });
     }
 
     const { query, userLocation, limit = 10, searchMode, streetOnly, numberOnly } = requestBody;
 
     if (!query || typeof query !== 'string') {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Query inválida' 
+      return NextResponse.json({
+        success: false,
+        error: 'Query inválida'
       }, { status: 400 });
     }
 
@@ -1065,43 +1067,59 @@ export async function POST(request: NextRequest) {
 
     // ✅ PRIORIZAR: Se temos número, buscar por rua + número primeiro
     let results: SearchResult[] = [];
-    
+
     try {
       if (number && street) {
         console.log(`🎯 Buscando por rua + número: "${street}, ${number}"`);
-        
-        // 1. Tentar Photon com número específico
-        const photonResults = await searchPhotonOptimized(`${street} ${number}`, userLocation, limit);
+        const queryWithCity = userLocation?.city ? `${street}, ${number}, ${userLocation.city}` : `${street}, ${number}`;
+
+        // 1. Tentar busca específica com cidade
+        if (userLocation?.city) {
+          const citySpecificResults = await searchPhotonWithCityFilter(`${street}, ${number}`, userLocation, limit);
+          results.push(...citySpecificResults);
+        }
+
+        // 2. Tentar Photon com número específico e "bias" de cidade
+        const photonResults = await searchPhotonOptimized(queryWithCity, userLocation, limit);
         results.push(...photonResults);
-        
-        // 2. Tentar Nominatim com número específico
-        const nominatimResults = await searchNominatim(`${street} ${number}`, userLocation, limit);
+
+        // 3. Tentar Nominatim com número específico
+        const nominatimResults = await searchNominatim(queryWithCity, userLocation, limit);
         results.push(...nominatimResults);
-        
-        // 3. Se não encontrou, tentar apenas a rua
+
+        // 4. Se não encontrou, tentar apenas a rua (ainda com cidade)
         if (results.length === 0) {
-          console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua`);
-          const streetOnlyResults = await searchPhotonOptimized(street, userLocation, limit);
+          const streetQueryWithCity = userLocation?.city ? `${street}, ${userLocation.city}` : street;
+          console.log(`⚠️ Nenhum resultado para "${street}, ${number}" - tentando apenas rua com cidade`);
+
+          const streetOnlyResults = await searchPhotonOptimized(streetQueryWithCity, userLocation, limit);
           results.push(...streetOnlyResults);
-          
-          const streetNominatimResults = await searchNominatim(street, userLocation, limit);
+
+          const streetNominatimResults = await searchNominatim(streetQueryWithCity, userLocation, limit);
           results.push(...streetNominatimResults);
         }
       } else if (street) {
         console.log(`🔍 Buscando apenas por rua: "${street}"`);
-        
-        // Busca normal por rua
-        const photonResults = await searchPhotonOptimized(street, userLocation, limit);
+        const streetQueryWithCity = userLocation?.city ? `${street}, ${userLocation.city}` : street;
+
+        // 1. Tentar busca específica com cidade
+        if (userLocation?.city) {
+          const citySpecificResults = await searchPhotonWithCityFilter(street, userLocation, limit);
+          results.push(...citySpecificResults);
+        }
+
+        // Busca normal por rua com cidade
+        const photonResults = await searchPhotonOptimized(streetQueryWithCity, userLocation, limit);
         results.push(...photonResults);
-        
-        const nominatimResults = await searchNominatim(street, userLocation, limit);
+
+        const nominatimResults = await searchNominatim(streetQueryWithCity, userLocation, limit);
         results.push(...nominatimResults);
       }
     } catch (searchError) {
       console.error('❌ Erro durante a busca:', searchError);
       // ✅ NOVO: Fallback básico quando as APIs externas falham
       console.log('🔄 Tentando fallback básico...');
-      
+
       try {
         // Criar resultado básico baseado na query
         const fallbackResult: SearchResult = {
@@ -1121,7 +1139,7 @@ export async function POST(request: NextRequest) {
           confidence: 0.5,
           distance: 0
         };
-        
+
         results.push(fallbackResult);
         console.log('✅ Fallback básico criado:', fallbackResult.display_name);
       } catch (fallbackError) {
@@ -1129,25 +1147,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ✅ MELHORIA: Antes de ordenar, dar bonus para qualquer resultado que contenha a cidade do usuário no display_name
+    if (userLocation?.city) {
+      const userCity = userLocation.city.toLowerCase();
+      results.forEach(r => {
+        if (r.display_name.toLowerCase().includes(userCity)) {
+          r.confidence += 0.2;
+          r.importance += 0.2;
+        }
+      });
+    }
+
     // ✅ NOVA LÓGICA: Priorizar resultados com número quando disponível
     if (number) {
       results = results.sort((a, b) => {
         const aHasExactNumber = a.address.house_number === number;
         const bHasExactNumber = b.address.house_number === number;
-        
+
         // Prioridade 1: Número exato
         if (aHasExactNumber && !bHasExactNumber) return -1;
         if (!aHasExactNumber && bHasExactNumber) return 1;
-        
+
         // Prioridade 2: Mesma rua com qualquer número
         const aSameStreet = a.address.road?.toLowerCase().includes(street.toLowerCase());
         const bSameStreet = b.address.road?.toLowerCase().includes(street.toLowerCase());
-        
+
         if (aSameStreet && !bSameStreet) return -1;
         if (!aSameStreet && bSameStreet) return 1;
-        
-        // Prioridade 3: Importância e proximidade
+
+        // Prioridade 3: Cidade do usuário (se cidade especificada)
+        if (userLocation?.city) {
+          const userCity = userLocation.city.toLowerCase();
+          const aInCity = a.address.city?.toLowerCase().includes(userCity) || a.display_name.toLowerCase().includes(userCity);
+          const bInCity = b.address.city?.toLowerCase().includes(userCity) || b.display_name.toLowerCase().includes(userCity);
+          if (aInCity && !bInCity) return -1;
+          if (!aInCity && bInCity) return 1;
+        }
+
+        // Prioridade 4: Importância e proximidade
         return (b.importance || 0) - (a.importance || 0);
+
       });
     }
 
@@ -1155,45 +1194,45 @@ export async function POST(request: NextRequest) {
     if (userLocation?.city) {
       const userCity = userLocation.city.toLowerCase();
       const userState = userLocation.state?.toLowerCase();
-      
+
       console.log(`🏙️ Filtrando por cidade: "${userCity}" e estado: "${userState}"`);
-      
+
       const cityFilteredResults = results.filter(result => {
         const resultCity = result.address.city?.toLowerCase();
         const resultState = result.address.state?.toLowerCase();
-        
+
         // ✅ VALIDAÇÃO: Deve estar na mesma cidade OU no mesmo estado se cidade não especificada
         const sameCity = resultCity && resultCity.includes(userCity);
         const sameState = resultState && userState && resultState.includes(userState);
-        
+
         // ✅ BONUS: Se tem número exato, ser mais flexível com cidade
         const hasExactNumber = number && result.address.house_number === number;
-        
+
         if (sameCity) {
           console.log(`✅ ${result.display_name} - MESMA CIDADE: ${resultCity}`);
           return true;
         }
-        
+
         if (sameState && hasExactNumber) {
           console.log(`⚠️ ${result.display_name} - MESMO ESTADO + NÚMERO EXATO: ${resultState}`);
           return true;
         }
-        
+
         if (hasExactNumber && !resultCity) {
           console.log(`⚠️ ${result.display_name} - NÚMERO EXATO sem cidade especificada`);
           return true;
         }
-        
+
         // ✅ MELHORIA: Ser mais flexível com cidades similares
         if (resultCity && (resultCity.includes('uberlandia') || resultCity.includes('uberlândia'))) {
           console.log(`✅ ${result.display_name} - CIDADE SIMILAR: ${resultCity}`);
           return true;
         }
-        
+
         console.log(`❌ ${result.display_name} - CIDADE DIFERENTE: ${resultCity} vs ${userCity}`);
         return false;
       });
-      
+
       console.log(`🏙️ Filtro por cidade: ${results.length} → ${cityFilteredResults.length} resultados`);
       results = cityFilteredResults;
     }
@@ -1202,73 +1241,73 @@ export async function POST(request: NextRequest) {
     if (number) {
       const validatedResults = results.filter(result => {
         const resultNumber = result.address.house_number;
-        
+
         // ✅ PRIORIDADE 1: Se tem o número exato, sempre manter
         if (resultNumber === number) {
           console.log(`🎯 ${result.display_name} - NÚMERO EXATO: ${resultNumber}`);
           result.confidence += 0.3; // Grande bonus
           return true;
         }
-        
+
         // ✅ PRIORIDADE 2: Se tem qualquer número válido na mesma rua
         if (resultNumber && /^\d+$/.test(resultNumber) && resultNumber.length <= 5) {
           const street = result.address.road?.toLowerCase() || '';
           const searchStreet = extractAddressNumber(query).street.toLowerCase();
-          
+
           if (street.includes(searchStreet) || searchStreet.includes(street)) {
             console.log(`✅ ${result.display_name} - MESMA RUA COM NÚMERO: ${resultNumber}`);
             result.confidence += 0.1;
             return true;
           }
         }
-        
+
         // ✅ PRIORIDADE 3: Se é da mesma rua mesmo sem número (FALLBACK)
         const street = result.address.road?.toLowerCase() || '';
         const searchStreet = extractAddressNumber(query).street.toLowerCase();
-        
+
         if (street.includes(searchStreet) || searchStreet.includes(street)) {
           console.log(`⚠️ ${result.display_name} - MESMA RUA SEM NÚMERO (fallback permitido)`);
           result.confidence += 0.05; // Bonus menor
           return true;
         }
-        
+
         console.log(`❌ ${result.display_name} - NÃO RELACIONADO`);
         return false;
       });
-      
+
       console.log(`🔢 Validação FLEXÍVEL: ${results.length} → ${validatedResults.length} resultados válidos`);
       results = validatedResults;
-      
+
       // ✅ Se não encontrou nada, ser ainda mais flexível
       if (validatedResults.length === 0) {
         console.log('🆘 NENHUM RESULTADO - sendo mais flexível...');
-        
+
         const fallbackResults = results.filter(result => {
           const street = result.address.road?.toLowerCase() || result.display_name.toLowerCase();
           const searchStreet = extractAddressNumber(query).street.toLowerCase();
-          
+
           // Aceitar qualquer resultado da mesma rua
           return street.includes(searchStreet) || searchStreet.includes(street);
         });
-        
+
         console.log(`🆘 Fallback: ${fallbackResults.length} resultados encontrados`);
         results = fallbackResults;
       }
     }
-    
+
     // ✅ NOVA LÓGICA: PRIORIZAR RESULTADOS DA CIDADE DO USUÁRIO
     if (userLocation?.city) {
       const userCity = userLocation.city.toLowerCase();
-      
+
       results.forEach(result => {
         const resultCity = result.address.city?.toLowerCase();
-        
+
         // ✅ BONUS para mesma cidade
         if (resultCity && resultCity.includes(userCity)) {
           result.confidence += 0.3;
           console.log(`🏙️ BONUS CIDADE: ${result.display_name} +0.3 confiança`);
         }
-        
+
         // ✅ BONUS para cidades similares
         if (resultCity && (resultCity.includes('uberlandia') || resultCity.includes('uberlândia'))) {
           result.confidence += 0.2;
@@ -1279,8 +1318,8 @@ export async function POST(request: NextRequest) {
 
     // Remover duplicatas baseado em coordenadas
     const uniqueResults = results.filter((result, index, self) => {
-      const firstIndex = self.findIndex(r => 
-        Math.abs(r.lat - result.lat) < 0.001 && 
+      const firstIndex = self.findIndex(r =>
+        Math.abs(r.lat - result.lat) < 0.001 &&
         Math.abs(r.lng - result.lng) < 0.001
       );
       return firstIndex === index;
@@ -1288,7 +1327,7 @@ export async function POST(request: NextRequest) {
 
     // 🎯 VALIDAÇÃO INTELIGENTE DE LOCALIZAÇÃO - FILTRAR DUPLICATAS POR ENDEREÇO REAL
     const validatedResults = await validateAndFilterRealLocations(uniqueResults, query, userLocation);
-    
+
     // 🎯 VALIDAÇÃO ADICIONAL POR NÚMERO ESPECÍFICO (CESÁRIO ALVIM)
     const numberValidatedResults = validateBySpecificNumber(validatedResults, query);
 
@@ -1296,7 +1335,7 @@ export async function POST(request: NextRequest) {
     const limitedResults = numberValidatedResults.slice(0, limit);
 
     console.log(`✅ Encontrados ${limitedResults.length} resultados únicos (${uniqueResults.length} antes da validação)`);
-    
+
     // ✅ NOVO: Log detalhado dos resultados
     limitedResults.forEach((result, index) => {
       const hasNumber = result.address.house_number ? `✅ ${result.address.house_number}` : '❌ sem número';
@@ -1315,7 +1354,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Erro na busca de endereços:', error);
-    
+
     // ✅ CORRIGIDO: Log mais detalhado do erro
     if (error instanceof Error) {
       console.error('❌ Detalhes do erro:', {
@@ -1324,9 +1363,9 @@ export async function POST(request: NextRequest) {
         name: error.name
       });
     }
-    
-    return NextResponse.json({ 
-      success: false, 
+
+    return NextResponse.json({
+      success: false,
       error: 'Erro interno do servidor',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, { status: 500 });
