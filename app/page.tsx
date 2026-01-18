@@ -594,31 +594,28 @@ export default function HomePage() {
         : `${stopsWithCoords[0].lat},${stopsWithCoords[0].lng}`;
 
       // Construir waypoints (paradas intermediárias)
-      // Se estamos usando deviceOrigin, os waypoints incluem a primeira parada da lista
-      // Se NÃO estamos usando deviceOrigin, a primeira parada da lista é a origem, então os waypoints começam da segunda
-      const waypoints = useDeviceOrigin
-        ? stopsWithCoords.slice(0, -1).map(stop => `${stop.lat},${stop.lng}`).join('|')
-        : stopsWithCoords.slice(1, -1).map(stop => `${stop.lat},${stop.lng}`).join('|');
+      // Se estamos usando deviceOrigin, os waypoints incluem todas as paradas até a penúltima
+      // Se NÃO estamos usando deviceOrigin, a primeira parada da lista é a origem, então os waypoints começam da segunda até a penúltima
+      const waypointsArray = useDeviceOrigin
+        ? stopsWithCoords.slice(0, -1).map(stop => `${stop.lat},${stop.lng}`)
+        : stopsWithCoords.slice(1, -1).map(stop => `${stop.lat},${stop.lng}`);
 
       // Destino (última parada)
       const destination = stopsWithCoords[stopsWithCoords.length - 1];
       const destinationCoords = `${destination.lat},${destination.lng}`;
 
-      // Construir URL do Google Maps
+      // Construir URL do Google Maps (formato: /dir/origem/parada1/parada2/destino)
       let googleMapsUrl = 'https://www.google.com/maps/dir/';
 
       if (origin) {
         googleMapsUrl += `${origin}/`;
       }
 
-      if (waypoints) {
-        googleMapsUrl += `${waypoints}/`;
+      if (waypointsArray.length > 0) {
+        googleMapsUrl += waypointsArray.join('/') + '/';
       }
 
       googleMapsUrl += `${destinationCoords}/`;
-
-      // Adicionar parâmetros para otimização de rota
-      googleMapsUrl += '?optimize=true';
 
       // Adicionar parâmetro para evitar pedágios se configurado
       if (typeof window !== 'undefined' && window.localStorage.getItem('rotafacil:avoidTolls') === 'true') {
