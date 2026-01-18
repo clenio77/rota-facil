@@ -24,36 +24,79 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const R = 6371; // Raio da Terra em km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
-// Algoritmo de otimização simples (Nearest Neighbor)
-function optimizeRouteSimple(stops: Stop[], startLat: number = -23.5505, startLng: number = -46.6333): Stop[] {
+// Função para calcular distância total de uma rota
+function calculateTotalDistance(waypoints: Stop[]): number {
+  if (waypoints.length < 2) return 0;
+  let totalDistance = 0;
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    totalDistance += calculateDistance(waypoints[i].lat, waypoints[i].lng, waypoints[i + 1].lat, waypoints[i + 1].lng);
+  }
+  return totalDistance;
+}
+
+// Auxiliar para inverter segmento (2-opt)
+function reverseSegment(route: Stop[], start: number, end: number): void {
+  while (start < end) {
+    [route[start], route[end]] = [route[end], route[start]];
+    start++;
+    end--;
+  }
+}
+
+// Algoritmo 2-opt para melhorar a rota (TSP Refinement)
+function optimize2Opt(waypoints: Stop[], maxIterations: number = 2000): Stop[] {
+  if (waypoints.length <= 3) return waypoints;
+
+  let bestRoute = [...waypoints];
+  let bestDistance = calculateTotalDistance(bestRoute);
+  let improved = true;
+  let iterations = 0;
+
+  while (improved && iterations < maxIterations) {
+    improved = false;
+    iterations++;
+
+    for (let i = 1; i < bestRoute.length - 2; i++) {
+      for (let j = i + 1; j < bestRoute.length - 1; j++) {
+        const newRoute = [...bestRoute];
+        reverseSegment(newRoute, i, j);
+        const newDistance = calculateTotalDistance(newRoute);
+
+        if (newDistance < bestDistance) {
+          bestRoute = newRoute;
+          bestDistance = newDistance;
+          improved = true;
+        }
+      }
+    }
+  }
+  return bestRoute;
+}
+
+// Algoritmo de otimização (Nearest Neighbor + 2-opt refinement)
+function optimizeRouteAdvanced(stops: Stop[], startLat: number = -23.5505, startLng: number = -46.6333): Stop[] {
   if (stops.length <= 1) return stops;
 
+  // 1) Gerar rota inicial com Nearest Neighbor
   const optimized: Stop[] = [];
   const remaining = [...stops];
   let currentLat = startLat;
   let currentLng = startLng;
 
-  // Encontrar o ponto mais próximo do início
   while (remaining.length > 0) {
     let nearestIndex = 0;
     let nearestDistance = Infinity;
 
     for (let i = 0; i < remaining.length; i++) {
-      const distance = calculateDistance(
-        currentLat, 
-        currentLng, 
-        remaining[i].lat, 
-        remaining[i].lng
-      );
-      
+      const distance = calculateDistance(currentLat, currentLng, remaining[i].lat, remaining[i].lng);
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestIndex = i;
@@ -66,7 +109,8 @@ function optimizeRouteSimple(stops: Stop[], startLat: number = -23.5505, startLn
     currentLng = nearest.lng;
   }
 
-  return optimized;
+  // 2) Refinar rota com 2-opt (remove cruzamentos, melhora eficiência em rotas grandes)
+  return optimize2Opt(optimized);
 }
 
 // Função para chamar OSRM (quando disponível) - removida pois não é mais usada
@@ -84,8 +128,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar coordenadas
-    const validStops: Stop[] = stops.filter((stop: Stop) => 
-      stop.lat && stop.lng && 
+    const validStops: Stop[] = stops.filter((stop: Stop) =>
+      stop.lat && stop.lng &&
       !isNaN(stop.lat) && !isNaN(stop.lng)
     );
 
@@ -157,9 +201,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2) Fallback: usar algoritmo simples para ordem (com origem se houver)
-    const simpleOrder = optimizeRouteSimple(validStops, hasOrigin ? originLat : undefined, hasOrigin ? originLng : undefined);
-    const optimizedStops = simpleOrder.map((stop, index) => ({ ...stop, sequence: index + 1 }));
+    // 2) Fallback: usar algoritmo avançado para ordem (com origem se houver)
+    const advancedOrder = optimizeRouteAdvanced(validStops, hasOrigin ? originLat : undefined, hasOrigin ? originLng : undefined);
+    const optimizedStops = advancedOrder.map((stop: Stop, index: number) => ({ ...stop, sequence: index + 1 }));
 
     // 3) Tentar obter geometria via OSRM para a ordem calculada
     const osrmUrl = process.env.OSRM_URL || 'http://router.project-osrm.org';
@@ -167,7 +211,7 @@ export async function POST(request: NextRequest) {
     if (hasOrigin && originLng !== undefined && originLat !== undefined) {
       routeCoordsParts.push(`${originLng},${originLat}`);
     }
-    routeCoordsParts.push(...optimizedStops.map(s => `${s.lng},${s.lat}`));
+    routeCoordsParts.push(...optimizedStops.map((s: Stop) => `${s.lng},${s.lat}`));
     if (hasOrigin && isRoundtrip && originLng !== undefined && originLat !== undefined) {
       routeCoordsParts.push(`${originLng},${originLat}`);
     }
@@ -221,13 +265,14 @@ export async function POST(request: NextRequest) {
       distance: totalDistance,
       duration: totalDistance * 3, // Estimativa: 3 min/km
       algorithm: 'simple',
+      provider: 'simple'
     });
 
   } catch (error) {
     console.error('Erro na otimização de rota:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Erro ao otimizar rota',
         details: error instanceof Error ? error.message : 'Erro desconhecido'
       },

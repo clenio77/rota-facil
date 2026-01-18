@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import Image from 'next/image'
 import BottomNavigation from '@/components/BottomNavigation'
+import { RouteProvider } from '@/lib/contexts/RouteContext'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -89,7 +91,14 @@ export default function RootLayout({
 
             {/* Main Content com Padding para Header e Navegação Fixos - CORRIGIDO */}
             <main className="flex-1 container mx-auto px-4 py-6 pt-20 pb-24 sm:px-6 lg:px-8 main-content">
-              {children}
+              <ErrorBoundary
+                title="Sistema Indisponível"
+                message="Pedimos desculpas, mas o sistema encontrou um erro crítico. Nossa equipe já foi notificada."
+              >
+                <RouteProvider>
+                  {children}
+                </RouteProvider>
+              </ErrorBoundary>
             </main>
 
             {/* Bottom Navigation Inteligente - Detecta rota atual e marca aba correspondente */}

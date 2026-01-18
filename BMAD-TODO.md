@@ -96,6 +96,18 @@
 	- Escrever testes unitários para APIs
 	- Testar componentes principais (StopCard, MapDisplay)
 	- Validar integração entre frontend e backend
+- [x] Implementar testes E2E com Playwright (concluído)
+	- Configurar ambiente Playwright
+	- Criar testes de fumaça (Smoke Tests)
+	- Validar fluxo principal do usuário
+- [x] Otimizar gerenciamento de estado com Context API (concluído)
+	- Centralizar estado global da rota no RouteProvider
+	- Reduzir re-renders com hooks useCallback/useMemo
+	- Modularizar lógica da HomePage
+- [x] Implementar Error Boundaries para resiliência da UI (concluído)
+	- Criar componente ErrorBoundary robusto
+	- Implementar Fallback UI premium
+	- Aplicar em seções críticas (Mapa e Modais)
 
 ---
 

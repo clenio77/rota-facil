@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { analytics, DailyStats, WeeklyStats } from '../lib/analytics';
+import { LiveMonitoringTab } from './LiveMonitoringTab';
 
 interface DashboardProps {
   isOpen: boolean;
@@ -9,7 +10,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ isOpen, onClose }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'today' | 'week' | 'records'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'week' | 'records' | 'live'>('today');
   const [todayStats, setTodayStats] = useState<DailyStats | null>(null);
   const [weekStats, setWeekStats] = useState<WeeklyStats | null>(null);
   const [records, setRecords] = useState<any>(null);
@@ -54,16 +55,16 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
           {[
             { id: 'today', label: 'Hoje', icon: '📅' },
             { id: 'week', label: 'Semana', icon: '📈' },
-            { id: 'records', label: 'Recordes', icon: '🏆' }
+            { id: 'records', label: 'Recordes', icon: '🏆' },
+            { id: 'live', label: 'Monitor', icon: '🛰️' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 py-4 px-2 text-center font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`flex-1 py-4 px-2 text-center font-medium transition-colors ${activeTab === tab.id
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
             >
               <div className="text-lg">{tab.icon}</div>
               <div className="text-sm">{tab.label}</div>
@@ -76,24 +77,24 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
           {activeTab === 'today' && (
             <div className="space-y-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">📅 Estatísticas de Hoje</h3>
-              
+
               {todayStats ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-blue-50 rounded-xl p-4 text-center">
                     <div className="text-2xl font-bold text-blue-600">{todayStats.totalDeliveries}</div>
                     <div className="text-sm text-blue-800">Entregas</div>
                   </div>
-                  
+
                   <div className="bg-green-50 rounded-xl p-4 text-center">
                     <div className="text-2xl font-bold text-green-600">{todayStats.totalDistance} km</div>
                     <div className="text-sm text-green-800">Distância</div>
                   </div>
-                  
+
                   <div className="bg-purple-50 rounded-xl p-4 text-center">
                     <div className="text-2xl font-bold text-purple-600">{Math.floor(todayStats.totalTime / 60)}h {todayStats.totalTime % 60}m</div>
                     <div className="text-sm text-purple-800">Tempo Total</div>
                   </div>
-                  
+
                   <div className="bg-yellow-50 rounded-xl p-4 text-center">
                     <div className="text-2xl font-bold text-yellow-600">R$ {todayStats.totalFuelCost.toFixed(2)}</div>
                     <div className="text-sm text-yellow-800">Combustível</div>
@@ -112,7 +113,7 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
           {activeTab === 'week' && (
             <div className="space-y-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">📈 Estatísticas da Semana</h3>
-              
+
               {weekStats && (
                 <>
                   {/* Médias Semanais */}
@@ -146,7 +147,7 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
                         const maxDeliveries = Math.max(...weekStats.days.map(d => d.totalDeliveries));
                         const percentage = maxDeliveries > 0 ? (day.totalDeliveries / maxDeliveries) * 100 : 0;
                         const dayName = new Date(day.date).toLocaleDateString('pt-BR', { weekday: 'short' });
-                        
+
                         return (
                           <div key={day.date} className="flex items-center gap-3">
                             <div className="w-8 text-xs text-gray-600 font-medium">{dayName}</div>
@@ -173,7 +174,7 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
           {activeTab === 'records' && (
             <div className="space-y-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">🏆 Seus Recordes</h3>
-              
+
               {records && (
                 <div className="space-y-3">
                   <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200">
@@ -230,6 +231,10 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === 'live' && (
+            <LiveMonitoringTab />
           )}
         </div>
 

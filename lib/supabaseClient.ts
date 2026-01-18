@@ -1,13 +1,13 @@
 // Configuração do cliente Supabase (instância sob demanda)
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { CONFIG } from './config';
 
 export function getSupabase(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const { url, anonKey } = CONFIG.supabase;
+  if (!url || !anonKey) {
     throw new Error(
-      'Supabase não configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+      'Supabase não configurado. Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no arquivo .env'
     );
   }
-  return createClient(supabaseUrl, supabaseKey);
+  return createClient(url, anonKey);
 }

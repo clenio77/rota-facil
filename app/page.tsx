@@ -7,10 +7,9 @@ import Image from 'next/image';
 import AddressSearch from '../components/AddressSearch';
 import StopCard from '../components/StopCard';
 import CarteiroUpload from '../components/CarteiroUpload';
-// SimpleUpload removido - funcionalidade não implementada
 import CityIndicator from '../components/CityIndicator';
 import { getSupabase } from '../lib/supabaseClient';
-import { useGeolocation, UserLocation } from '../hooks/useGeolocation';
+import { useGeolocation } from '../hooks/useGeolocation';
 import Dashboard from '../components/Dashboard';
 import VoiceControl, { useVoiceCommands } from '../components/VoiceControl';
 import OfflineStatusIndicator, { useOfflineActions } from '../components/OfflineStatus';
@@ -20,6 +19,10 @@ import { voiceCommands } from '../lib/voiceCommands';
 import { offlineManager } from '../lib/offlineManager';
 import { proofOfDelivery } from '../lib/proofOfDelivery';
 import Footer from '../components/Footer';
+import { useRoute } from '../lib/contexts/RouteContext';
+import { Stop, UserLocation } from '../types/route';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { MonitoringIndicator } from '../components/MonitoringIndicator';
 // SpeechRecognition types for browsers (ambient declarations)
 // Minimal subset to type usage without depending on lib.dom updates
 interface MinimalSpeechRecognitionEventResult {
@@ -54,28 +57,9 @@ declare global {
   }
 }
 
-const MapDisplay = dynamic(() => import('../components/MapDisplay'), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">Carregando mapa...</div>
-});
-
-interface Stop {
-  id: number;
-  photoUrl: string;
-  status: 'uploading' | 'processing' | 'confirmed' | 'error' | 'optimized';
-  address: string;
-  lat?: number;
-  lng?: number;
-  sequence?: number;
-}
-
-interface OptimizedStop extends Stop {
-  sequence: number;
-}
-
 interface OptimizeResponse {
   success: boolean;
-  optimizedStops: OptimizedStop[];
+  optimizedStops: any[];
   distance?: number;
   duration?: number;
   geometry?: {
@@ -85,17 +69,32 @@ interface OptimizeResponse {
   error?: string;
 }
 
+const STORAGE_KEY = 'rotafacil:stops:v1';
+const MapDisplay = dynamic(() => import('../components/MapDisplay'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">Carregando mapa...</div>
+});
+
 export default function HomePage() {
-  const STORAGE_KEY = 'rotafacil:stops:v1';
-  const [stops, setStops] = useState<Stop[]>([]);
+  const {
+    stops,
+    routeSummary,
+    isOptimizing,
+    addStop,
+    updateStop,
+    removeStop,
+    clearStops,
+    optimizeRoute
+  } = useRoute();
+
   const [showMap, setShowMap] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Route summary state
-  const [routeDistanceKm, setRouteDistanceKm] = useState<number | undefined>(undefined);
-  const [routeDurationMin, setRouteDurationMin] = useState<number | undefined>(undefined);
-  const [routeGeometry, setRouteGeometry] = useState<{ type: string; coordinates: [number, number][] } | undefined>(undefined);
-  const [routeProvider, setRouteProvider] = useState<string | undefined>(undefined);
+
+  // Constants migrated from state
+  const routeDistanceKm = routeSummary.distance;
+  const routeDurationMin = routeSummary.duration;
+  const routeGeometry = routeSummary.geometry;
+  const routeProvider = routeSummary.provider;
 
   // Voice input state
   const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
@@ -111,7 +110,7 @@ export default function HomePage() {
   // 🚀 NOVOS ESTADOS PARA FUNCIONALIDADES AVANÇADAS
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isProofModalOpen, setIsProofModalOpen] = useState(false);
-  const [currentProofStop, setCurrentProofStop] = useState<Stop | null>(null);
+  const [currentProofStop, setCurrentProofStop] = useState<{ id: number, address: string } | null>(null);
 
   // 🔄 OFFLINE ACTIONS
   const { queueAction, cacheData, getCachedData } = useOfflineActions();
@@ -143,7 +142,7 @@ export default function HomePage() {
       }));
 
     // Adicionar paradas à lista existente
-    setStops(prevStops => [...prevStops, ...carteiroStops]);
+    carteiroStops.forEach(stop => addStop(stop));
     setCarteiroAddresses(addresses);
 
     // Mostrar mapa automaticamente
@@ -154,43 +153,7 @@ export default function HomePage() {
     alert(`✅ ${carteiroStops.length} endereços adicionados à rota!`);
   };
 
-  // handleSimpleAddresses removido - funcionalidade não implementada
-
-  // Lógica de hash removida - aba Ajustes foi removida
-  React.useEffect(() => {
-    const handler = () => {
-      // Lógica de hash removida - aba Ajustes foi removida
-    };
-    handler();
-    window.addEventListener('hashchange', handler);
-    return () => window.removeEventListener('hashchange', handler);
-  }, []);
-
-  // Load stops from localStorage on first render
-  React.useEffect(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as Stop[];
-        if (Array.isArray(parsed)) {
-          setStops(parsed);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // Persist stops to localStorage on change
-  React.useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
-      }
-    } catch {
-      // ignore
-    }
-  }, [stops]);
+  // Persistence removed from page (moved to context)
 
   // Capturar imagem e processar
   const handleImageCapture = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,23 +171,19 @@ export default function HomePage() {
       address: '',
     };
 
-    setStops(prev => [...prev, newStop]);
+    addStop(newStop);
 
     try {
       // ✅ CORRIGIDO: Implementar OCR real para extrair endereço da imagem
       console.log('🔍 Processando imagem com OCR para extrair endereço...');
 
       // Atualizar status para processando
-      setStops(prev => prev.map(stop =>
-        stop.id === newStop.id
-          ? { ...stop, status: 'processing' }
-          : stop
-      ));
+      updateStop(newStop.id, { status: 'processing' });
 
       // ✅ NOVO: Enviar imagem para API de OCR
       const formData = new FormData();
       formData.append('image', file);
-      
+
       // Adicionar localização do usuário para contexto
       if (deviceOrigin || deviceLocation) {
         formData.append('userLocation', JSON.stringify(deviceOrigin || deviceLocation));
@@ -256,7 +215,7 @@ export default function HomePage() {
         try {
           const errorBody = await ocrResponse.text();
           console.error('❌ Corpo do erro da API:', errorBody);
-          
+
           try {
             const errorJson = JSON.parse(errorBody);
             errorDetails = errorJson.error || errorJson.details || errorBody;
@@ -267,7 +226,7 @@ export default function HomePage() {
           console.error('❌ Erro ao ler corpo da resposta:', readError);
           errorDetails = `Erro HTTP ${ocrResponse.status}: ${ocrResponse.statusText}`;
         }
-        
+
         throw new Error(`Erro na API de OCR: ${errorDetails}`);
       }
 
@@ -302,18 +261,13 @@ export default function HomePage() {
       // ✅ NOVO: Validar se o endereço está na cidade correta
       const extractedAddress = ocrResult.address;
       const userCity = (deviceOrigin || deviceLocation)?.city;
-      
+
       if (userCity && !extractedAddress.toLowerCase().includes(userCity.toLowerCase())) {
         // Endereço não está na cidade do usuário
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? {
-                ...stop,
-                status: 'error',
-                address: `❌ Endereço fora da cidade: "${extractedAddress}" não está em ${userCity}. Tire uma foto de um endereço local.`
-              }
-            : stop
-        ));
+        updateStop(newStop.id, {
+          status: 'error',
+          address: `❌ Endereço fora da cidade: "${extractedAddress}" não está em ${userCity}. Tire uma foto de um endereço local.`
+        });
         return;
       }
 
@@ -329,35 +283,25 @@ export default function HomePage() {
       });
 
       const geocodeResult = await geocodeResponse.json();
-      
+
       if (geocodeResult.success && geocodeResult.results.length > 0) {
         const bestResult = geocodeResult.results[0];
-        
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? {
-                ...stop,
-                status: 'confirmed',
-                address: extractedAddress,
-                lat: bestResult.lat,
-                lng: bestResult.lng
-              }
-            : stop
-        ));
-        
+
+        updateStop(newStop.id, {
+          status: 'confirmed',
+          address: extractedAddress,
+          lat: bestResult.lat,
+          lng: bestResult.lng
+        });
+
         console.log('✅ Endereço confirmado com coordenadas:', extractedAddress);
       } else {
         // Endereço extraído mas sem coordenadas - marcar como confirmado sem lat/lng
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? {
-                ...stop,
-                status: 'confirmed',
-                address: extractedAddress
-              }
-            : stop
-        ));
-        
+        updateStop(newStop.id, {
+          status: 'confirmed',
+          address: extractedAddress
+        });
+
         console.log('⚠️ Endereço extraído mas sem coordenadas:', extractedAddress);
       }
 
@@ -366,20 +310,15 @@ export default function HomePage() {
 
       // Mostrar erro específico
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
+
       if (errorMessage.includes('blob')) {
         alert('❌ Problema no upload da imagem. Por favor, tire uma nova foto.');
-        setStops(prev => prev.filter(stop => stop.id !== newStop.id));
+        removeStop(newStop.id);
       } else {
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? { 
-                ...stop, 
-                status: 'error',
-                address: `❌ Erro na extração: ${errorMessage}`
-              }
-            : stop
-        ));
+        updateStop(newStop.id, {
+          status: 'error',
+          address: `❌ Erro na extração: ${errorMessage}`
+        });
       }
     }
 
@@ -391,7 +330,7 @@ export default function HomePage() {
 
   // Remover parada
   const handleRemove = (id: number) => {
-    setStops(prev => prev.filter(stop => stop.id !== id));
+    removeStop(id);
   };
 
   // Retentar processamento
@@ -399,16 +338,12 @@ export default function HomePage() {
     const stop = stops.find(s => s.id === id);
     if (!stop) return;
 
-    // Verificar se a URL é blob (problema conhecido)
     if (stop.photoUrl.startsWith('blob:')) {
-      console.error('Tentativa de reprocessar URL blob - isso não funcionará');
       alert('Erro: Não é possível reprocessar esta imagem. Por favor, tire uma nova foto.');
       return;
     }
 
-    setStops(prev => prev.map(s =>
-      s.id === id ? { ...s, status: 'processing' } : s
-    ));
+    updateStop(id, { status: 'processing' });
 
     try {
       const response = await fetch('/api/ocr-process', {
@@ -423,79 +358,32 @@ export default function HomePage() {
       const result = await response.json();
 
       if (result.success) {
-        setStops(prev => prev.map(s => 
-          s.id === id 
-            ? { 
-                ...s, 
-                status: 'confirmed', 
-                address: result.address,
-                lat: result.lat,
-                lng: result.lng
-              }
-            : s
-        ));
+        updateStop(id, {
+          status: 'confirmed',
+          address: result.address,
+          lat: result.lat,
+          lng: result.lng
+        });
       } else {
         throw new Error(result.error || 'Erro ao processar imagem');
       }
     } catch (error) {
       console.error('Erro:', error);
-      setStops(prev => prev.map(s => 
-        s.id === id ? { ...s, status: 'error' } : s
-      ));
+      updateStop(id, { status: 'error' });
     }
   };
 
   // Otimizar rota
   const handleOptimizeRoute = async () => {
-    const validStops = stops.filter(s => s.status === 'confirmed' && s.lat && s.lng);
-    if (validStops.length < 2) {
-      alert('Adicione pelo menos 2 paradas confirmadas para otimizar a rota');
-      return;
-    }
-
-    setIsOptimizing(true);
-
     try {
-      const response = await fetch('/api/route-optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stops: validStops.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })),
-          origin: useDeviceOrigin && deviceOrigin ? deviceOrigin : undefined,
-          roundtrip,
-        }),
-      });
-
-      const result: OptimizeResponse = await response.json();
-
-      if (result.success) {
-        // Atualizar paradas com sequência otimizada
-        const optimizedStops = stops.map(stop => {
-          const optimizedData = result.optimizedStops.find((os) => os.id === stop.id);
-          if (optimizedData) {
-            return {
-              ...stop,
-              sequence: optimizedData.sequence,
-              status: 'optimized' as const,
-            };
-          }
-          return stop;
-        });
-
-        setStops(optimizedStops);
-        setShowMap(true);
-        setRouteDistanceKm(result.distance);
-        setRouteDurationMin(result.duration);
-        setRouteGeometry(result.geometry);
-        setRouteProvider((result as { provider?: string }).provider);
-      } else {
-        throw new Error(result.error || 'Erro ao otimizar rota');
-      }
+      await optimizeRoute(
+        useDeviceOrigin && deviceOrigin ? deviceOrigin : undefined,
+        roundtrip
+      );
+      setShowMap(true);
     } catch (error) {
       console.error('Erro:', error);
-      alert('Erro ao otimizar rota. Tente novamente.');
-    } finally {
-      setIsOptimizing(false);
+      alert(error instanceof Error ? error.message : 'Erro ao otimizar rota. Tente novamente.');
     }
   };
 
@@ -602,11 +490,7 @@ export default function HomePage() {
     if (!currentProofStop) return;
 
     // Marcar parada como entregue
-    setStops(prev => prev.map(stop =>
-      stop.id === currentProofStop.id
-        ? { ...stop, status: 'delivered' as any }
-        : stop
-    ));
+    updateStop(currentProofStop.id, { status: 'delivered' as any });
 
     // 🔄 QUEUE OFFLINE ACTION
     await queueAction('delivery_update', {
@@ -694,22 +578,22 @@ export default function HomePage() {
 
     try {
       // ✅ CORRIGIDO: Construir URL do Google Maps com todas as paradas
-      const origin = useDeviceOrigin && deviceOrigin 
-        ? `${deviceOrigin.lat},${deviceOrigin.lng}` 
-        : confirmedStops[0].lat && confirmedStops[0].lng 
-          ? `${confirmedStops[0].lat},${confirmedStops[0].lng}` 
+      const origin = useDeviceOrigin && deviceOrigin
+        ? `${deviceOrigin.lat},${deviceOrigin.lng}`
+        : confirmedStops[0].lat && confirmedStops[0].lng
+          ? `${confirmedStops[0].lat},${confirmedStops[0].lng}`
           : '';
 
       // Filtrar paradas com coordenadas válidas
       const stopsWithCoords = confirmedStops.filter(stop => stop.lat && stop.lng);
-      
+
       if (stopsWithCoords.length < 2) {
         alert('❌ Pelo menos 2 paradas precisam ter coordenadas válidas para iniciar a rota.');
         return;
       }
 
       // Construir waypoints (paradas intermediárias)
-      const waypoints = stopsWithCoords.slice(1, -1).map(stop => 
+      const waypoints = stopsWithCoords.slice(1, -1).map(stop =>
         `${stop.lat},${stop.lng}`
       ).join('|');
 
@@ -719,20 +603,20 @@ export default function HomePage() {
 
       // Construir URL do Google Maps
       let googleMapsUrl = 'https://www.google.com/maps/dir/';
-      
+
       if (origin) {
         googleMapsUrl += `${origin}/`;
       }
-      
+
       if (waypoints) {
         googleMapsUrl += `${waypoints}/`;
       }
-      
+
       googleMapsUrl += `${destinationCoords}/`;
 
       // Adicionar parâmetros para otimização de rota
       googleMapsUrl += '?optimize=true';
-      
+
       // Adicionar parâmetro para evitar pedágios se configurado
       if (typeof window !== 'undefined' && window.localStorage.getItem('rotafacil:avoidTolls') === 'true') {
         googleMapsUrl += '&avoid=tolls';
@@ -742,7 +626,7 @@ export default function HomePage() {
 
       // ✅ NOVO: Abrir Google Maps em nova aba
       const newWindow = window.open(googleMapsUrl, '_blank');
-      
+
       if (newWindow) {
         // ✅ NOVO: Feedback visual e de voz
         voiceCommands.speak({
@@ -764,7 +648,7 @@ export default function HomePage() {
       } else {
         // Fallback se popup for bloqueado
         alert('❌ Popup bloqueado! Copie e cole este link no seu navegador:\n\n' + googleMapsUrl);
-        
+
         // Tentar copiar para clipboard
         if (navigator.clipboard) {
           navigator.clipboard.writeText(googleMapsUrl).then(() => {
@@ -784,15 +668,8 @@ export default function HomePage() {
   // Clear route list
   const handleClearStops = () => {
     if (!confirm('Deseja limpar todas as paradas?')) return;
-    setStops([]);
+    clearStops();
     setShowMap(false);
-    setRouteDistanceKm(undefined);
-    setRouteDurationMin(undefined);
-    setRouteGeometry(undefined);
-    setRouteProvider(undefined);
-    if (typeof window !== 'undefined') {
-      try { window.localStorage.removeItem('rotafacil:stops:v1'); } catch {}
-    }
   };
 
   const stopListening = () => {
@@ -830,28 +707,22 @@ export default function HomePage() {
       address: '',
     };
 
-    setStops(prev => [...prev, newStop]);
+    addStop(newStop);
 
     // Simular processamento
     setTimeout(() => {
       if (scenario.success) {
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? {
-                ...stop,
-                status: 'confirmed',
-                address: scenario.address,
-                lat: scenario.lat,
-                lng: scenario.lng
-              }
-            : stop
-        ));
+        updateStop(newStop.id, {
+          status: 'confirmed',
+          address: scenario.address,
+          lat: scenario.lat,
+          lng: scenario.lng
+        });
       } else {
-        setStops(prev => prev.map(stop =>
-          stop.id === newStop.id
-            ? { ...stop, status: 'error', address: scenario.error || 'Erro desconhecido' }
-            : stop
-        ));
+        updateStop(newStop.id, {
+          status: 'error',
+          address: scenario.error || 'Erro desconhecido'
+        });
       }
     }, 2000);
   };
@@ -865,7 +736,7 @@ export default function HomePage() {
 
       // ✅ CORRIGIDO: Usar localização atual para filtro rigoroso por cidade
       const currentLocation = deviceOrigin || deviceLocation;
-      
+
       if (!currentLocation?.city) {
         alert('❌ Não foi possível determinar sua cidade. Ative a localização e tente novamente.');
         return;
@@ -895,7 +766,7 @@ export default function HomePage() {
 
       // ✅ A API já filtrou por cidade, usar resultados diretamente
       console.log(`✅ API retornou ${data.results.length} resultados já filtrados por cidade`);
-      
+
       if (data.results.length === 0) {
         alert(`❌ Nenhum endereço encontrado em ${currentLocation.city}.\n\n💡 O endereço "${voiceText}" pode estar em outra cidade ou ser muito específico. Tente um nome mais simples da rua.`);
         return;
@@ -917,14 +788,14 @@ export default function HomePage() {
         lng: bestResult.lng,
       };
 
-      setStops(prev => [...prev, newStop]);
+      addStop(newStop);
       setIsVoiceDialogOpen(false);
       setVoiceText('');
 
       // ✅ NOVO: Feedback de sucesso com confirmação da cidade
       const distanceInfo = bestResult.distance ? ` (${bestResult.distance.toFixed(1)}km de distância)` : '';
       const cityInfo = bestResult.address.city ? ` em ${bestResult.address.city}` : '';
-      
+
       console.log(`✅ Endereço adicionado via voz${cityInfo}: ${bestResult.display_name}${distanceInfo}`);
 
       // ✅ NOVO: Aviso se confiança baixa
@@ -946,16 +817,16 @@ export default function HomePage() {
     <div className="space-y-6">
       {/* 🏆 HEADER PRINCIPAL COM LOGO */}
       <div className="bg-white rounded-xl shadow-custom p-6 border-2 border-blue-300">
-                        <div className="flex items-center justify-center gap-4 mb-4">
-                                  <div className="w-16 h-16 relative">
-                  <img
-                    src="/logo-carro-azul-removebg-preview.png"
-                    alt="Rota Fácil Logo"
-                    width={64}
-                    height={64}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="w-16 h-16 relative">
+            <img
+              src="/logo-carro-azul-removebg-preview.png"
+              alt="Rota Fácil Logo"
+              width={64}
+              height={64}
+              className="w-full h-full object-contain"
+            />
+          </div>
           <div className="text-center">
             <h1 className="text-3xl font-bold text-slate-800 leading-tight">ROTA FÁCIL</h1>
             <p className="text-lg text-slate-600 leading-tight">MOURA <span className="bg-green-500 text-white px-2 py-1 rounded text-sm font-bold ml-2">PRO</span></p>
@@ -1031,10 +902,9 @@ export default function HomePage() {
                     photoUrl: '',
                     status: 'confirmed',
                     address: result.display_name,
-                    lat: result.lat,
                     lng: result.lng,
                   };
-                  setStops(prev => [...prev, newStop]);
+                  addStop(newStop);
                   console.log('✅ Endereço adicionado via busca:', result);
                 }}
                 userLocation={deviceOrigin || deviceLocation || undefined}
@@ -1103,11 +973,10 @@ export default function HomePage() {
             onTouchStart={deviceLocation ? startListening : undefined}
             onTouchEnd={deviceLocation ? stopListening : undefined}
             onClick={!deviceLocation ? () => alert('🌍 Ative a localização para usar busca por voz. A busca é restrita à sua cidade atual.') : undefined}
-            className={`w-full flex items-center justify-center gap-2 ${
-              deviceLocation 
-                ? 'btn-secondary' 
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            className={`w-full flex items-center justify-center gap-2 ${deviceLocation
+              ? 'btn-secondary'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
             aria-pressed={isListening}
             disabled={!deviceLocation}
             title={deviceLocation ? 'Segure para falar o endereço (busca apenas na sua cidade)' : 'Ative localização para usar busca por voz'}
@@ -1118,7 +987,7 @@ export default function HomePage() {
             </svg>
             {!deviceLocation ? '🌍 Ative localização' : (isListening ? 'Gravando...' : '🎤 Falar endereço')}
           </button>
-          
+
           {confirmedStops.length >= 2 && (
             <button
               onClick={handleOptimizeRoute}
@@ -1212,36 +1081,36 @@ export default function HomePage() {
           )}
 
           <div className="space-y-4">
-        {stops.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-custom p-12 text-center border-2 border-blue-300">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma parada adicionada</h3>
-            <p className="text-gray-500 mb-4">Tire uma foto do pacote para começar</p>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Tirar Foto
-            </button>
-          </div>
-        ) : (
-          stops
-            .sort((a, b) => (a.sequence || 999) - (b.sequence || 999))
-            .map(stop => (
-              <StopCard
-                key={stop.id}
-                {...stop}
-                onRemove={handleRemove}
-                onRetry={handleRetry}
-              />
-            ))
-        )}
+            {stops.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-custom p-12 text-center border-2 border-blue-300">
+                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma parada adicionada</h3>
+                <p className="text-gray-500 mb-4">Tire uma foto do pacote para começar</p>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Tirar Foto
+                </button>
+              </div>
+            ) : (
+              stops
+                .sort((a, b) => (a.sequence || 999) - (b.sequence || 999))
+                .map(stop => (
+                  <StopCard
+                    key={stop.id}
+                    {...stop}
+                    onRemove={handleRemove}
+                    onRetry={handleRetry}
+                  />
+                ))
+            )}
           </div>
         </div>
 
@@ -1252,12 +1121,15 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Rota Otimizada</h3>
                 <div className="flex items-center gap-2">
+                  <MonitoringIndicator />
                   <button onClick={handleStartRoute} className="btn-primary px-3 py-1.5">Iniciar rota</button>
                   <button onClick={() => setIsMapFullscreen(true)} className="btn-secondary px-3 py-1.5">Tela cheia</button>
                 </div>
               </div>
               <div className="h-96 lg:h-[600px]">
-                <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
+                <ErrorBoundary title="Erro no Mapa" message="Não foi possível carregar o mapa interativo. Tente recarregar a seção.">
+                  <MapDisplay stops={confirmedStops} routeGeometry={routeGeometry} origin={useDeviceOrigin ? deviceOrigin : undefined} />
+                </ErrorBoundary>
               </div>
             </div>
           ) : (
@@ -1267,7 +1139,7 @@ export default function HomePage() {
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma rota otimizada</h3>
               <p className="text-gray-500 mb-4">Adicione paradas e otimize sua rota para ver o mapa</p>
-              <button 
+              <button
                 onClick={() => setShowMap(true)}
                 className="btn-primary inline-flex items-center gap-2"
                 disabled={confirmedStops.length === 0}
@@ -1320,11 +1192,10 @@ export default function HomePage() {
               className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[96px]"
               value={voiceText}
               onChange={(e) => setVoiceText(e.target.value)}
-              placeholder={`Ex.: "Rua Principal, 123" ou "Centro" ou "Praça da Matriz"${
-                (deviceOrigin?.city || deviceLocation?.city)
-                  ? `\n(Buscará em ${deviceOrigin?.city || deviceLocation?.city})`
-                  : ''
-              }`}
+              placeholder={`Ex.: "Rua Principal, 123" ou "Centro" ou "Praça da Matriz"${(deviceOrigin?.city || deviceLocation?.city)
+                ? `\n(Buscará em ${deviceOrigin?.city || deviceLocation?.city})`
+                : ''
+                }`}
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -1360,29 +1231,35 @@ export default function HomePage() {
       {/* Navegação móvel removida - agora fixa no layout principal */}
 
       {/* 📊 DASHBOARD MODAL */}
-      <Dashboard
-        isOpen={isDashboardOpen}
-        onClose={() => setIsDashboardOpen(false)}
-      />
+      <ErrorBoundary fallback={null}>
+        <Dashboard
+          isOpen={isDashboardOpen}
+          onClose={() => setIsDashboardOpen(false)}
+        />
+      </ErrorBoundary>
 
       {/* Modal de Carteiro removido - funcionalidade movida para página dedicada /carteiro */}
 
       {/* 🔄 OFFLINE STATUS INDICATOR */}
-      <OfflineStatusIndicator />
+      <ErrorBoundary fallback={null}>
+        <OfflineStatusIndicator />
+      </ErrorBoundary>
 
       {/* 📸 PROOF OF DELIVERY MODAL */}
-      {currentProofStop && (
-        <ProofOfDeliveryModal
-          stopId={currentProofStop.id}
-          address={currentProofStop.address}
-          isOpen={isProofModalOpen}
-          onClose={() => {
-            setIsProofModalOpen(false);
-            setCurrentProofStop(null);
-          }}
-          onProofCaptured={handleProofCaptured}
-        />
-      )}
+      <ErrorBoundary fallback={null}>
+        {currentProofStop && (
+          <ProofOfDeliveryModal
+            stopId={currentProofStop.id}
+            address={currentProofStop.address}
+            isOpen={isProofModalOpen}
+            onClose={() => {
+              setIsProofModalOpen(false);
+              setCurrentProofStop(null);
+            }}
+            onProofCaptured={handleProofCaptured}
+          />
+        )}
+      </ErrorBoundary>
 
       {/* Clear list floating action - Ajustado para não sobrepor navegação fixa */}
       {stops.length > 0 && (

@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 
-type StopStatus = 'uploading' | 'processing' | 'confirmed' | 'error' | 'optimized';
+import { StopStatus } from '../types/route';
 
 interface StopProps {
   id: number;
@@ -41,19 +41,24 @@ const statusConfig = {
     className: 'badge-success',
     icon: '📍',
   },
+  delivered: {
+    label: 'Entregue',
+    className: 'badge-success',
+    icon: '📦',
+  },
 };
 
-export default function StopCard({ 
-  id, 
-  photoUrl, 
-  status, 
-  address, 
+export default function StopCard({
+  id,
+  photoUrl,
+  status,
+  address,
   sequence,
   onRemove,
-  onRetry 
+  onRetry
 }: StopProps) {
   const config = statusConfig[status];
-  
+
   return (
     <div className="bg-white rounded-xl shadow-custom p-4 card-hover animate-fadeIn border-2 border-blue-300">
       <div className="flex items-start space-x-4">
@@ -63,7 +68,7 @@ export default function StopCard({
             {sequence}
           </div>
         )}
-        
+
         {/* Photo */}
         <div className="flex-shrink-0">
           {photoUrl ? (
@@ -89,7 +94,7 @@ export default function StopCard({
             </div>
           )}
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
@@ -109,17 +114,17 @@ export default function StopCard({
               </button>
             )}
           </div>
-          
+
           <p className="text-sm text-gray-900 font-medium truncate">
             {address || 'Aguardando endereço...'}
           </p>
-          
+
           {status === 'processing' && (
             <p className="text-xs text-gray-500 mt-1">
               Extraindo endereço da imagem...
             </p>
           )}
-          
+
           {status === 'error' && (
             <div className="mt-2">
               <p className="text-xs text-red-600 mb-1">
