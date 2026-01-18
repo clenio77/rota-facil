@@ -25,4 +25,6 @@ export interface UserLocation {
     lng: number;
     city?: string;
     state?: string;
+    country?: string;
+    fullAddress?: string;
 }

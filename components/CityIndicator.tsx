@@ -18,13 +18,12 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
     if (!customCity.trim()) return;
 
     try {
-      // Geocodificar a cidade customizada SEM forçar filtro local
+      // Geocodificar o endereço ou CEP customizado
       const response = await fetch('/api/geocode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          address: `${customCity}, ${customState || 'Brasil'}`,
-          // Não enviar userLocation com city/state para não restringir a busca
+          address: customCity, // Agora pode ser CEP ou endereço completo
           forceLocalSearch: false
         }),
       });
@@ -32,23 +31,28 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // Criar nova localização com a cidade customizada
+          // Criar nova localização com os dados retornados
           const newLocation: UserLocation = {
             lat: data.lat,
             lng: data.lng,
-            city: customCity.toLowerCase(),
-            state: customState.toLowerCase() || undefined,
-            country: 'Brasil'
+            city: data.city || customCity.toLowerCase(),
+            state: data.state || customState.toLowerCase() || undefined,
+            country: 'Brasil',
+            fullAddress: data.address, // Guardar o endereço completo validado
+            provider: data.provider
           };
-          
+
           onLocationChange(newLocation);
           setIsEditing(false);
           setCustomCity('');
           setCustomState('');
+        } else {
+          alert('Não foi possível encontrar este endereço. Tente ser mais específico.');
         }
       }
     } catch (error) {
-      console.error('Erro ao geocodificar cidade customizada:', error);
+      console.error('Erro ao geocodificar local customizado:', error);
+      alert('Erro ao buscar endereço. Verifique sua conexão.');
     }
   };
 
@@ -56,6 +60,12 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
     return (
       <div className={`bg-gray-100 rounded-lg p-2 sm:p-3 text-center ${className}`}>
         <p className="text-xs sm:text-sm text-gray-600">Localização não disponível</p>
+        <button
+          onClick={() => setIsEditing(true)}
+          className="text-xs text-blue-600 hover:text-blue-800 underline mt-1"
+        >
+          Inserir endereço manualmente
+        </button>
       </div>
     );
   }
@@ -63,38 +73,27 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
   if (isEditing) {
     return (
       <div className={`bg-white border border-blue-300 rounded-lg p-2 sm:p-3 ${className}`}>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Cidade
+              Endereço ou CEP (Onde a rota começa?)
             </label>
             <input
               type="text"
               value={customCity}
               onChange={(e) => setCustomCity(e.target.value)}
-              placeholder="Ex: São Paulo"
-              className="w-full px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Estado (opcional)
-            </label>
-            <input
-              type="text"
-              value={customState}
-              onChange={(e) => setCustomState(e.target.value)}
-              placeholder="Ex: SP"
-              className="w-full px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Ex: 38412-881 ou Rua Principal, Uberlândia"
+              className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              autoFocus
             />
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleCustomLocationSubmit}
               disabled={!customCity.trim()}
-              className="flex-1 px-2 sm:px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              Confirmar
+              Confirmar Local de Início
             </button>
             <button
               onClick={() => {
@@ -102,7 +101,7 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
                 setCustomCity('');
                 setCustomState('');
               }}
-              className="px-2 sm:px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              className="px-4 py-2 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
             >
               Cancelar
             </button>
@@ -135,7 +134,7 @@ export default function CityIndicator({ currentLocation, onLocationChange, class
           Alterar
         </button>
       </div>
-      
+
       {currentLocation.fullAddress && (
         <p className="text-xs text-blue-600 mt-1 truncate">
           {currentLocation.fullAddress}

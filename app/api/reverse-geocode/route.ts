@@ -22,7 +22,7 @@ async function reverseGeocodeWithMapbox(lat: number, lng: number): Promise<Rever
   try {
     const response = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
-      `types=place,locality&country=BR&language=pt&access_token=${mapboxToken}`
+      `types=address,poi,postcode,place,locality&country=BR&language=pt&access_token=${mapboxToken}`
     );
 
     const data = await response.json();
@@ -30,11 +30,11 @@ async function reverseGeocodeWithMapbox(lat: number, lng: number): Promise<Rever
     if (data.features && data.features.length > 0) {
       const feature = data.features[0];
       const context = feature.context || [];
-      
+
       // Extrair cidade e estado do contexto
       const city = feature.text;
       let state = '';
-      
+
       for (const ctx of context) {
         if (ctx.id.startsWith('region')) {
           state = ctx.text;
@@ -122,19 +122,19 @@ async function reverseGeocodeLocation(lat: number, lng: number): Promise<Reverse
 export async function POST(request: NextRequest) {
   try {
     const { lat, lng } = await request.json();
-    
+
     if (!lat || !lng || typeof lat !== 'number' || typeof lng !== 'number') {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Coordenadas inválidas' 
+      return NextResponse.json({
+        success: false,
+        error: 'Coordenadas inválidas'
       }, { status: 400 });
     }
 
     const result = await reverseGeocodeLocation(lat, lng);
-    
+
     if (!result) {
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         error: 'Não foi possível identificar a localização',
         coordinates: { lat, lng }
       }, { status: 404 });
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Reverse geocoding bem-sucedido: ${result.city} - ${result.state} (${result.provider})`);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       city: result.city,
       state: result.state,
@@ -155,10 +155,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Erro no endpoint /api/reverse-geocode:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Erro interno do servidor', 
-        details: error instanceof Error ? error.message : 'Erro desconhecido' 
+      {
+        success: false,
+        error: 'Erro interno do servidor',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
       },
       { status: 500 }
     );
