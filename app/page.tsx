@@ -377,7 +377,7 @@ export default function HomePage() {
   const handleOptimizeRoute = async () => {
     try {
       await optimizeRoute(
-        useDeviceOrigin && deviceOrigin ? deviceOrigin : undefined,
+        useDeviceOrigin ? (deviceOrigin || deviceLocation || undefined) : undefined,
         roundtrip
       );
       setShowMap(true);
@@ -589,8 +589,8 @@ export default function HomePage() {
         return;
       }
 
-      const origin = useDeviceOrigin && deviceOrigin
-        ? `${deviceOrigin.lat},${deviceOrigin.lng}`
+      const origin = useDeviceOrigin
+        ? `${(deviceOrigin || deviceLocation)?.lat},${(deviceOrigin || deviceLocation)?.lng}`
         : `${stopsWithCoords[0].lat},${stopsWithCoords[0].lng}`;
 
       // Construir waypoints (paradas intermediárias)
@@ -638,8 +638,8 @@ export default function HomePage() {
         alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${stopsWithCoords.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
 
         // ✅ NOVO: Registrar no analytics
-        if (typeof window !== 'undefined' && window.gtag) {
-          window.gtag('event', 'route_started', {
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'route_started', {
             event_category: 'navigation',
             event_label: 'google_maps',
             value: stopsWithCoords.length
