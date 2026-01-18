@@ -578,24 +578,27 @@ export default function HomePage() {
 
     try {
       // ✅ CORRIGIDO: Construir URL do Google Maps com todas as paradas
-      const origin = useDeviceOrigin && deviceOrigin
-        ? `${deviceOrigin.lat},${deviceOrigin.lng}`
-        : confirmedStops[0].lat && confirmedStops[0].lng
-          ? `${confirmedStops[0].lat},${confirmedStops[0].lng}`
-          : '';
+      // ✅ CORRIGIDO: Usar a ordem otimizada se disponível
+      const stopsToNavigate = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
 
       // Filtrar paradas com coordenadas válidas
-      const stopsWithCoords = confirmedStops.filter(stop => stop.lat && stop.lng);
+      const stopsWithCoords = stopsToNavigate.filter(stop => stop.lat && stop.lng);
 
       if (stopsWithCoords.length < 2) {
         alert('❌ Pelo menos 2 paradas precisam ter coordenadas válidas para iniciar a rota.');
         return;
       }
 
+      const origin = useDeviceOrigin && deviceOrigin
+        ? `${deviceOrigin.lat},${deviceOrigin.lng}`
+        : `${stopsWithCoords[0].lat},${stopsWithCoords[0].lng}`;
+
       // Construir waypoints (paradas intermediárias)
-      const waypoints = stopsWithCoords.slice(1, -1).map(stop =>
-        `${stop.lat},${stop.lng}`
-      ).join('|');
+      // Se estamos usando deviceOrigin, os waypoints incluem a primeira parada da lista
+      // Se NÃO estamos usando deviceOrigin, a primeira parada da lista é a origem, então os waypoints começam da segunda
+      const waypoints = useDeviceOrigin
+        ? stopsWithCoords.slice(0, -1).map(stop => `${stop.lat},${stop.lng}`).join('|')
+        : stopsWithCoords.slice(1, -1).map(stop => `${stop.lat},${stop.lng}`).join('|');
 
       // Destino (última parada)
       const destination = stopsWithCoords[stopsWithCoords.length - 1];
@@ -902,6 +905,7 @@ export default function HomePage() {
                     photoUrl: '',
                     status: 'confirmed',
                     address: result.display_name,
+                    lat: result.lat,
                     lng: result.lng,
                   };
                   addStop(newStop);
