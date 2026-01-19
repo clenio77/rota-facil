@@ -579,32 +579,64 @@ export default function HomePage() {
     console.log('🚀 Iniciando rota no Google Maps com', confirmedStops.length, 'paradas');
 
     try {
-      // ✅ CORRIGIDO: Construir URL do Google Maps com todas as paradas
       // ✅ CORRIGIDO: Usar a ordem otimizada se disponível
       const stopsToNavigate = optimizedStops.length > 0 ? optimizedStops : confirmedStops;
 
-      // Filtrar paradas com coordenadas válidas
-      const stopsWithCoords = stopsToNavigate.filter(stop => stop.lat && stop.lng);
+      // Filtrar paradas com endereço ou coordenadas válidas
+      const validStops = stopsToNavigate.filter(stop => stop.address || (stop.lat && stop.lng));
 
-      if (stopsWithCoords.length < 2) {
-        alert('❌ Pelo menos 2 paradas precisam ter coordenadas válidas para iniciar a rota.');
+      if (validStops.length < 2) {
+        alert('❌ Pelo menos 2 paradas precisam ter endereço ou coordenadas válidas para iniciar a rota.');
         return;
       }
 
-      const origin = useDeviceOrigin
-        ? `${(deviceOrigin || deviceLocation)?.lat},${(deviceOrigin || deviceLocation)?.lng}`
-        : `${stopsWithCoords[0].lat},${stopsWithCoords[0].lng}`;
+      // ✅ NOVO: Função auxiliar para formatar endereço para URL do Google Maps
+      // Prioriza endereço textual sobre coordenadas para melhor precisão
+      const formatStopForGoogleMaps = (stop: Stop): string => {
+        // Se tem endereço textual, usar ele (mais preciso no Google Maps)
+        if (stop.address && stop.address.length > 5) {
+          // Adicionar cidade/estado se não estiver no endereço
+          const userCity = (deviceOrigin || deviceLocation)?.city;
+          const userState = (deviceOrigin || deviceLocation)?.state;
 
-      // Construir waypoints (paradas intermediárias)
-      // Se estamos usando deviceOrigin, os waypoints incluem todas as paradas até a penúltima
-      // Se NÃO estamos usando deviceOrigin, a primeira parada da lista é a origem, então os waypoints começam da segunda até a penúltima
+          let fullAddress = stop.address;
+
+          // Se o endereço não parece ter cidade, adicionar
+          if (userCity && !stop.address.toLowerCase().includes(userCity.toLowerCase())) {
+            fullAddress = `${stop.address}, ${userCity}`;
+            if (userState) {
+              fullAddress += `, ${userState}`;
+            }
+          }
+
+          // Codificar para URL
+          return encodeURIComponent(fullAddress);
+        }
+
+        // Fallback para coordenadas se não tiver endereço
+        if (stop.lat && stop.lng) {
+          return `${stop.lat},${stop.lng}`;
+        }
+
+        return '';
+      };
+
+      // Construir origem
+      let origin: string;
+      if (useDeviceOrigin && (deviceOrigin || deviceLocation)) {
+        origin = `${(deviceOrigin || deviceLocation)?.lat},${(deviceOrigin || deviceLocation)?.lng}`;
+      } else {
+        origin = formatStopForGoogleMaps(validStops[0]);
+      }
+
+      // Construir waypoints (paradas intermediárias) usando ENDEREÇOS, não coordenadas
       const waypointsArray = useDeviceOrigin
-        ? stopsWithCoords.slice(0, -1).map(stop => `${stop.lat},${stop.lng}`)
-        : stopsWithCoords.slice(1, -1).map(stop => `${stop.lat},${stop.lng}`);
+        ? validStops.slice(0, -1).map(stop => formatStopForGoogleMaps(stop))
+        : validStops.slice(1, -1).map(stop => formatStopForGoogleMaps(stop));
 
-      // Destino (última parada)
-      const destination = stopsWithCoords[stopsWithCoords.length - 1];
-      const destinationCoords = `${destination.lat},${destination.lng}`;
+      // Destino (última parada) - usar ENDEREÇO
+      const destination = validStops[validStops.length - 1];
+      const destinationForUrl = formatStopForGoogleMaps(destination);
 
       // Construir URL do Google Maps (formato: /dir/origem/parada1/parada2/destino)
       let googleMapsUrl = 'https://www.google.com/maps/dir/';
@@ -617,7 +649,7 @@ export default function HomePage() {
         googleMapsUrl += waypointsArray.join('/') + '/';
       }
 
-      googleMapsUrl += `${destinationCoords}/`;
+      googleMapsUrl += `${destinationForUrl}/`;
 
       // Adicionar parâmetro para evitar pedágios se configurado
       if (typeof window !== 'undefined' && window.localStorage.getItem('rotafacil:avoidTolls') === 'true') {
@@ -625,6 +657,7 @@ export default function HomePage() {
       }
 
       console.log('🗺️ URL do Google Maps:', googleMapsUrl);
+      console.log('📍 Paradas enviadas:', validStops.map(s => ({ address: s.address, lat: s.lat, lng: s.lng })));
 
       // ✅ NOVO: Abrir Google Maps em nova aba
       const newWindow = window.open(googleMapsUrl, '_blank');
@@ -632,12 +665,12 @@ export default function HomePage() {
       if (newWindow) {
         // ✅ NOVO: Feedback visual e de voz
         voiceCommands.speak({
-          text: `Rota iniciada no Google Maps com ${stopsWithCoords.length} paradas.`,
+          text: `Rota iniciada no Google Maps com ${validStops.length} paradas.`,
           priority: 'high'
         });
 
         // ✅ NOVO: Mostrar confirmação
-        alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${stopsWithCoords.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
+        alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${validStops.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (typeof window !== 'undefined' && (window as any).gtag) {
@@ -645,7 +678,7 @@ export default function HomePage() {
           (window as any).gtag('event', 'route_started', {
             event_category: 'navigation',
             event_label: 'google_maps',
-            value: stopsWithCoords.length
+            value: validStops.length
           });
         }
       } else {
