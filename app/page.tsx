@@ -571,12 +571,13 @@ export default function HomePage() {
 
   // Função para iniciar rota no Google Maps
   const handleStartRoute = () => {
-    if (confirmedStops.length < 2) {
-      alert('Adicione pelo menos 2 paradas para iniciar uma rota.');
+    if (confirmedStops.length < 1) {
+      alert('Adicione pelo menos 1 parada para iniciar uma rota.');
       return;
     }
 
     console.log('🚀 Iniciando rota no Google Maps com', confirmedStops.length, 'paradas');
+    console.log('📍 Opções: useDeviceOrigin =', useDeviceOrigin, ', roundtrip =', roundtrip);
 
     try {
       // ✅ CORRIGIDO: Usar a ordem otimizada se disponível
@@ -585,9 +586,37 @@ export default function HomePage() {
       // Filtrar paradas com endereço ou coordenadas válidas
       const validStops = stopsToNavigate.filter(stop => stop.address || (stop.lat && stop.lng));
 
-      if (validStops.length < 2) {
-        alert('❌ Pelo menos 2 paradas precisam ter endereço ou coordenadas válidas para iniciar a rota.');
+      if (validStops.length < 1) {
+        alert('❌ Pelo menos 1 parada precisa ter endereço ou coordenadas válidas para iniciar a rota.');
         return;
+      }
+
+      // ✅ NOVO: Verificar se a localização do dispositivo está disponível quando useDeviceOrigin está ativo
+      const deviceCoords = deviceOrigin || deviceLocation;
+      if (useDeviceOrigin && !deviceCoords?.lat) {
+        alert('❌ Localização do dispositivo não disponível. Ative a localização ou desmarque "Usar minha localização como ponto de partida".');
+        return;
+      }
+
+      // ✅ LIMITE DO GOOGLE MAPS: URLs suportam ~10 waypoints
+      const MAX_GOOGLE_MAPS_WAYPOINTS = 9;
+      const totalStops = validStops.length;
+
+      if (totalStops > MAX_GOOGLE_MAPS_WAYPOINTS) {
+        const proceed = confirm(
+          `⚠️ O Google Maps suporta no máximo ${MAX_GOOGLE_MAPS_WAYPOINTS} paradas intermediárias.\n\n` +
+          `Você tem ${totalStops} paradas.\n\n` +
+          `Opções:\n` +
+          `• OK: Abrir rota com as primeiras ${MAX_GOOGLE_MAPS_WAYPOINTS} paradas\n` +
+          `• Cancelar: Voltar e remover paradas extras\n\n` +
+          `💡 Dica: Divida sua rota em partes menores para muitas entregas.`
+        );
+
+        if (!proceed) return;
+
+        // Limitar aos primeiros waypoints
+        validStops.splice(MAX_GOOGLE_MAPS_WAYPOINTS);
+        console.log(`⚠️ Rota limitada a ${MAX_GOOGLE_MAPS_WAYPOINTS} paradas`);
       }
 
       // ✅ NOVO: Função auxiliar para formatar endereço para URL do Google Maps
@@ -596,8 +625,8 @@ export default function HomePage() {
         // Se tem endereço textual, usar ele (mais preciso no Google Maps)
         if (stop.address && stop.address.length > 5) {
           // Adicionar cidade/estado se não estiver no endereço
-          const userCity = (deviceOrigin || deviceLocation)?.city;
-          const userState = (deviceOrigin || deviceLocation)?.state;
+          const userCity = deviceCoords?.city;
+          const userState = deviceCoords?.state;
 
           let fullAddress = stop.address;
 
@@ -621,56 +650,94 @@ export default function HomePage() {
         return '';
       };
 
-      // Construir origem
+      // ✅ CONSTRUIR ROTA COM BASE NAS OPÇÕES
       let origin: string;
-      if (useDeviceOrigin && (deviceOrigin || deviceLocation)) {
-        origin = `${(deviceOrigin || deviceLocation)?.lat},${(deviceOrigin || deviceLocation)?.lng}`;
+      let destination: string;
+      let waypoints: string[];
+
+      if (useDeviceOrigin && deviceCoords?.lat && deviceCoords?.lng) {
+        // 📍 ORIGEM = LOCALIZAÇÃO DO DISPOSITIVO
+        origin = `${deviceCoords.lat},${deviceCoords.lng}`;
+
+        if (roundtrip) {
+          // 🔄 ROUNDTRIP: Dispositivo -> Paradas -> Dispositivo
+          // Todos os stops são waypoints, destino final = origem (dispositivo)
+          waypoints = validStops.map(stop => formatStopForGoogleMaps(stop));
+          destination = origin; // Voltar ao ponto de partida
+          console.log('🔄 Modo: Roundtrip (voltar ao ponto de partida)');
+        } else {
+          // ➡️ SEM ROUNDTRIP: Dispositivo -> Paradas (última parada = destino)
+          waypoints = validStops.slice(0, -1).map(stop => formatStopForGoogleMaps(stop));
+          destination = formatStopForGoogleMaps(validStops[validStops.length - 1]);
+          console.log('➡️ Modo: Sem roundtrip (terminar na última parada)');
+        }
       } else {
+        // 📍 ORIGEM = PRIMEIRA PARADA (não usa localização do dispositivo)
         origin = formatStopForGoogleMaps(validStops[0]);
+
+        if (roundtrip && validStops.length > 1) {
+          // 🔄 ROUNDTRIP: Primeira parada -> Outras paradas -> Primeira parada
+          waypoints = validStops.slice(1).map(stop => formatStopForGoogleMaps(stop));
+          destination = origin; // Voltar à primeira parada
+          console.log('🔄 Modo: Roundtrip (voltar à primeira parada)');
+        } else {
+          // ➡️ SEM ROUNDTRIP: Primeira parada -> Outras paradas -> Última parada
+          waypoints = validStops.slice(1, -1).map(stop => formatStopForGoogleMaps(stop));
+          destination = validStops.length > 1
+            ? formatStopForGoogleMaps(validStops[validStops.length - 1])
+            : origin;
+          console.log('➡️ Modo: Sem roundtrip');
+        }
       }
-
-      // Construir waypoints (paradas intermediárias) usando ENDEREÇOS, não coordenadas
-      const waypointsArray = useDeviceOrigin
-        ? validStops.slice(0, -1).map(stop => formatStopForGoogleMaps(stop))
-        : validStops.slice(1, -1).map(stop => formatStopForGoogleMaps(stop));
-
-      // Destino (última parada) - usar ENDEREÇO
-      const destination = validStops[validStops.length - 1];
-      const destinationForUrl = formatStopForGoogleMaps(destination);
 
       // Construir URL do Google Maps (formato: /dir/origem/parada1/parada2/destino)
       let googleMapsUrl = 'https://www.google.com/maps/dir/';
 
-      if (origin) {
-        googleMapsUrl += `${origin}/`;
+      // Adicionar origem
+      googleMapsUrl += `${origin}/`;
+
+      // Adicionar waypoints (paradas intermediárias)
+      if (waypoints.length > 0) {
+        googleMapsUrl += waypoints.join('/') + '/';
       }
 
-      if (waypointsArray.length > 0) {
-        googleMapsUrl += waypointsArray.join('/') + '/';
-      }
-
-      googleMapsUrl += `${destinationForUrl}/`;
-
-      // Adicionar parâmetro para evitar pedágios se configurado
-      if (typeof window !== 'undefined' && window.localStorage.getItem('rotafacil:avoidTolls') === 'true') {
-        googleMapsUrl += '&avoid=tolls';
-      }
+      // Adicionar destino
+      googleMapsUrl += `${destination}/`;
 
       console.log('🗺️ URL do Google Maps:', googleMapsUrl);
-      console.log('📍 Paradas enviadas:', validStops.map(s => ({ address: s.address, lat: s.lat, lng: s.lng })));
+      console.log('📍 Resumo:', {
+        origem: useDeviceOrigin ? 'Localização do dispositivo' : 'Primeira parada',
+        waypoints: waypoints.length,
+        destino: roundtrip ? 'Voltar à origem' : 'Última parada',
+        totalParadas: validStops.length
+      });
 
       // ✅ NOVO: Abrir Google Maps em nova aba
       const newWindow = window.open(googleMapsUrl, '_blank');
 
       if (newWindow) {
         // ✅ NOVO: Feedback visual e de voz
+        const routeDescription = roundtrip
+          ? `Rota circular com ${validStops.length} paradas`
+          : `Rota com ${validStops.length} paradas`;
+
         voiceCommands.speak({
-          text: `Rota iniciada no Google Maps com ${validStops.length} paradas.`,
+          text: `${routeDescription} iniciada no Google Maps.`,
           priority: 'high'
         });
 
-        // ✅ NOVO: Mostrar confirmação
-        alert(`✅ Rota iniciada no Google Maps!\n\n🗺️ Paradas: ${validStops.length}\n📍 Origem: ${origin ? 'Sua localização' : 'Primeira parada'}\n🎯 Destino: ${destination.address}\n\nA rota foi aberta em uma nova aba.`);
+        // ✅ NOVO: Mostrar confirmação detalhada
+        const originLabel = useDeviceOrigin ? 'Sua localização' : validStops[0]?.address || 'Primeira parada';
+        const destinationLabel = roundtrip ? originLabel : (validStops[validStops.length - 1]?.address || 'Última parada');
+
+        alert(
+          `✅ Rota iniciada no Google Maps!\n\n` +
+          `🗺️ Total de paradas: ${validStops.length}\n` +
+          `📍 Origem: ${originLabel}\n` +
+          `🎯 Destino: ${destinationLabel}\n` +
+          `🔄 Retorno: ${roundtrip ? 'Sim' : 'Não'}\n\n` +
+          `A rota foi aberta em uma nova aba.`
+        );
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (typeof window !== 'undefined' && (window as any).gtag) {
