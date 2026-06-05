@@ -2,7 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { analytics, DailyStats, WeeklyStats } from '../lib/analytics';
-import { LiveMonitoringTab } from './LiveMonitoringTab';
+import dynamic from 'next/dynamic';
+
+const LiveMonitoringTab = dynamic(() => import('./LiveMonitoringTab').then(mod => mod.LiveMonitoringTab), {
+  ssr: false,
+  loading: () => (
+    <div className="py-8 flex flex-col items-center justify-center text-gray-400 space-y-3 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+      <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="font-semibold text-xs animate-pulse">Carregando Mapa...</p>
+    </div>
+  )
+});
 
 interface DashboardProps {
   isOpen: boolean;
@@ -27,11 +37,49 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
     setRecords(analytics.getPersonalRecords());
   };
 
+  const handleExportPDF = () => {
+    try {
+      const rawStops = window.localStorage.getItem('rotafacil:stops:v1');
+      if (!rawStops) {
+        alert('Nenhuma parada encontrada no sistema para exportar.');
+        return;
+      }
+      const stops = JSON.parse(rawStops);
+      
+      const stats = {
+        estimatedTime: stops.length * 3,
+        estimatedDistance: (stops.length * 0.5).toFixed(1),
+        estimatedCost: todayStats ? todayStats.totalFuelCost : stops.length * 0.5 * 0.58,
+        totalItems: stops.length
+      };
+
+      const reportData = {
+        items: stops.map((s: any, idx: number) => ({
+          sequence: s.sequence || idx + 1,
+          objectCode: s.objectCode || `OBJ-${idx + 1}`,
+          address: s.address,
+          completed: s.status === 'delivered' || s.completed || false,
+          status: s.status
+        })),
+        stats,
+        city: 'Cidade atual',
+        state: 'Estado atual',
+        date: new Date().toLocaleDateString('pt-BR')
+      };
+
+      window.localStorage.setItem('rotafacil:active_report_data', JSON.stringify(reportData));
+      window.open('/relatorio', '_blank');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao exportar relatório.');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col justify-between">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
           <div className="flex items-center justify-between">
@@ -73,32 +121,42 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <div className="p-6 overflow-y-auto max-h-[60vh] flex-1">
           {activeTab === 'today' && (
             <div className="space-y-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">📅 Estatísticas de Hoje</h3>
 
               {todayStats ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">{todayStats.totalDeliveries}</div>
-                    <div className="text-sm text-blue-800">Entregas</div>
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-blue-50 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">{todayStats.totalDeliveries}</div>
+                      <div className="text-sm text-blue-800">Entregas</div>
+                    </div>
+
+                    <div className="bg-green-50 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">{todayStats.totalDistance} km</div>
+                      <div className="text-sm text-green-800">Distância</div>
+                    </div>
+
+                    <div className="bg-purple-50 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-purple-600">{Math.floor(todayStats.totalTime / 60)}h {todayStats.totalTime % 60}m</div>
+                      <div className="text-sm text-purple-800">Tempo Total</div>
+                    </div>
+
+                    <div className="bg-yellow-50 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-yellow-600">R$ {todayStats.totalFuelCost.toFixed(2)}</div>
+                      <div className="text-sm text-yellow-800">Combustível</div>
+                    </div>
                   </div>
 
-                  <div className="bg-green-50 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">{todayStats.totalDistance} km</div>
-                    <div className="text-sm text-green-800">Distância</div>
-                  </div>
-
-                  <div className="bg-purple-50 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-600">{Math.floor(todayStats.totalTime / 60)}h {todayStats.totalTime % 60}m</div>
-                    <div className="text-sm text-purple-800">Tempo Total</div>
-                  </div>
-
-                  <div className="bg-yellow-50 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">R$ {todayStats.totalFuelCost.toFixed(2)}</div>
-                    <div className="text-sm text-yellow-800">Combustível</div>
-                  </div>
+                  <button
+                    onClick={handleExportPDF}
+                    className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm text-sm"
+                  >
+                    <span>📋</span>
+                    <span>Exportar Relatório PDF do Dia</span>
+                  </button>
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">

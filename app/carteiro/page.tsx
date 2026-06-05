@@ -304,6 +304,35 @@ export default function CarteiroPage() {
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
 
+  // ⛽ ESTADOS DA CALCULADORA DE COMBUSTÍVEL
+  const [fuelConsumption, setFuelConsumption] = useState<number>(10.0);
+  const [fuelPrice, setFuelPrice] = useState<number>(5.80);
+
+  // Inicializar do localStorage no client mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedConsumption = window.localStorage.getItem('rotafacil:fuel_consumption');
+      const savedPrice = window.localStorage.getItem('rotafacil:fuel_price');
+      if (savedConsumption) setFuelConsumption(parseFloat(savedConsumption));
+      if (savedPrice) setFuelPrice(parseFloat(savedPrice));
+    }
+  }, []);
+
+  // Salvar preferências no localStorage com helpers
+  const handleFuelConsumptionChange = (val: number) => {
+    setFuelConsumption(val);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rotafacil:fuel_consumption', String(val));
+    }
+  };
+
+  const handleFuelPriceChange = (val: number) => {
+    setFuelPrice(val);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rotafacil:fuel_price', String(val));
+    }
+  };
+
   useEffect(() => {
     setIsClientMounted(true);
   }, []);
@@ -339,17 +368,30 @@ export default function CarteiroPage() {
     );
   }, []);
 
-  // ✅ Otimização: Usar useMemo para cálculos que dependem de dados
+  // ✅ Otimização: Usar useMemo para calcular estatísticas com consumo e custos
   const routeStats = useMemo(() => {
     if (!processedData?.totalItems) return null;
     
     const totalItems = processedData.totalItems;
+    
+    // Obter distância da rota otimizada (se disponível) ou aproximar
+    let distance = totalItems * 0.5;
+    if (processedData.customMapData?.optimizationInfo?.totalDistance) {
+      const parsedDist = parseFloat(processedData.customMapData.optimizationInfo.totalDistance);
+      if (!isNaN(parsedDist)) distance = parsedDist;
+    } else if (processedData.googleMapsUrl) {
+      distance = totalItems * 0.45;
+    }
+
+    const estimatedCost = (distance * fuelPrice) / fuelConsumption;
+    
     return {
       estimatedTime: totalItems * 3, // 3 min por parada
-      estimatedDistance: (totalItems * 0.5).toFixed(1), // 0.5 km por parada
+      estimatedDistance: distance.toFixed(1),
+      estimatedCost: isNaN(estimatedCost) ? 0 : estimatedCost,
       totalItems
     };
-  }, [processedData?.totalItems]);
+  }, [processedData, fuelConsumption, fuelPrice]);
 
   // ✅ Otimização: Função de limpeza de erro
   const clearError = useCallback(() => {
@@ -673,6 +715,24 @@ export default function CarteiroPage() {
     }
   };
 
+  const handleExportPDFReport = useCallback(() => {
+    if (!processedData) return;
+    
+    const reportData = {
+      items: editableItems,
+      userLocation,
+      stats: routeStats,
+      city: processedData.city,
+      state: processedData.state,
+      date: new Date().toLocaleDateString('pt-BR')
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('rotafacil:active_report_data', JSON.stringify(reportData));
+      window.open('/relatorio', '_blank');
+    }
+  }, [processedData, editableItems, userLocation, routeStats]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-indigo-300">
       {/* Header */}
@@ -912,12 +972,36 @@ export default function CarteiroPage() {
               🎯 Resultados do Processamento
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-800 mb-2">📊 Estatísticas</h3>
-                <p className="text-blue-700">Total de itens: {processedData.totalItems || 0}</p>
-                <p className="text-blue-700">Cidade: {processedData.city || 'Não especificada'}</p>
-                <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg flex flex-col justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-800 mb-2">📊 Estatísticas</h3>
+                  <p className="text-blue-700">Total de itens: {processedData.totalItems || 0}</p>
+                  <p className="text-blue-700">Cidade: {processedData.city || 'Não especificada'}</p>
+                  <p className="text-blue-700">Estado: {processedData.state || 'Não especificado'}</p>
+                </div>
+                
+                <div className="mt-4 space-y-2">
+                  {processedData.googleMapsUrl && (
+                    <a
+                      href={processedData.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 text-center"
+                    >
+                      <span>🗺️</span>
+                      <span>Abrir no Google Maps</span>
+                    </a>
+                  )}
+                  
+                  <button
+                    onClick={handleExportPDFReport}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>📋</span>
+                    <span>Relatório de Entregas (PDF)</span>
+                  </button>
+                </div>
               </div>
               
               <div className="bg-purple-50 p-4 rounded-lg">
@@ -942,6 +1026,12 @@ export default function CarteiroPage() {
                         {routeStats.estimatedDistance} km
                       </span>
                     </div>
+                    <div className="flex justify-between font-bold border-t border-purple-200 pt-2 mt-2">
+                      <span className="text-purple-900">⛽ Custo Combustível:</span>
+                      <span className="text-purple-900">
+                        R$ {routeStats.estimatedCost.toFixed(2)}
+                      </span>
+                    </div>
                     {userLocation && (
                       <div className="mt-3 p-2 bg-green-100 rounded border border-green-200">
                         <p className="text-xs text-green-700 text-center">
@@ -952,27 +1042,34 @@ export default function CarteiroPage() {
                   </div>
                 )}
               </div>
-              
-              {processedData.googleMapsUrl && (
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-green-800 mb-2">🗺️ Rota Gerada</h3>
-                  <a
-                    href={processedData.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-block"
-                  >
-                    🚀 Abrir no Google Maps
-                  </a>
-                  <div className="mt-3 text-sm text-green-700">
-                    <p>📍 <strong>Origem:</strong> Sua localização atual ({userLocation?.lat?.toFixed(6)}, {userLocation?.lng?.toFixed(6)})</p>
-                    <p>🏁 <strong>Destino:</strong> Sua localização atual ({userLocation?.lat?.toFixed(6)}, {userLocation?.lng?.toFixed(6)})</p>
-                    <p className="text-xs mt-2 bg-green-200 p-2 rounded">
-                      ✅ <strong>Rota Circular:</strong> Inicia e termina na sua localização
-                    </p>
+
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <h3 className="font-semibold text-amber-800 mb-2">⛽ Consumo & Custos</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-700 mb-1">CONSUMO MÉDIO (km/L)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={fuelConsumption}
+                      onChange={(e) => handleFuelConsumptionChange(Math.max(1, parseFloat(e.target.value) || 10))}
+                      className="w-full bg-white border border-amber-300 rounded px-3 py-1.5 text-sm font-semibold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-700 mb-1">PREÇO DO COMBUSTÍVEL (R$/L)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.1"
+                      value={fuelPrice}
+                      onChange={(e) => handleFuelPriceChange(Math.max(0.1, parseFloat(e.target.value) || 5.8))}
+                      className="w-full bg-white border border-amber-300 rounded px-3 py-1.5 text-sm font-semibold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* ✅ MAPA CUSTOMIZADO LEAFLET (para rotas grandes) */}
               {processedData.useCustomMap && processedData.customMapData && (
@@ -1103,8 +1200,6 @@ export default function CarteiroPage() {
                             // ✅ MAPBOX - ROTA PROFISSIONAL
                             const coords = processedData.customMapData.coordinates;
                             if (coords && coords.length > 0) {
-                              const waypointsStr = coords.map(coord => `${coord.lng},${coord.lat}`).join(';');
-                              const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${waypointsStr}?geometries=geojson&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
                               // Redirecionar para Mapbox web app
                               const mapboxWebUrl = `https://www.mapbox.com/directions/#profile=driving&waypoints=${coords.map(c => `${c.lng},${c.lat}`).join(';')}`;
                               window.open(mapboxWebUrl, '_blank');
