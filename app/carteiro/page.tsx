@@ -18,6 +18,7 @@ const MapDisplay = dynamic(() => import('../../components/MapDisplay'), {
 });
 import CarteiroAutomation from '../../components/CarteiroAutomation';
 import CarteiroUpload from '../../components/CarteiroUpload';
+import SignatureModal from '../../components/SignatureModal';
 
 // ✅ INTERFACES TIPADAS ESPECÍFICAS
 interface ECTItem {
@@ -29,6 +30,11 @@ interface ECTItem {
   lng?: number;
   correctedAddress?: string;
   id?: string; // ✅ ADICIONAR ID para compatibilidade
+  status?: 'confirmed' | 'pending' | 'optimized' | 'delivered' | 'failed';
+  completed?: boolean;
+  signature?: string;
+  receiverName?: string;
+  receiverDoc?: string;
 }
 
 // ✅ INTERFACE: Endereço do CarteiroUpload
@@ -304,6 +310,13 @@ export default function CarteiroPage() {
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
 
+  // ✍️ ESTADOS DE ASSINATURA E STATUS
+  const [signingItemIndex, setSigningItemIndex] = useState<number | null>(null);
+
+  const signingItem = signingItemIndex !== null && processedData?.items
+    ? processedData.items[signingItemIndex]
+    : null;
+
   // ⛽ ESTADOS DA CALCULADORA DE COMBUSTÍVEL
   const [fuelConsumption, setFuelConsumption] = useState<number>(10.0);
   const [fuelPrice, setFuelPrice] = useState<number>(5.80);
@@ -331,6 +344,66 @@ export default function CarteiroPage() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('rotafacil:fuel_price', String(val));
     }
+  };
+
+  // ✍️ AÇÕES DE ASSINATURA E CONFIRMAÇÃO DE STATUS
+  const handleOpenSignature = (index: number) => {
+    setSigningItemIndex(index);
+  };
+
+  const handleSaveSignature = (data: { signatureUrl: string; receiverName: string; receiverDoc: string }) => {
+    if (signingItemIndex === null || !processedData?.items) return;
+    
+    const updatedItems = [...processedData.items];
+    updatedItems[signingItemIndex] = {
+      ...updatedItems[signingItemIndex],
+      status: 'delivered',
+      completed: true,
+      signature: data.signatureUrl,
+      receiverName: data.receiverName,
+      receiverDoc: data.receiverDoc
+    };
+
+    setProcessedData({
+      ...processedData,
+      items: updatedItems
+    });
+    
+    setSigningItemIndex(null);
+  };
+
+  const handleMarkAsFailed = (index: number) => {
+    if (!processedData?.items) return;
+    const updatedItems = [...processedData.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      status: 'failed',
+      completed: false,
+      signature: undefined,
+      receiverName: undefined,
+      receiverDoc: undefined
+    };
+    setProcessedData({
+      ...processedData,
+      items: updatedItems
+    });
+  };
+
+  const handleResetStatus = (index: number) => {
+    if (!processedData?.items) return;
+    const updatedItems = [...processedData.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      status: 'pending',
+      completed: false,
+      signature: undefined,
+      receiverName: undefined,
+      receiverDoc: undefined
+    };
+    setProcessedData({
+      ...processedData,
+      items: updatedItems
+    });
   };
 
   useEffect(() => {
@@ -1276,19 +1349,100 @@ export default function CarteiroPage() {
             <div className="space-y-3">
               <h3 className="font-semibold text-gray-800">📍 Endereços Processados</h3>
               {processedData.items && processedData.items.length > 0 ? (
-                processedData.items.map((item, index) => (
-                  <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-700">
-                        {item.sequence?.toString().padStart(3, '0') || '000'} - {item.objectCode || 'N/A'}
-                      </span>
-                      {item.cep && (
-                        <span className="text-sm text-gray-500">CEP: {item.cep}</span>
+                processedData.items.map((item, index) => {
+                  const isCompleted = item.completed || item.status === 'delivered';
+                  const isFailed = item.status === 'failed';
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className={`border-l-4 p-4 rounded-r-xl transition-all ${
+                        isCompleted ? 'border-green-500 bg-green-50/40' :
+                        isFailed ? 'border-red-500 bg-red-50/40' :
+                        'border-blue-500 bg-white shadow-sm'
+                      } hover:shadow-md`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-800 text-sm">
+                            #{item.sequence?.toString().padStart(3, '0') || '000'} - {item.objectCode || 'N/A'}
+                          </span>
+                          
+                          {/* Badges de Status */}
+                          {isCompleted ? (
+                            <span className="bg-green-100 text-green-800 text-[10px] font-black uppercase px-2 py-0.5 rounded border border-green-200">
+                              ✓ Entregue
+                            </span>
+                          ) : isFailed ? (
+                            <span className="bg-red-100 text-red-800 text-[10px] font-black uppercase px-2 py-0.5 rounded border border-red-200">
+                              ⚠️ Falhou
+                            </span>
+                          ) : (
+                            <span className="bg-yellow-100 text-yellow-800 text-[10px] font-black uppercase px-2 py-0.5 rounded border border-yellow-200">
+                              ⏳ Pendente
+                            </span>
+                          )}
+                        </div>
+
+                        {item.cep && (
+                          <span className="text-xs text-gray-500 font-mono">CEP: {item.cep}</span>
+                        )}
+                      </div>
+                      
+                      <p className="text-gray-700 text-sm leading-relaxed mb-3">{item.address || 'Endereço não disponível'}</p>
+
+                      {/* Informações de Assinatura se já Entregue */}
+                      {isCompleted && (item.receiverName || item.signature) && (
+                        <div className="bg-white/80 border border-green-150 rounded-lg p-3 mb-3 text-xs flex flex-wrap items-center justify-between gap-4">
+                          <div>
+                            <p className="text-gray-500 font-bold uppercase text-[9px] tracking-wider">Recebedor:</p>
+                            <p className="text-gray-800 font-bold text-sm">{item.receiverName || 'Não Informado'}</p>
+                            {item.receiverDoc && (
+                              <p className="text-gray-500 mt-0.5">Doc: {item.receiverDoc}</p>
+                            )}
+                          </div>
+                          {item.signature && (
+                            <div className="bg-gray-50 border border-gray-200 rounded p-1">
+                              <img 
+                                src={item.signature} 
+                                alt="Assinatura" 
+                                className="max-h-10 max-w-[100px] object-contain"
+                              />
+                            </div>
+                          )}
+                        </div>
                       )}
+
+                      {/* Botões de Ação */}
+                      <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-100">
+                        {!isCompleted && !isFailed && (
+                          <>
+                            <button
+                              onClick={() => handleOpenSignature(index)}
+                              className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                            >
+                              ✍️ Registrar Entrega
+                            </button>
+                            <button
+                              onClick={() => handleMarkAsFailed(index)}
+                              className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs px-3.5 py-1.5 rounded-lg transition-colors border border-red-200"
+                            >
+                              ❌ Falhou / Ausente
+                            </button>
+                          </>
+                        )}
+                        {(isCompleted || isFailed) && (
+                          <button
+                            onClick={() => handleResetStatus(index)}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold text-xs px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            🔄 Resetar Status
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-gray-600">{item.address || 'Endereço não disponível'}</p>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-gray-500 text-center py-4">
                   Nenhum endereço processado ainda.
@@ -1376,6 +1530,17 @@ export default function CarteiroPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Modal de Assinatura Digital */}
+        {signingItem !== null && (
+          <SignatureModal
+            isOpen={signingItem !== null}
+            onClose={() => setSigningItemIndex(null)}
+            onSave={handleSaveSignature}
+            objectCode={signingItem.objectCode || 'Sem código'}
+            address={signingItem.address}
+          />
         )}
       </main>
     </div>

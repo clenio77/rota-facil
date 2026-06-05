@@ -10,6 +10,9 @@ interface ReportItem {
   cep?: string;
   status?: 'confirmed' | 'pending' | 'optimized' | 'delivered' | 'failed';
   completed?: boolean;
+  signature?: string;
+  receiverName?: string;
+  receiverDoc?: string;
 }
 
 interface ReportData {
@@ -216,8 +219,32 @@ export default function RelatorioPage() {
                           {isCompleted ? 'Entregue' : isFailed ? 'Falhou' : 'Pendente'}
                         </span>
                       </td>
-                      <td className="p-2.5 text-center border-gray-300 text-[10px] text-gray-400">
-                        {isCompleted ? 'Assinado digitalmente' : '___________________'}
+                      <td className="p-2.5 text-center border-r border-gray-300">
+                        {item.signature ? (
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <img 
+                              src={item.signature} 
+                              alt="Assinatura" 
+                              className="max-h-10 max-w-[120px] object-contain border border-gray-200 rounded bg-white p-0.5" 
+                            />
+                            {item.receiverName && (
+                              <span className="text-[9px] text-gray-700 font-bold block leading-none">
+                                {item.receiverName}
+                              </span>
+                            )}
+                            {item.receiverDoc && (
+                              <span className="text-[8px] text-gray-500 block leading-none">
+                                Doc: {item.receiverDoc}
+                              </span>
+                            )}
+                          </div>
+                        ) : isCompleted ? (
+                          <span className="text-green-700 font-bold text-[10px]">Entregue (Sem Assinatura)</span>
+                        ) : isFailed ? (
+                          <span className="text-red-650 font-bold text-[10px]">Não Entregue</span>
+                        ) : (
+                          <span className="text-gray-400 font-mono tracking-widest text-[9px]">_________________</span>
+                        )}
                       </td>
                     </tr>
                   );
