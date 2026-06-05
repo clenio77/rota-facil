@@ -792,7 +792,7 @@ export default function CarteiroPage() {
     if (!processedData) return;
     
     const reportData = {
-      items: editableItems,
+      items: processedData.items || editableItems,
       userLocation,
       stats: routeStats,
       city: processedData.city,

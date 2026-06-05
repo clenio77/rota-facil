@@ -59,7 +59,10 @@ export default function Dashboard({ isOpen, onClose }: DashboardProps) {
           objectCode: s.objectCode || `OBJ-${idx + 1}`,
           address: s.address,
           completed: s.status === 'delivered' || s.completed || false,
-          status: s.status
+          status: s.status,
+          signature: s.signature || null,
+          receiverName: s.receiverName || null,
+          receiverDoc: s.receiverDoc || null
         })),
         stats,
         city: 'Cidade atual',
