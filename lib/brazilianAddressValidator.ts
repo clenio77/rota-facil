@@ -227,17 +227,17 @@ export function isLikelyBrazilianAddress(text: string): {
 export function correctCommonOCRErrors(text: string): string {
   return text
     // Correções de caracteres similares
-    .replace(/[0O]/g, match => {
+    .replace(/[0O]/g, (match, offset, fullText) => {
       // Se está no meio de números, provavelmente é 0
-      const before = text[text.indexOf(match) - 1];
-      const after = text[text.indexOf(match) + 1];
-      if (/\d/.test(before) || /\d/.test(after)) {
+      const before = fullText[offset - 1];
+      const after = fullText[offset + 1];
+      if ((before && /\d/.test(before)) || (after && /\d/.test(after))) {
         return '0';
       }
       return 'O';
     })
-    .replace(/[1I|l]/g, match => {
-      const context = text.substring(Math.max(0, text.indexOf(match) - 2), text.indexOf(match) + 3);
+    .replace(/[1I|l]/g, (match, offset, fullText) => {
+      const context = fullText.substring(Math.max(0, offset - 2), offset + 3);
       if (/\d/.test(context)) {
         return '1';
       }

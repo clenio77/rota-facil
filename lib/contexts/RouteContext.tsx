@@ -20,24 +20,24 @@ const RouteContext = createContext<RouteContextType | undefined>(undefined);
 const STORAGE_KEY = 'rotafacil:stops:v1';
 
 export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [stops, setStops] = useState<Stop[]>([]);
+    const [stops, setStops] = useState<Stop[]>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const raw = window.localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load stops from localStorage', e);
+            }
+        }
+        return [];
+    });
     const [routeSummary, setRouteSummaryState] = useState<RouteSummary>({});
     const [isOptimizing, setIsOptimizing] = useState(false);
-
-    // Load stops from localStorage on first render
-    useEffect(() => {
-        try {
-            const raw = window.localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                    setStops(parsed);
-                }
-            }
-        } catch (e) {
-            console.error('Failed to load stops from localStorage', e);
-        }
-    }, []);
 
     // Persist stops to localStorage
     useEffect(() => {
@@ -77,13 +77,15 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         setIsOptimizing(true);
         try {
-            const response = await fetch('/api/route-optimize', {
+            const endpoint = validStops.length > 25 ? '/api/large-route-optimize' : '/api/route-optimize';
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     stops: validStops.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })),
                     origin,
                     roundtrip,
+                    maxClusterSize: 15
                 }),
             });
 
@@ -91,7 +93,7 @@ export const RouteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             if (result.success) {
                 const optimizedStops = stops.map(stop => {
-                    const optimizedData = result.optimizedStops.find((os: any) => os.id === stop.id);
+                    const optimizedData = result.optimizedStops.find((os: any) => String(os.id) === String(stop.id));
                     if (optimizedData) {
                         return {
                             ...stop,

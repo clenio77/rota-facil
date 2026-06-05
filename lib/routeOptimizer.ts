@@ -287,6 +287,10 @@ export function antColonyOptimization(
     };
   }
 
+  // Mapeamento de ID para índice sequencial 0..N-1
+  const idToIdx = new Map<string, number>();
+  points.forEach((p, idx) => idToIdx.set(p.id, idx));
+
   // Matriz de feromônios
   const pheromones = Array(points.length).fill(0).map(() => 
     Array(points.length).fill(1)
@@ -300,7 +304,7 @@ export function antColonyOptimization(
     const antRoutes: RoutePoint[][] = [];
     
     for (let ant = 0; ant < antCount; ant++) {
-      const route = constructAntRoute(points, pheromones, alpha, beta);
+      const route = constructAntRoute(points, pheromones, alpha, beta, idToIdx);
       antRoutes.push(route);
       
       const distance = calculateTotalDistance(route);
@@ -326,11 +330,11 @@ export function antColonyOptimization(
         const current = route[i];
         const next = route[i + 1];
         
-        // ✅ CORREÇÃO: Usar acesso seguro aos índices
-        const currentIndex = parseInt(current.id) - 1;
-        const nextIndex = parseInt(next.id) - 1;
+        const currentIndex = idToIdx.get(current.id);
+        const nextIndex = idToIdx.get(next.id);
         
-        if (currentIndex >= 0 && currentIndex < pheromones.length && 
+        if (currentIndex !== undefined && nextIndex !== undefined &&
+            currentIndex >= 0 && currentIndex < pheromones.length && 
             nextIndex >= 0 && nextIndex < pheromones.length) {
           pheromones[currentIndex][nextIndex] += pheromoneDeposit;
           pheromones[nextIndex][currentIndex] += pheromoneDeposit;
@@ -423,7 +427,8 @@ function constructAntRoute(
   points: RoutePoint[], 
   pheromones: number[][], 
   alpha: number, 
-  beta: number
+  beta: number,
+  idToIdx: Map<string, number>
 ): RoutePoint[] {
   const unvisited = [...points];
   const route = [unvisited.shift()!];
@@ -431,11 +436,12 @@ function constructAntRoute(
   while (unvisited.length > 0) {
     const current = route[route.length - 1];
     const probabilities = unvisited.map(point => {
-      const currentIndex = parseInt(current.id) - 1;
-      const pointIndex = parseInt(point.id) - 1;
+      const currentIndex = idToIdx.get(current.id);
+      const pointIndex = idToIdx.get(point.id);
       
       let pheromone = 1;
-      if (currentIndex >= 0 && currentIndex < pheromones.length && 
+      if (currentIndex !== undefined && pointIndex !== undefined &&
+          currentIndex >= 0 && currentIndex < pheromones.length && 
           pointIndex >= 0 && pointIndex < pheromones.length) {
         pheromone = pheromones[currentIndex][pointIndex];
       }
